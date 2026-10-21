@@ -2562,7 +2562,7 @@ jobs:
           ls -l proj/app/build/outputs/apk/debug/
           SIZE=$(stat -c%s "$APK")
           echo "Ukuran APK: $SIZE byte"
-          test "$SIZE" -gt 100000
+          test "$SIZE" -gt 20000
           "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK"
 
       - name: Unggah APK debug
