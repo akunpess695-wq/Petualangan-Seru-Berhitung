@@ -1,4 +1,4 @@
-name: Build APK Berhitung
+name: Build APK Belajar Bersama
 
 on:
   push:
@@ -68,8 +68,8 @@ jobs:
                   applicationId "com.petualangan.berhitung"
                   minSdk 21
                   targetSdk 34
-                  versionCode 8
-                  versionName "3.4"
+                  versionCode 9
+                  versionName "4.0"
               }
 
               signingConfigs {
@@ -101,7 +101,7 @@ jobs:
               <application
                   android:allowBackup="true"
                   android:icon="@drawable/ic_launcher"
-                  android:label="Petualangan Berhitung"
+                  android:label="Belajar Bersama"
                   android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
                   <activity
@@ -138,10 +138,13 @@ jobs:
           package com.petualangan.berhitung;
 
           import android.app.Activity;
+          import android.app.AlertDialog;
+          import android.content.Intent;
           import android.content.SharedPreferences;
           import android.graphics.Color;
           import android.graphics.Typeface;
           import android.graphics.drawable.GradientDrawable;
+          import android.net.Uri;
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
@@ -157,12 +160,27 @@ jobs:
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
           import android.widget.TextView;
+          import android.widget.Toast;
 
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          import java.io.ByteArrayOutputStream;
+          import java.io.IOException;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+          import java.nio.charset.StandardCharsets;
+          import java.util.ArrayList;
           import java.util.Arrays;
+          import java.util.Collections;
+          import java.util.Locale;
           import java.util.Random;
 
           public class MainActivity extends Activity {
 
+              private static final String APP_NAME = "Belajar Bersama";
+              private static final String BANK_FILE = "bank.json";
+              private static final int REQ_IMPORT = 41;
               private static final int TOTAL = 10;
               private static final int MAX_PLAYERS = 4;
               private static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -221,6 +239,10 @@ jobs:
                       "\uD83D\uDC31", "\uD83D\uDC36", "\uD83D\uDC30", "\uD83D\uDC3C"
               };
               private static final int[] OPT_COLORS = {BLUE, PURPLE, TEAL, PINK};
+              // Mata pelajaran: 0 Matematika, 1 Bahasa Indonesia, 2 Bahasa Inggris
+              private static final String[] SUBJ_NAMES = {"Matematika", "Bahasa Indonesia", "Bahasa Inggris"};
+              private static final String[] SUBJ_ICON = {"\uD83D\uDD22", "\uD83D\uDCD6", "\uD83C\uDF0D"};
+              private static final int[] SUBJ_COLOR = {ORANGE, TEAL, BLUE};
 
               // Batas waktu per soal yang bisa diatur (detik)
               private static final int SECS_MIN = 3;
@@ -229,10 +251,22 @@ jobs:
               private static class Q {
                   String text;
                   String full;
+                  String[] sopts;
+                  String expl;
                   int answer;
                   int correctIdx;
                   int trap = -1;
                   final int[] opts = new int[4];
+              }
+
+              // Soal dari guru (pilihan ganda)
+              private static class B {
+                  int subj;
+                  int kelas;
+                  String text;
+                  final String[] opt = new String[4];
+                  int key;
+                  String expl = "";
               }
 
               private interface Pick {
@@ -262,6 +296,10 @@ jobs:
               private final int[][] pPick = new int[MAX_PLAYERS][TOTAL];
               private boolean rekorNow;
               private int reviewPlayer;
+              private final ArrayList<B> bank = new ArrayList<>();
+              private String importMsg = "";
+              private int total = TOTAL;
+              private int subj = 0;
               private int cur;
 
               // Giliran berjalan
@@ -306,6 +344,7 @@ jobs:
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   prefs = getSharedPreferences("berhitung", MODE_PRIVATE);
+                  loadBank();
                   showMenu();
               }
 
@@ -469,11 +508,23 @@ jobs:
               }
 
               private String bestKey() {
-                  return "best_k" + kelas + (timed ? "_t" : "");
+                  return "best_k" + kelas + (mode == 7 ? "_b" + subj : "") + (timed ? "_t" : "");
+              }
+
+              private String timeLabel() {
+                  return timed ? "Berwaktu " + secs + " detik" : "Tanpa waktu";
               }
 
               private String modeLabel() {
-                  return timed ? "Berwaktu " + secs + " detik" : "Tanpa waktu";
+                  return mode == 7 ? SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
+              }
+
+              private String optText(Q q, int i) {
+                  return q.sopts != null ? q.sopts[i] : fmt(q.opts[i]);
+              }
+
+              private int bankOptionSize(int len) {
+                  return len <= 10 ? 20 : len <= 24 ? 16 : 13;
               }
 
               private void saveNames() {
@@ -523,8 +574,8 @@ jobs:
                   hero.setBackground(hg);
                   hero.setElevation(dp(6));
                   hero.addView(text("\u2B50", 40, Color.WHITE, false), lp(WRAP, 0));
-                  hero.addView(text("Petualangan Berhitung", 26, Color.WHITE, true), lp(WRAP, 2));
-                  hero.addView(text("Ayo belajar berhitung sambil bermain!", 14,
+                  hero.addView(text(APP_NAME, 26, Color.WHITE, true), lp(WRAP, 2));
+                  hero.addView(text("Ayo belajar sambil bermain!", 14,
                           Color.parseColor("#FFF3E0"), false), lp(WRAP, 4));
                   c.addView(hero, lp(WRAP, 0));
 
@@ -535,16 +586,102 @@ jobs:
                       prefs.edit().putInt("kelas", k).apply();
                       showMenu();
                   }), lp(dp(46), 10));
-                  ck.addView(text(KELAS_DESC[kelas] + " \u2022 " + KELAS_LIVES[kelas] + " nyawa",
-                          13, DARK, false), lp(WRAP, 8));
-                  if (np == 1) {
-                      ck.addView(text("\uD83C\uDFC6 Rekor: " + prefs.getInt(bestKey(), 0), 13, PURPLE, true),
-                              lp(WRAP, 4));
-                  }
                   c.addView(ck, lp(WRAP, 18));
 
-                  // Pilih permainan
-                  c.addView(text("Pilih permainan", 16, DARK, true), lp(WRAP, 20));
+                  // Pilih pelajaran
+                  c.addView(text("Pilih pelajaran", 16, DARK, true), lp(WRAP, 20));
+                  for (int s = 0; s < 3; s++) {
+                      final int sj = s;
+                      int n = countBank(s, kelas);
+                      String sub;
+                      if (s == 0) {
+                          sub = n > 0 ? "Latihan hitung + " + n + " soal guru" : "Latihan hitung";
+                      } else {
+                          sub = n > 0 ? n + " soal" : "Belum ada soal";
+                      }
+                      LinearLayout t = subjectTile(SUBJ_ICON[s], SUBJ_NAMES[s], sub, SUBJ_COLOR[s]);
+                      t.setOnClickListener(v -> openSubject(sj));
+                      c.addView(t, lp(dp(84), 12));
+                  }
+
+                  // Pengaturan (pemain dan waktu)
+                  String who = (np == 1) ? "Main sendiri" : np + " pemain";
+                  Button st = button("\u2699  " + who + " \u2022 " + timeLabel() + "  \u203A", Color.WHITE, 14);
+                  st.setTextColor(DARK);
+                  st.setElevation(dp(3));
+                  c.addView(st, lp(dp(52), 22));
+                  st.setOnClickListener(v -> showSettings());
+
+                  // Soal dari guru
+                  Button gr = button("\uD83D\uDCDA  Soal dari Guru  \u203A", Color.WHITE, 14);
+                  gr.setTextColor(DARK);
+                  gr.setElevation(dp(3));
+                  c.addView(gr, lp(dp(52), 12));
+                  gr.setOnClickListener(v -> {
+                      importMsg = "";
+                      showGuru();
+                  });
+
+                  c.setFocusableInTouchMode(true);
+                  c.requestFocus();
+                  wrap(c);
+              }
+
+              private LinearLayout subjectTile(String icon, String label, String sub, int color) {
+                  LinearLayout t = new LinearLayout(this);
+                  t.setOrientation(LinearLayout.HORIZONTAL);
+                  t.setGravity(Gravity.CENTER_VERTICAL);
+                  t.setPadding(dp(18), 0, dp(18), 0);
+                  t.setBackground(box(color, 22));
+                  t.setElevation(dp(5));
+                  t.addView(text(icon, 34, Color.WHITE, false), new LinearLayout.LayoutParams(dp(52), WRAP));
+                  LinearLayout col = new LinearLayout(this);
+                  col.setOrientation(LinearLayout.VERTICAL);
+                  TextView n = text(label, 20, Color.WHITE, true);
+                  n.setGravity(Gravity.START);
+                  TextView s = text(sub, 13, Color.parseColor("#FFF3E0"), false);
+                  s.setGravity(Gravity.START);
+                  col.addView(n, new LinearLayout.LayoutParams(WRAP, WRAP));
+                  col.addView(s, new LinearLayout.LayoutParams(WRAP, WRAP));
+                  t.addView(col, new LinearLayout.LayoutParams(0, WRAP, 1f));
+                  t.setClickable(true);
+                  return t;
+              }
+
+              private void openSubject(int s) {
+                  if (s == 0) {
+                      showMath();
+                  } else if (countBank(s, kelas) == 0) {
+                      Toast.makeText(this, "Belum ada soal " + SUBJ_NAMES[s] + " untuk " + KELAS_NAMES[kelas]
+                              + ". Guru bisa menambahkannya lewat tombol Soal dari Guru.", Toast.LENGTH_LONG).show();
+                  } else {
+                      startBank(s);
+                  }
+              }
+
+              private void startBank(int s) {
+                  if (countBank(s, kelas) == 0) {
+                      showMenu();
+                      return;
+                  }
+                  subj = s;
+                  startGame(7);
+              }
+
+              // ---------- Menu Matematika ----------
+
+              private void showMath() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 6;
+                  nameFields = null;
+
+                  LinearLayout c = column();
+                  c.addView(text("\uD83D\uDD22 Matematika", 26, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(pill(KELAS_NAMES[kelas], KELAS_COLOR[kelas]), lpw(10));
+                  c.addView(text(KELAS_DESC[kelas] + " \u2022 " + KELAS_LIVES[kelas] + " nyawa",
+                          13, DARK, false), lp(WRAP, 10));
+
+                  c.addView(text("Pilih permainan", 16, DARK, true), lp(WRAP, 16));
                   LinearLayout r1 = new LinearLayout(this);
                   r1.setOrientation(LinearLayout.HORIZONTAL);
                   c.addView(r1, lp(dp(96), 10));
@@ -563,18 +700,476 @@ jobs:
                   LinearLayout r4 = new LinearLayout(this);
                   r4.setOrientation(LinearLayout.HORIZONTAL);
                   c.addView(r4, lp(dp(96), 12));
-                  r4.addView(tile("?", "Isi Titik", INDIGO, 6), weight(0, 0));
+                  if (countBank(0, kelas) > 0) {
+                      r4.addView(tile("?", "Isi Titik", INDIGO, 6), weight(0, 6));
+                      LinearLayout tg = tile("\uD83D\uDCDD", "Soal Guru", RED, 7);
+                      tg.setOnClickListener(v -> startBank(0));
+                      r4.addView(tg, weight(6, 0));
+                  } else {
+                      r4.addView(tile("?", "Isi Titik", INDIGO, 6), weight(0, 0));
+                  }
 
-                  // Pengaturan (pemain dan waktu)
-                  String who = (np == 1) ? "Main sendiri" : np + " pemain";
-                  Button st = button("\u2699  " + who + " \u2022 " + modeLabel() + "  \u203A", Color.WHITE, 14);
-                  st.setTextColor(DARK);
-                  st.setElevation(dp(3));
-                  c.addView(st, lp(dp(52), 22));
-                  st.setOnClickListener(v -> showSettings());
+                  Button back = button("Kembali", GRAY, 14);
+                  back.setTextColor(DARK);
+                  c.addView(back, lp(dp(46), 22));
+                  back.setOnClickListener(v -> showMenu());
 
-                  c.setFocusableInTouchMode(true);
-                  c.requestFocus();
+                  wrap(c);
+              }
+
+              // ---------- Soal dari guru: simpan, impor, tampilan ----------
+
+              private int countBank(int s, int k0) {
+                  int n = 0;
+                  for (B b : bank) {
+                      if (b.subj == s && b.kelas == k0 + 1) {
+                          n++;
+                      }
+                  }
+                  return n;
+              }
+
+              private String readAll(InputStream in) throws IOException {
+                  try {
+                      ByteArrayOutputStream out = new ByteArrayOutputStream();
+                      byte[] buf = new byte[4096];
+                      int n;
+                      int size = 0;
+                      while ((n = in.read(buf)) != -1) {
+                          out.write(buf, 0, n);
+                          size += n;
+                          if (size > 3000000) {
+                              throw new IOException("Berkas terlalu besar");
+                          }
+                      }
+                      return new String(out.toByteArray(), StandardCharsets.UTF_8);
+                  } finally {
+                      in.close();
+                  }
+              }
+
+              private void loadBank() {
+                  bank.clear();
+                  try {
+                      JSONArray arr = new JSONArray(readAll(openFileInput(BANK_FILE)));
+                      for (int i = 0; i < arr.length(); i++) {
+                          JSONObject o = arr.getJSONObject(i);
+                          B b = new B();
+                          b.subj = o.getInt("s");
+                          b.kelas = o.getInt("k");
+                          b.text = o.getString("q");
+                          JSONArray op = o.getJSONArray("o");
+                          for (int j = 0; j < 4; j++) {
+                              b.opt[j] = op.getString(j);
+                          }
+                          b.key = o.getInt("a");
+                          b.expl = o.optString("e", "");
+                          bank.add(b);
+                      }
+                  } catch (Exception e) {
+                      // Belum ada berkas soal atau berkas rusak: mulai dari kosong
+                  }
+              }
+
+              private boolean saveBank() {
+                  try {
+                      JSONArray arr = new JSONArray();
+                      for (B b : bank) {
+                          JSONObject o = new JSONObject();
+                          o.put("s", b.subj);
+                          o.put("k", b.kelas);
+                          o.put("q", b.text);
+                          JSONArray op = new JSONArray();
+                          for (int j = 0; j < 4; j++) {
+                              op.put(b.opt[j]);
+                          }
+                          o.put("o", op);
+                          o.put("a", b.key);
+                          o.put("e", b.expl);
+                          arr.put(o);
+                      }
+                      OutputStream out = openFileOutput(BANK_FILE, MODE_PRIVATE);
+                      try {
+                          out.write(arr.toString().getBytes(StandardCharsets.UTF_8));
+                      } finally {
+                          out.close();
+                      }
+                      return true;
+                  } catch (Exception e) {
+                      return false;
+                  }
+              }
+
+              private void pickFile() {
+                  Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                  it.addCategory(Intent.CATEGORY_OPENABLE);
+                  it.setType("*/*");
+                  try {
+                      startActivityForResult(it, REQ_IMPORT);
+                  } catch (Exception e) {
+                      importMsg = "Tidak bisa membuka pemilih berkas di HP ini.";
+                      showGuru();
+                  }
+              }
+
+              @Override
+              protected void onActivityResult(int req, int res, Intent data) {
+                  super.onActivityResult(req, res, data);
+                  if (req != REQ_IMPORT || res != RESULT_OK || data == null || data.getData() == null) {
+                      return;
+                  }
+                  importFrom(data.getData());
+              }
+
+              private void importFrom(Uri uri) {
+                  String s;
+                  try {
+                      s = readAll(getContentResolver().openInputStream(uri));
+                  } catch (Exception e) {
+                      importMsg = "Gagal membaca berkas. Pastikan berkasnya CSV.";
+                      showGuru();
+                      return;
+                  }
+                  importMsg = importCsv(s);
+                  showGuru();
+              }
+
+              private int cnt(String s, char ch) {
+                  int n = 0;
+                  for (int i = 0; i < s.length(); i++) {
+                      if (s.charAt(i) == ch) {
+                          n++;
+                      }
+                  }
+                  return n;
+              }
+
+              private ArrayList<ArrayList<String>> parseCsv(String s, char d) {
+                  ArrayList<ArrayList<String>> rows = new ArrayList<>();
+                  ArrayList<String> row = new ArrayList<>();
+                  StringBuilder f = new StringBuilder();
+                  boolean inQ = false;
+                  for (int i = 0; i < s.length(); i++) {
+                      char ch = s.charAt(i);
+                      if (inQ) {
+                          if (ch == '"') {
+                              if (i + 1 < s.length() && s.charAt(i + 1) == '"') {
+                                  f.append('"');
+                                  i++;
+                              } else {
+                                  inQ = false;
+                              }
+                          } else {
+                              f.append(ch);
+                          }
+                      } else if (ch == '"') {
+                          inQ = true;
+                      } else if (ch == d) {
+                          row.add(f.toString());
+                          f.setLength(0);
+                      } else if (ch == '\n' || ch == '\r') {
+                          if (ch == '\r' && i + 1 < s.length() && s.charAt(i + 1) == '\n') {
+                              i++;
+                          }
+                          row.add(f.toString());
+                          f.setLength(0);
+                          rows.add(row);
+                          row = new ArrayList<>();
+                      } else {
+                          f.append(ch);
+                      }
+                  }
+                  if (f.length() > 0 || !row.isEmpty()) {
+                      row.add(f.toString());
+                      rows.add(row);
+                  }
+                  return rows;
+              }
+
+              private int col(ArrayList<String> head, String name) {
+                  for (int i = 0; i < head.size(); i++) {
+                      if (head.get(i).trim().toLowerCase(Locale.ROOT).equals(name)) {
+                          return i;
+                      }
+                  }
+                  return -1;
+              }
+
+              private String cell(ArrayList<String> row, int idx) {
+                  if (idx < 0 || idx >= row.size()) {
+                      return "";
+                  }
+                  return row.get(idx).trim();
+              }
+
+              private boolean isBlank(ArrayList<String> row) {
+                  for (String x : row) {
+                      if (!x.trim().isEmpty()) {
+                          return false;
+                      }
+                  }
+                  return true;
+              }
+
+              private int parseSubject(String m) {
+                  String x = m.toLowerCase(Locale.ROOT);
+                  if (x.contains("indo")) {
+                      return 1;
+                  }
+                  if (x.contains("ing") || x.contains("eng")) {
+                      return 2;
+                  }
+                  if (x.contains("mat") || x.contains("hitung")) {
+                      return 0;
+                  }
+                  return -1;
+              }
+
+              private int parseKelas(String k) {
+                  StringBuilder dg = new StringBuilder();
+                  for (int i = 0; i < k.length(); i++) {
+                      if (Character.isDigit(k.charAt(i))) {
+                          dg.append(k.charAt(i));
+                      }
+                  }
+                  if (dg.length() != 1) {
+                      return 0;
+                  }
+                  return dg.charAt(0) - '0';
+              }
+
+              private B toBank(ArrayList<String> row, int[] c) {
+                  int sj = parseSubject(cell(row, c[0]));
+                  int kl = parseKelas(cell(row, c[1]));
+                  String q = cell(row, c[2]);
+                  if (sj < 0 || kl < 1 || kl > 6 || q.isEmpty()) {
+                      return null;
+                  }
+                  B b = new B();
+                  b.subj = sj;
+                  b.kelas = kl;
+                  b.text = q;
+                  for (int j = 0; j < 4; j++) {
+                      b.opt[j] = cell(row, c[3 + j]);
+                      if (b.opt[j].isEmpty()) {
+                          return null;
+                      }
+                  }
+                  String k = cell(row, c[7]);
+                  int key = -1;
+                  if (!k.isEmpty() && k.length() <= 2
+                          && "ABCD".indexOf(Character.toUpperCase(k.charAt(0))) >= 0
+                          && (k.length() == 1 || !Character.isLetterOrDigit(k.charAt(1)))) {
+                      key = "ABCD".indexOf(Character.toUpperCase(k.charAt(0)));
+                  } else {
+                      for (int j = 0; j < 4; j++) {
+                          if (k.equalsIgnoreCase(b.opt[j])) {
+                              key = j;
+                          }
+                      }
+                  }
+                  if (key < 0) {
+                      return null;
+                  }
+                  b.key = key;
+                  b.expl = cell(row, c[8]);
+                  return b;
+              }
+
+              private int findBank(B b) {
+                  for (int i = 0; i < bank.size(); i++) {
+                      B x = bank.get(i);
+                      if (x.subj == b.subj && x.kelas == b.kelas && x.text.equalsIgnoreCase(b.text)) {
+                          return i;
+                      }
+                  }
+                  return -1;
+              }
+
+              private String importCsv(String s) {
+                  if (s.length() > 0 && s.charAt(0) == '\uFEFF') {
+                      s = s.substring(1);
+                  }
+                  int nl = s.indexOf('\n');
+                  String first = nl >= 0 ? s.substring(0, nl) : s;
+                  char d = ',';
+                  int most = cnt(first, ',');
+                  if (cnt(first, ';') > most) {
+                      d = ';';
+                      most = cnt(first, ';');
+                  }
+                  if (cnt(first, '\t') > most) {
+                      d = '\t';
+                  }
+                  ArrayList<ArrayList<String>> rows = parseCsv(s, d);
+                  if (rows.isEmpty()) {
+                      return "Berkas kosong.";
+                  }
+                  ArrayList<String> head = rows.get(0);
+                  String[] heads = {"mapel", "kelas", "soal", "a", "b", "c", "d", "kunci", "pembahasan"};
+                  int[] c = new int[9];
+                  for (int i = 0; i < 9; i++) {
+                      c[i] = col(head, heads[i]);
+                  }
+                  for (int i = 0; i < 8; i++) {
+                      if (c[i] < 0) {
+                          return "Judul kolom tidak cocok. Pakai template: mapel, kelas, soal, a, b, c, d, kunci, "
+                                  + "pembahasan. Lalu simpan sebagai CSV.";
+                      }
+                  }
+
+                  int added = 0;
+                  int updated = 0;
+                  int skipped = 0;
+                  StringBuilder where = new StringBuilder();
+                  for (int r = 1; r < rows.size(); r++) {
+                      ArrayList<String> row = rows.get(r);
+                      if (isBlank(row)) {
+                          continue;
+                      }
+                      B b = toBank(row, c);
+                      if (b == null) {
+                          if (skipped < 5) {
+                              if (where.length() > 0) {
+                                  where.append(", ");
+                              }
+                              where.append(r + 1);
+                          }
+                          skipped++;
+                          continue;
+                      }
+                      int at = findBank(b);
+                      if (at >= 0) {
+                          bank.set(at, b);
+                          updated++;
+                      } else {
+                          bank.add(b);
+                          added++;
+                      }
+                  }
+                  if (added + updated > 0 && !saveBank()) {
+                      return "Gagal menyimpan soal di HP ini.";
+                  }
+                  if (added + updated == 0 && skipped == 0) {
+                      return "Tidak ada soal di berkas.";
+                  }
+                  StringBuilder msg = new StringBuilder();
+                  if (added + updated > 0) {
+                      msg.append("Berhasil: ").append(added).append(" soal baru");
+                      if (updated > 0) {
+                          msg.append(", ").append(updated).append(" diperbarui");
+                      }
+                      msg.append(".");
+                  } else {
+                      msg.append("Tidak ada soal yang masuk.");
+                  }
+                  if (skipped > 0) {
+                      msg.append(" ").append(skipped).append(" baris dilewati (baris ").append(where);
+                      msg.append("). Cek mapel, kelas 1-6, soal, 4 pilihan, dan kunci A-D.");
+                  }
+                  return msg.toString();
+              }
+
+              private void buildBank() {
+                  ArrayList<B> pool = new ArrayList<>();
+                  for (B b : bank) {
+                      if (b.subj == subj && b.kelas == kelas + 1) {
+                          pool.add(b);
+                      }
+                  }
+                  Collections.shuffle(pool, rnd);
+                  total = Math.min(TOTAL, pool.size());
+                  for (int i = 0; i < total; i++) {
+                      B b = pool.get(i);
+                      Q q = new Q();
+                      q.text = b.text;
+                      q.full = b.text;
+                      q.sopts = b.opt;
+                      q.correctIdx = b.key;
+                      q.expl = b.expl;
+                      qs[i] = q;
+                  }
+              }
+
+              private void showGuru() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 7;
+                  nameFields = null;
+
+                  LinearLayout c = column();
+                  c.addView(text("\uD83D\uDCDA Soal dari Guru", 26, ORANGE_DARK, true), lp(WRAP, 0));
+
+                  if (!importMsg.isEmpty()) {
+                      TextView m = text(importMsg, 14, Color.WHITE, true);
+                      m.setBackground(box(importMsg.startsWith("Berhasil") ? GREEN : RED, 16));
+                      m.setPadding(dp(14), dp(10), dp(14), dp(10));
+                      c.addView(m, lp(WRAP, 14));
+                  }
+
+                  LinearLayout cs = card();
+                  cs.addView(heading("Soal yang tersimpan"), lp(WRAP, 0));
+                  if (bank.isEmpty()) {
+                      cs.addView(text("Belum ada soal.", 14, DARK, false), lp(WRAP, 8));
+                  } else {
+                      for (int s = 0; s < 3; s++) {
+                          StringBuilder sb = new StringBuilder();
+                          for (int k = 0; k < 6; k++) {
+                              int n = countBank(s, k);
+                              if (n > 0) {
+                                  if (sb.length() > 0) {
+                                      sb.append(" \u2022 ");
+                                  }
+                                  sb.append("Kelas ").append(k + 1).append(": ").append(n);
+                              }
+                          }
+                          TextView t = text(SUBJ_NAMES[s] + "\n" + (sb.length() > 0 ? sb.toString() : "-"),
+                                  13, DARK, false);
+                          t.setGravity(Gravity.START);
+                          cs.addView(t, lp(WRAP, 8));
+                      }
+                  }
+                  c.addView(cs, lp(WRAP, 14));
+
+                  Button imp = button("Impor soal dari file", BLUE, 20);
+                  imp.setElevation(dp(4));
+                  c.addView(imp, lp(dp(60), 16));
+                  imp.setOnClickListener(v -> pickFile());
+
+                  LinearLayout ch = card();
+                  ch.addView(heading("Cara membuat file soal"), lp(WRAP, 0));
+                  TextView how = text("1. Buka file template_soal.xlsx di Excel atau Google Sheets.\n"
+                          + "2. Isi satu baris untuk satu soal.\n"
+                          + "3. Simpan sebagai CSV (UTF-8).\n"
+                          + "4. Kirim file ke HP ini, lalu tekan Impor.\n\n"
+                          + "Kolom: mapel, kelas, soal, a, b, c, d, kunci (A/B/C/D), pembahasan (boleh kosong).\n"
+                          + "Mapel: Matematika, Bahasa Indonesia, atau Bahasa Inggris. Kelas: 1 sampai 6.\n"
+                          + "Pilihan jawaban sebaiknya singkat. Soal yang sama akan diperbarui, bukan dobel.",
+                          13, DARK, false);
+                  how.setGravity(Gravity.START);
+                  ch.addView(how, lp(WRAP, 8));
+                  c.addView(ch, lp(WRAP, 14));
+
+                  if (!bank.isEmpty()) {
+                      Button del = button("Hapus semua soal guru", RED, 14);
+                      c.addView(del, lp(dp(46), 16));
+                      del.setOnClickListener(v -> new AlertDialog.Builder(this)
+                              .setTitle("Hapus semua soal guru?")
+                              .setMessage("Semua soal yang sudah diimpor akan dihapus dari HP ini.")
+                              .setPositiveButton("Hapus", (dl, w) -> {
+                                  bank.clear();
+                                  saveBank();
+                                  importMsg = "Berhasil: semua soal guru dihapus.";
+                                  showGuru();
+                              })
+                              .setNegativeButton("Batal", null)
+                              .show());
+                  }
+
+                  Button back = button("Kembali", GRAY, 14);
+                  back.setTextColor(DARK);
+                  c.addView(back, lp(dp(46), 14));
+                  back.setOnClickListener(v -> showMenu());
+
                   wrap(c);
               }
 
@@ -683,6 +1278,9 @@ jobs:
                   saveNames();
                   nameFields = null;
                   mode = m;
+                  if (m != 7) {
+                      subj = 0;
+                  }
                   buildQuestions();
                   Arrays.fill(pScore, 0);
                   Arrays.fill(pCorrect, 0);
@@ -731,6 +1329,11 @@ jobs:
               }
 
               private void buildQuestions() {
+                  if (mode == 7) {
+                      buildBank();
+                      return;
+                  }
+                  total = TOTAL;
                   for (int i = 0; i < TOTAL; i++) {
                       Q q = new Q();
                       if (mode == 5) {
@@ -964,7 +1567,7 @@ jobs:
                   qi = 0;
                   score = 0;
                   correct = 0;
-                  lives = KELAS_LIVES[kelas];
+                  lives = (mode == 7) ? 99 : KELAS_LIVES[kelas];
                   showGame();
                   showQuestion();
               }
@@ -989,10 +1592,10 @@ jobs:
                   LinearLayout dotsRow = new LinearLayout(this);
                   dotsRow.setOrientation(LinearLayout.HORIZONTAL);
                   c.addView(dotsRow, lp(dp(8), 16));
-                  for (int i = 0; i < TOTAL; i++) {
+                  for (int i = 0; i < total; i++) {
                       View d = new View(this);
                       d.setBackground(box(GRAY_D, 4));
-                      dotsRow.addView(d, weight(i == 0 ? 0 : 2, i == TOTAL - 1 ? 0 : 2));
+                      dotsRow.addView(d, weight(i == 0 ? 0 : 2, i == total - 1 ? 0 : 2));
                       dots[i] = d;
                   }
 
@@ -1058,7 +1661,7 @@ jobs:
               }
 
               private void showQuestion() {
-                  if (qi >= TOTAL || lives <= 0) {
+                  if (qi >= total || lives <= 0) {
                       endTurn();
                       return;
                   }
@@ -1068,14 +1671,15 @@ jobs:
 
                   tvQuestion.setText(q.text);
                   int nl = q.text.indexOf('\n');
-                  tvQuestion.setTextSize(questionSize(nl >= 0 ? nl : q.text.length()));
+                  int qsz = questionSize(nl >= 0 ? nl : q.text.length());
+                  tvQuestion.setTextSize(q.sopts != null ? Math.min(qsz, 24) : qsz);
                   tvFeedback.setText(mode == 6 ? "Isi titik-titiknya!" : " ");
                   tvFeedback.setTextColor(DARK);
                   for (int i = 0; i < 4; i++) {
                       final int idx = i;
-                      String ot = fmt(q.opts[i]);
+                      String ot = optText(q, i);
                       opts[i].setText(ot);
-                      opts[i].setTextSize(optionSize(ot.length()));
+                      opts[i].setTextSize(q.sopts != null ? bankOptionSize(ot.length()) : optionSize(ot.length()));
                       opts[i].setBackground(box(OPT_COLORS[i], 16));
                       opts[i].setAlpha(1f);
                       opts[i].setOnClickListener(v -> choose(idx));
@@ -1124,7 +1728,7 @@ jobs:
                       timerFill.animate().cancel();
                   }
                   Q q = qs[qi - 1];
-                  pPick[cur][qi - 1] = q.opts[idx];
+                  pPick[cur][qi - 1] = idx;
                   pRes[cur][qi - 1] = (idx == q.correctIdx) ? 1 : 2;
                   dimOthers(idx, q.correctIdx);
                   if (idx == q.correctIdx) {
@@ -1139,7 +1743,7 @@ jobs:
                       opts[idx].setBackground(box(RED, 16));
                       correctBtn.setBackground(box(GREEN, 16));
                       dots[qi - 1].setBackground(box(RED, 4));
-                      tvFeedback.setText("Oops! Jawabannya " + fmt(q.answer));
+                      tvFeedback.setText("Oops! Jawabannya " + optText(q, q.correctIdx));
                       tvFeedback.setTextColor(RED);
                   }
                   updateHud();
@@ -1158,7 +1762,7 @@ jobs:
                   dimOthers(q.correctIdx, q.correctIdx);
                   correctBtn.setBackground(box(GREEN, 16));
                   dots[qi - 1].setBackground(box(RED, 4));
-                  tvFeedback.setText("Jawabannya " + fmt(q.answer));
+                  tvFeedback.setText("Jawabannya " + optText(q, q.correctIdx));
                   tvFeedback.setTextColor(RED);
                   updateHud();
                   handler.postDelayed(this::showQuestion, 1000);
@@ -1166,11 +1770,11 @@ jobs:
 
               private void updateHud() {
                   StringBuilder h = new StringBuilder();
-                  for (int i = 0; i < lives; i++) {
+                  for (int i = 0; mode != 7 && i < lives; i++) {
                       h.append("\u2764\uFE0F");
                   }
                   tvHearts.setText(h.toString());
-                  tvStep.setText("Soal " + qi + " dari " + TOTAL);
+                  tvStep.setText("Soal " + qi + " dari " + total);
                   tvScore.setText("\u2B50 " + score);
               }
 
@@ -1203,7 +1807,8 @@ jobs:
               private void renderSoloResult() {
                   screen = 2;
                   boolean rekor = rekorNow;
-                  int stars = pCorrect[0] >= 9 ? 3 : pCorrect[0] >= 6 ? 2 : pCorrect[0] >= 3 ? 1 : 0;
+                  int pct = total > 0 ? pCorrect[0] * 10 / total : 0;
+                  int stars = pct >= 9 ? 3 : pct >= 6 ? 2 : pct >= 3 ? 1 : 0;
 
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
@@ -1218,7 +1823,7 @@ jobs:
                   }
                   card.addView(text(s.toString(), 44, ORANGE, false), lp(WRAP, 0));
                   card.addView(text("Skor: " + pScore[0], 30, DARK, true), lp(WRAP, 10));
-                  card.addView(text("Benar " + pCorrect[0] + " dari " + TOTAL, 16, DARK, false), lp(WRAP, 6));
+                  card.addView(text("Benar " + pCorrect[0] + " dari " + total, 16, DARK, false), lp(WRAP, 6));
                   if (rekor) {
                       card.addView(pill("Rekor baru! \uD83C\uDFC6", PURPLE), lpw(12));
                   }
@@ -1283,7 +1888,7 @@ jobs:
                       nmp.leftMargin = dp(12);
                       row.addView(nm, nmp);
 
-                      TextView sc = text(pScore[p] + " poin\nbenar " + pCorrect[p] + "/" + TOTAL,
+                      TextView sc = text(pScore[p] + " poin\nbenar " + pCorrect[p] + "/" + total,
                               14, PURPLE, true);
                       sc.setGravity(Gravity.END);
                       row.addView(sc, new LinearLayout.LayoutParams(WRAP, WRAP));
@@ -1297,7 +1902,7 @@ jobs:
 
               private boolean hasMistakes() {
                   for (int p = 0; p < np; p++) {
-                      for (int i = 0; i < TOTAL; i++) {
+                      for (int i = 0; i < total; i++) {
                           if (pRes[p][i] != 1) {
                               return true;
                           }
@@ -1333,7 +1938,7 @@ jobs:
 
                   int wrong = 0;
                   int skipped = 0;
-                  for (int i = 0; i < TOTAL; i++) {
+                  for (int i = 0; i < total; i++) {
                       if (pRes[p][i] == 2 || pRes[p][i] == 3) {
                           wrong++;
                       } else if (pRes[p][i] == 0) {
@@ -1353,7 +1958,7 @@ jobs:
                               lp(WRAP, 14));
                   }
 
-                  for (int i = 0; i < TOTAL; i++) {
+                  for (int i = 0; i < total; i++) {
                       int r = pRes[p][i];
                       if (r != 2 && r != 3) {
                           continue;
@@ -1363,17 +1968,21 @@ jobs:
                       TextView no = text("Soal " + (i + 1), 13, DARK, false);
                       no.setGravity(Gravity.START);
                       cd.addView(no, lp(WRAP, 0));
-                      cd.addView(text(q.text.replace("\n", " "), 22, ORANGE_DARK, true), lp(WRAP, 6));
+                      cd.addView(text(q.text.replace("\n", " "), q.sopts != null ? 18 : 22, ORANGE_DARK, true),
+                    lp(WRAP, 6));
                       if (r == 3) {
                           cd.addView(text("Waktu habis \u23F0", 15, RED, true), lp(WRAP, 10));
                       } else {
-                          cd.addView(text("Jawabanmu: " + fmt(pPick[p][i]), 15, RED, true), lp(WRAP, 10));
+                          cd.addView(text("Jawabanmu: " + optText(q, pPick[p][i]), 15, RED, true), lp(WRAP, 10));
                       }
-                      cd.addView(text("Jawaban yang benar: " + fmt(q.answer), 16, GREEN, true), lp(WRAP, 4));
+                      cd.addView(text("Jawaban yang benar: " + optText(q, q.correctIdx), 16, GREEN, true), lp(WRAP, 4));
                       if (mode == 6) {
                           cd.addView(text("Jadi: " + q.full, 15, DARK, false), lp(WRAP, 4));
                       }
-                      if (r == 2 && q.trap >= 1 && pPick[p][i] == q.trap) {
+                      if (q.expl != null && !q.expl.isEmpty()) {
+                          cd.addView(text("Pembahasan: " + q.expl, 14, DARK, false), lp(WRAP, 8));
+                      }
+                      if (r == 2 && q.trap >= 1 && q.opts[pPick[p][i]] == q.trap) {
                           cd.addView(text("Ingat: kerjakan tanda kurung atau perkalian dulu.", 13, PURPLE, true),
                                   lp(WRAP, 8));
                       }
@@ -1491,6 +2100,6 @@ jobs:
       - name: Unggah APK
         uses: actions/upload-artifact@v4
         with:
-          name: Petualangan-Berhitung-APK
+          name: Belajar-Bersama-APK
           path: proj/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
