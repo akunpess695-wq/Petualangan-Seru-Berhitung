@@ -68,8 +68,17 @@ jobs:
                   applicationId "com.petualangan.berhitung"
                   minSdk 21
                   targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
+                  versionCode 3
+                  versionName "2.1"
+              }
+
+              signingConfigs {
+                  debug {
+                      storeFile file('pb.keystore')
+                      storePassword 'berhitung123'
+                      keyAlias 'berhitung'
+                      keyPassword 'berhitung123'
+                  }
               }
 
               buildTypes {
@@ -87,42 +96,12 @@ jobs:
           mkdir -p app/src/main
           cat > app/src/main/AndroidManifest.xml <<'PB_EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-              <application
-                  android:allowBackup="true"
-                  android:icon="@drawable/ic_launcher"
-                  android:label="Petualangan Berhitung"
-                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
-
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:screenOrientation="portrait">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-              </application>
-
-          </manifest>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"> <application android:allowBackup="true" android:icon="@drawable/ic_launcher" android:label="Petualangan Berhitung" android:theme="@android:style/Theme.Material.Light.NoActionBar"> <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="portrait"> <intent-filter> <action android:name="android.intent.action.MAIN" /> <category android:name="android.intent.category.LAUNCHER" /> </intent-filter> </activity> </application> </manifest>
           PB_EOF
           mkdir -p app/src/main/res/drawable
           cat > app/src/main/res/drawable/ic_launcher.xml <<'PB_EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="96dp"
-              android:height="96dp"
-              android:viewportWidth="96"
-              android:viewportHeight="96">
-              <path
-                  android:fillColor="#FF9800"
-                  android:pathData="M16,0 H80 A16,16 0 0 1 96,16 V80 A16,16 0 0 1 80,96 H16 A16,16 0 0 1 0,80 V16 A16,16 0 0 1 16,0 Z" />
-              <path
-                  android:fillColor="#FFFFFF"
-                  android:pathData="M42,20 H54 V42 H76 V54 H54 V76 H42 V54 H20 V42 H42 Z" />
-          </vector>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="96dp" android:height="96dp" android:viewportWidth="96" android:viewportHeight="96"> <path android:fillColor="#FF9800" android:pathData="M16,0 H80 A16,16 0 0 1 96,16 V80 A16,16 0 0 1 80,96 H16 A16,16 0 0 1 0,80 V16 A16,16 0 0 1 16,0 Z" /> <path android:fillColor="#FFFFFF" android:pathData="M42,20 H54 V42 H76 V54 H54 V76 H42 V54 H20 V42 H42 Z" /> </vector>
           PB_EOF
           mkdir -p app/src/main/java/com/petualangan/berhitung
           cat > app/src/main/java/com/petualangan/berhitung/MainActivity.java <<'PB_EOF'
@@ -149,8 +128,8 @@ jobs:
           public class MainActivity extends Activity {
 
               private static final int TOTAL = 10;
-              private static final int START_LIVES = 3;
               private static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
+              private static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
 
               private static final int ORANGE = Color.parseColor("#FB8C00");
               private static final int ORANGE_DARK = Color.parseColor("#E65100");
@@ -160,6 +139,26 @@ jobs:
               private static final int PURPLE = Color.parseColor("#8E24AA");
               private static final int BG = Color.parseColor("#FFF8E1");
               private static final int DARK = Color.parseColor("#4E342E");
+              private static final int GRAY = Color.parseColor("#E0E0E0");
+
+              // Tingkat kesulitan soal: 0 Easy, 1 Normal, 2 Hard, 3 Extreme
+              private static final String[] DIFF_NAMES = {"Easy", "Normal", "Hard", "Extreme"};
+              private static final String[] DIFF_DESC = {
+                      "Angka kecil \u2022 4 nyawa",
+                      "Angka sedang \u2022 3 nyawa",
+                      "Angka besar \u2022 2 nyawa",
+                      "Angka sangat besar \u2022 1 nyawa"
+              };
+              private static final int[] DIFF_COLOR = {GREEN, BLUE, ORANGE, RED};
+              private static final int[] DIFF_LIVES = {4, 3, 2, 1};
+              private static final int[] DIFF_BASE = {5, 10, 25, 50};
+              private static final int[] DIFF_STEP = {1, 2, 5, 15};
+              private static final int[] DIFF_MUL_A = {5, 0, 12, 20};
+              private static final int[] DIFF_MUL_B = {5, 10, 12, 20};
+
+              // Batas waktu per soal yang bisa diatur (detik)
+              private static final int SECS_MIN = 3;
+              private static final int SECS_MAX = 120;
 
               private final Random rnd = new Random();
               private final Handler handler = new Handler(Looper.getMainLooper());
@@ -167,18 +166,39 @@ jobs:
 
               private int screen;
               private int mode;
+              private int diff = 1;
+              private boolean timed = false;
+              private int secs = 10;
               private int index;
               private int score;
               private int lives;
               private int correct;
               private int answer;
+              private int timeLeft;
               private boolean locked;
 
               private TextView tvInfo;
+              private TextView tvTimer;
               private TextView tvQuestion;
               private TextView tvFeedback;
               private final Button[] opts = new Button[4];
               private Button correctBtn;
+
+              private final Runnable tick = new Runnable() {
+                  @Override
+                  public void run() {
+                      if (locked) {
+                          return;
+                      }
+                      timeLeft--;
+                      if (timeLeft <= 0) {
+                          timeout();
+                      } else {
+                          showTime();
+                          handler.postDelayed(this, 1000);
+                      }
+                  }
+              };
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
@@ -238,6 +258,14 @@ jobs:
                   return b;
               }
 
+              private void flat(Button b) {
+                  b.setMinWidth(0);
+                  b.setMinimumWidth(0);
+                  b.setMinHeight(0);
+                  b.setMinimumHeight(0);
+                  b.setPadding(0, 0, 0, 0);
+              }
+
               private LinearLayout column() {
                   LinearLayout l = new LinearLayout(this);
                   l.setOrientation(LinearLayout.VERTICAL);
@@ -248,10 +276,31 @@ jobs:
               }
 
               private LinearLayout.LayoutParams lp(int height, int topDp) {
-                  LinearLayout.LayoutParams p =
-                          new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height);
+                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(MATCH, height);
                   p.topMargin = dp(topDp);
                   return p;
+              }
+
+              private LinearLayout.LayoutParams weight(int leftDp, int rightDp) {
+                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, MATCH, 1f);
+                  p.leftMargin = dp(leftDp);
+                  p.rightMargin = dp(rightDp);
+                  return p;
+              }
+
+              private LinearLayout.LayoutParams fixed(int widthDp) {
+                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(widthDp), MATCH);
+                  p.leftMargin = dp(3);
+                  p.rightMargin = dp(3);
+                  return p;
+              }
+
+              private String bestKey() {
+                  return "best_" + diff + (timed ? "_t" : "");
+              }
+
+              private String modeLabel() {
+                  return timed ? "Berwaktu " + secs + " detik" : "Tanpa waktu";
               }
 
               // ---------- Menu ----------
@@ -259,18 +308,67 @@ jobs:
               private void showMenu() {
                   handler.removeCallbacksAndMessages(null);
                   screen = 0;
+                  diff = prefs.getInt("diff", 1);
+                  if (diff < 0 || diff > 3) {
+                      diff = 1;
+                  }
+                  timed = prefs.getBoolean("timed", false);
+                  secs = Math.max(SECS_MIN, Math.min(SECS_MAX, prefs.getInt("secs", 10)));
 
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
-                  c.addView(text("⭐", 64, ORANGE, false), lp(WRAP, 0));
-                  c.addView(text("Petualangan Berhitung", 30, ORANGE_DARK, true), lp(WRAP, 8));
-                  c.addView(text("Ayo belajar berhitung sambil bermain!", 16, DARK, false), lp(WRAP, 8));
-                  c.addView(text("Skor terbaik: " + prefs.getInt("best", 0), 18, PURPLE, true), lp(WRAP, 16));
+                  c.addView(text("\u2B50", 56, ORANGE, false), lp(WRAP, 0));
+                  c.addView(text("Petualangan Berhitung", 30, ORANGE_DARK, true), lp(WRAP, 4));
+                  c.addView(text("Ayo belajar berhitung sambil bermain!", 16, DARK, false), lp(WRAP, 6));
 
-                  addMenuButton(c, "➕  Penjumlahan", ORANGE, 0);
-                  addMenuButton(c, "➖  Pengurangan", BLUE, 1);
-                  addMenuButton(c, "✖  Perkalian", GREEN, 2);
-                  addMenuButton(c, "🎲  Campur", PURPLE, 3);
+                  // Tingkat kesulitan soal
+                  c.addView(text("Tingkat kesulitan", 16, DARK, true), lp(WRAP, 16));
+                  LinearLayout drow = new LinearLayout(this);
+                  drow.setOrientation(LinearLayout.HORIZONTAL);
+                  c.addView(drow, lp(dp(48), 8));
+                  for (int i = 0; i < 4; i++) {
+                      final int d = i;
+                      Button b = button(DIFF_NAMES[i], i == diff ? DIFF_COLOR[i] : GRAY, 12);
+                      b.setTextColor(i == diff ? Color.WHITE : DARK);
+                      flat(b);
+                      drow.addView(b, weight(i == 0 ? 0 : 3, i == 3 ? 0 : 3));
+                      b.setOnClickListener(v -> {
+                          prefs.edit().putInt("diff", d).apply();
+                          showMenu();
+                      });
+                  }
+                  c.addView(text(DIFF_DESC[diff], 14, DARK, false), lp(WRAP, 8));
+
+                  // Mode waktu
+                  c.addView(text("Mode waktu", 16, DARK, true), lp(WRAP, 16));
+                  LinearLayout trow = new LinearLayout(this);
+                  trow.setOrientation(LinearLayout.HORIZONTAL);
+                  c.addView(trow, lp(dp(48), 8));
+                  trow.addView(modeChip("Tanpa waktu", !timed, false), weight(0, 4));
+                  trow.addView(modeChip("Berwaktu", timed, true), weight(4, 0));
+
+                  if (timed) {
+                      LinearLayout srow = new LinearLayout(this);
+                      srow.setOrientation(LinearLayout.HORIZONTAL);
+                      c.addView(srow, lp(dp(48), 10));
+                      srow.addView(stepButton("\u22125", -5), fixed(52));
+                      srow.addView(stepButton("\u22121", -1), fixed(52));
+                      srow.addView(text(secs + " detik", 18, PURPLE, true),
+                              new LinearLayout.LayoutParams(0, MATCH, 1f));
+                      srow.addView(stepButton("+1", 1), fixed(52));
+                      srow.addView(stepButton("+5", 5), fixed(52));
+                      c.addView(text("Waktu per soal, atur dengan tombol di atas", 12, DARK, false),
+                              lp(WRAP, 4));
+                  }
+
+                  c.addView(text("Skor terbaik (" + DIFF_NAMES[diff] + ", "
+                                  + (timed ? "berwaktu" : "tanpa waktu") + "): " + prefs.getInt(bestKey(), 0),
+                          16, PURPLE, true), lp(WRAP, 14));
+
+                  addMenuButton(c, "\u2795 Penjumlahan", ORANGE, 0);
+                  addMenuButton(c, "\u2796 Pengurangan", BLUE, 1);
+                  addMenuButton(c, "\u2716 Perkalian", GREEN, 2);
+                  addMenuButton(c, "\uD83C\uDFB2 Campur", PURPLE, 3);
 
                   ScrollView sv = new ScrollView(this);
                   sv.setFillViewport(true);
@@ -279,9 +377,31 @@ jobs:
                   setContentView(sv);
               }
 
+              private Button modeChip(String label, boolean selected, final boolean value) {
+                  Button b = button(label, selected ? PURPLE : GRAY, 14);
+                  b.setTextColor(selected ? Color.WHITE : DARK);
+                  flat(b);
+                  b.setOnClickListener(v -> {
+                      prefs.edit().putBoolean("timed", value).apply();
+                      showMenu();
+                  });
+                  return b;
+              }
+
+              private Button stepButton(String label, final int delta) {
+                  Button b = button(label, ORANGE, 14);
+                  flat(b);
+                  b.setOnClickListener(v -> {
+                      int n = Math.max(SECS_MIN, Math.min(SECS_MAX, secs + delta));
+                      prefs.edit().putInt("secs", n).apply();
+                      showMenu();
+                  });
+                  return b;
+              }
+
               private void addMenuButton(LinearLayout c, String label, int color, final int m) {
                   Button b = button(label, color, 20);
-                  c.addView(b, lp(dp(64), 14));
+                  c.addView(b, lp(dp(60), 12));
                   b.setOnClickListener(v -> startGame(m));
               }
 
@@ -291,7 +411,7 @@ jobs:
                   mode = m;
                   index = 0;
                   score = 0;
-                  lives = START_LIVES;
+                  lives = DIFF_LIVES[diff];
                   correct = 0;
                   showGame();
                   nextQuestion();
@@ -304,8 +424,11 @@ jobs:
                   tvInfo = text("", 18, DARK, true);
                   c.addView(tvInfo, lp(WRAP, 0));
 
+                  tvTimer = text(" ", 18, DARK, true);
+                  c.addView(tvTimer, lp(WRAP, 8));
+
                   tvQuestion = text("", 48, ORANGE_DARK, true);
-                  c.addView(tvQuestion, lp(WRAP, 40));
+                  c.addView(tvQuestion, lp(WRAP, 28));
 
                   tvFeedback = text(" ", 20, DARK, true);
                   c.addView(tvFeedback, lp(WRAP, 16));
@@ -316,17 +439,13 @@ jobs:
                       c.addView(row, lp(dp(84), 16));
                       for (int k = 0; k < 2; k++) {
                           Button b = button("", BLUE, 28);
-                          LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
-                                  0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-                          p.leftMargin = dp(k == 0 ? 0 : 8);
-                          p.rightMargin = dp(k == 0 ? 8 : 0);
-                          row.addView(b, p);
+                          row.addView(b, weight(k == 0 ? 0 : 8, k == 0 ? 8 : 0));
                           opts[r * 2 + k] = b;
                       }
                   }
 
                   Button back = button("Menu", PURPLE, 16);
-                  c.addView(back, lp(dp(52), 40));
+                  c.addView(back, lp(dp(52), 36));
                   back.setOnClickListener(v -> showMenu());
 
                   setContentView(c);
@@ -340,7 +459,7 @@ jobs:
                   index++;
                   locked = false;
 
-                  int max = 10 + (index - 1) * 2;
+                  int max = DIFF_BASE[diff] + (index - 1) * DIFF_STEP[diff];
                   int op = (mode == 3) ? rnd.nextInt(3) : mode;
                   int a;
                   int b;
@@ -356,15 +475,17 @@ jobs:
                       answer = a - b;
                       sym = "-";
                   } else {
-                      a = 1 + rnd.nextInt(Math.min(10, 2 + index));
-                      b = 1 + rnd.nextInt(10);
+                      int aMax = (diff == 1) ? Math.min(10, 2 + index) : DIFF_MUL_A[diff];
+                      a = 1 + rnd.nextInt(aMax);
+                      b = 1 + rnd.nextInt(DIFF_MUL_B[diff]);
                       answer = a * b;
-                      sym = "×";
+                      sym = "\u00D7";
                   }
 
                   tvQuestion.setText(a + " " + sym + " " + b + " = ?");
                   tvFeedback.setText(" ");
 
+                  int spread = Math.max(10, answer / 4);
                   int pos = rnd.nextInt(4);
                   int[] vals = new int[4];
                   Arrays.fill(vals, -1);
@@ -376,7 +497,7 @@ jobs:
                       int v;
                       boolean bad;
                       do {
-                          v = answer + rnd.nextInt(21) - 10;
+                          v = answer + rnd.nextInt(2 * spread + 1) - spread;
                           bad = (v < 0 || v == answer);
                           for (int j = 0; j < 4 && !bad; j++) {
                               if (vals[j] == v) {
@@ -397,7 +518,21 @@ jobs:
                       }
                       btn.setOnClickListener(v -> choose(value, btn));
                   }
+
+                  handler.removeCallbacks(tick);
+                  if (timed) {
+                      timeLeft = secs;
+                      showTime();
+                      handler.postDelayed(tick, 1000);
+                  } else {
+                      tvTimer.setText(" ");
+                  }
                   updateInfo();
+              }
+
+              private void showTime() {
+                  tvTimer.setText("Waktu: " + timeLeft + " detik");
+                  tvTimer.setTextColor(timeLeft <= 3 ? RED : DARK);
               }
 
               private void choose(int value, Button btn) {
@@ -405,11 +540,12 @@ jobs:
                       return;
                   }
                   locked = true;
+                  handler.removeCallbacks(tick);
                   if (value == answer) {
                       score += 10;
                       correct++;
                       btn.setBackground(box(GREEN, 16));
-                      tvFeedback.setText("Benar! 🎉");
+                      tvFeedback.setText("Benar! \uD83C\uDF89");
                       tvFeedback.setTextColor(GREEN);
                   } else {
                       lives--;
@@ -422,38 +558,53 @@ jobs:
                   handler.postDelayed(this::nextQuestion, 1000);
               }
 
+              private void timeout() {
+                  locked = true;
+                  lives--;
+                  tvTimer.setText("Waktu habis!");
+                  tvTimer.setTextColor(RED);
+                  correctBtn.setBackground(box(GREEN, 16));
+                  tvFeedback.setText("Jawabannya " + answer);
+                  tvFeedback.setTextColor(RED);
+                  updateInfo();
+                  handler.postDelayed(this::nextQuestion, 1000);
+              }
+
               private void updateInfo() {
                   StringBuilder h = new StringBuilder();
                   for (int i = 0; i < lives; i++) {
-                      h.append("❤️");
+                      h.append("\u2764\uFE0F");
                   }
-                  tvInfo.setText("Soal " + index + "/" + TOTAL + "    ⭐ " + score + "    " + h);
+                  tvInfo.setText("Soal " + index + "/" + TOTAL + " \u2B50 " + score + " " + h);
               }
 
               // ---------- Hasil ----------
 
               private void showResult() {
                   screen = 2;
-                  int best = prefs.getInt("best", 0);
+                  String key = bestKey();
+                  int best = prefs.getInt(key, 0);
                   boolean rekor = score > best;
                   if (rekor) {
-                      prefs.edit().putInt("best", score).apply();
+                      prefs.edit().putInt(key, score).apply();
                   }
                   int stars = correct >= 9 ? 3 : correct >= 6 ? 2 : correct >= 3 ? 1 : 0;
 
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
                   c.addView(text(lives <= 0 ? "Nyawa habis!" : "Selesai!", 32, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(text("Tingkat: " + DIFF_NAMES[diff] + " \u2022 " + modeLabel(), 16,
+                          DIFF_COLOR[diff], true), lp(WRAP, 6));
 
                   StringBuilder s = new StringBuilder();
                   for (int i = 0; i < 3; i++) {
-                      s.append(i < stars ? "⭐" : "☆");
+                      s.append(i < stars ? "\u2B50" : "\u2606");
                   }
-                  c.addView(text(s.toString(), 44, ORANGE, false), lp(WRAP, 16));
-                  c.addView(text("Skor: " + score, 28, DARK, true), lp(WRAP, 16));
+                  c.addView(text(s.toString(), 44, ORANGE, false), lp(WRAP, 14));
+                  c.addView(text("Skor: " + score, 28, DARK, true), lp(WRAP, 14));
                   c.addView(text("Benar " + correct + " dari " + TOTAL, 18, DARK, false), lp(WRAP, 8));
                   if (rekor) {
-                      c.addView(text("Rekor baru! 🏆", 20, PURPLE, true), lp(WRAP, 12));
+                      c.addView(text("Rekor baru! \uD83C\uDFC6", 20, PURPLE, true), lp(WRAP, 12));
                   }
 
                   Button again = button("Main Lagi", GREEN, 22);
@@ -467,6 +618,55 @@ jobs:
                   setContentView(c);
               }
           }
+          PB_EOF
+          mkdir -p app
+          base64 -d > app/pb.keystore <<'PB_EOF'
+          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
           PB_EOF
 
       - name: Pasang Gradle 8.9
