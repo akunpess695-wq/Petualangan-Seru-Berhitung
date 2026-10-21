@@ -1,0 +1,493 @@
+name: Build APK Berhitung
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Pasang Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Siapkan Android SDK
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-34" "build-tools;34.0.0" > /dev/null || true
+
+      - name: Buat proyek Petualangan Berhitung
+        run: |
+          set -e
+          mkdir -p proj
+          cd proj
+          cat > settings.gradle <<'PB_EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "PetualanganBerhitung"
+          include ':app'
+          PB_EOF
+          cat > build.gradle <<'PB_EOF'
+          plugins {
+              id 'com.android.application' version '8.5.2' apply false
+          }
+          PB_EOF
+          cat > gradle.properties <<'PB_EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.nonTransitiveRClass=true
+          PB_EOF
+          mkdir -p app
+          cat > app/build.gradle <<'PB_EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.petualangan.berhitung'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.petualangan.berhitung"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+          }
+          PB_EOF
+          mkdir -p app/src/main
+          cat > app/src/main/AndroidManifest.xml <<'PB_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="Petualangan Berhitung"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:screenOrientation="portrait">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+
+          </manifest>
+          PB_EOF
+          mkdir -p app/src/main/res/drawable
+          cat > app/src/main/res/drawable/ic_launcher.xml <<'PB_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="96dp"
+              android:height="96dp"
+              android:viewportWidth="96"
+              android:viewportHeight="96">
+              <path
+                  android:fillColor="#FF9800"
+                  android:pathData="M16,0 H80 A16,16 0 0 1 96,16 V80 A16,16 0 0 1 80,96 H16 A16,16 0 0 1 0,80 V16 A16,16 0 0 1 16,0 Z" />
+              <path
+                  android:fillColor="#FFFFFF"
+                  android:pathData="M42,20 H54 V42 H76 V54 H54 V76 H42 V54 H20 V42 H42 Z" />
+          </vector>
+          PB_EOF
+          mkdir -p app/src/main/java/com/petualangan/berhitung
+          cat > app/src/main/java/com/petualangan/berhitung/MainActivity.java <<'PB_EOF'
+          package com.petualangan.berhitung;
+
+          import android.app.Activity;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.view.Gravity;
+          import android.view.ViewGroup;
+          import android.widget.Button;
+          import android.widget.LinearLayout;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+
+          import java.util.Arrays;
+          import java.util.Random;
+
+          public class MainActivity extends Activity {
+
+              private static final int TOTAL = 10;
+              private static final int START_LIVES = 3;
+              private static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
+
+              private static final int ORANGE = Color.parseColor("#FB8C00");
+              private static final int ORANGE_DARK = Color.parseColor("#E65100");
+              private static final int GREEN = Color.parseColor("#43A047");
+              private static final int RED = Color.parseColor("#E53935");
+              private static final int BLUE = Color.parseColor("#1E88E5");
+              private static final int PURPLE = Color.parseColor("#8E24AA");
+              private static final int BG = Color.parseColor("#FFF8E1");
+              private static final int DARK = Color.parseColor("#4E342E");
+
+              private final Random rnd = new Random();
+              private final Handler handler = new Handler(Looper.getMainLooper());
+              private SharedPreferences prefs;
+
+              private int screen;
+              private int mode;
+              private int index;
+              private int score;
+              private int lives;
+              private int correct;
+              private int answer;
+              private boolean locked;
+
+              private TextView tvInfo;
+              private TextView tvQuestion;
+              private TextView tvFeedback;
+              private final Button[] opts = new Button[4];
+              private Button correctBtn;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  prefs = getSharedPreferences("berhitung", MODE_PRIVATE);
+                  showMenu();
+              }
+
+              @Override
+              protected void onDestroy() {
+                  handler.removeCallbacksAndMessages(null);
+                  super.onDestroy();
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (screen == 0) {
+                      super.onBackPressed();
+                  } else {
+                      showMenu();
+                  }
+              }
+
+              // ---------- Helper tampilan ----------
+
+              private int dp(int v) {
+                  return Math.round(v * getResources().getDisplayMetrics().density);
+              }
+
+              private GradientDrawable box(int color, int radiusDp) {
+                  GradientDrawable g = new GradientDrawable();
+                  g.setColor(color);
+                  g.setCornerRadius(dp(radiusDp));
+                  return g;
+              }
+
+              private TextView text(String s, int sp, int color, boolean bold) {
+                  TextView t = new TextView(this);
+                  t.setText(s);
+                  t.setTextSize(sp);
+                  t.setTextColor(color);
+                  t.setGravity(Gravity.CENTER);
+                  if (bold) {
+                      t.setTypeface(Typeface.DEFAULT_BOLD);
+                  }
+                  return t;
+              }
+
+              private Button button(String s, int color, int sp) {
+                  Button b = new Button(this);
+                  b.setText(s);
+                  b.setAllCaps(false);
+                  b.setTextSize(sp);
+                  b.setTextColor(Color.WHITE);
+                  b.setTypeface(Typeface.DEFAULT_BOLD);
+                  b.setBackground(box(color, 16));
+                  return b;
+              }
+
+              private LinearLayout column() {
+                  LinearLayout l = new LinearLayout(this);
+                  l.setOrientation(LinearLayout.VERTICAL);
+                  l.setGravity(Gravity.CENTER_HORIZONTAL);
+                  l.setPadding(dp(20), dp(32), dp(20), dp(24));
+                  l.setBackgroundColor(BG);
+                  return l;
+              }
+
+              private LinearLayout.LayoutParams lp(int height, int topDp) {
+                  LinearLayout.LayoutParams p =
+                          new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height);
+                  p.topMargin = dp(topDp);
+                  return p;
+              }
+
+              // ---------- Menu ----------
+
+              private void showMenu() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 0;
+
+                  LinearLayout c = column();
+                  c.setGravity(Gravity.CENTER);
+                  c.addView(text("⭐", 64, ORANGE, false), lp(WRAP, 0));
+                  c.addView(text("Petualangan Berhitung", 30, ORANGE_DARK, true), lp(WRAP, 8));
+                  c.addView(text("Ayo belajar berhitung sambil bermain!", 16, DARK, false), lp(WRAP, 8));
+                  c.addView(text("Skor terbaik: " + prefs.getInt("best", 0), 18, PURPLE, true), lp(WRAP, 16));
+
+                  addMenuButton(c, "➕  Penjumlahan", ORANGE, 0);
+                  addMenuButton(c, "➖  Pengurangan", BLUE, 1);
+                  addMenuButton(c, "✖  Perkalian", GREEN, 2);
+                  addMenuButton(c, "🎲  Campur", PURPLE, 3);
+
+                  ScrollView sv = new ScrollView(this);
+                  sv.setFillViewport(true);
+                  sv.setBackgroundColor(BG);
+                  sv.addView(c);
+                  setContentView(sv);
+              }
+
+              private void addMenuButton(LinearLayout c, String label, int color, final int m) {
+                  Button b = button(label, color, 20);
+                  c.addView(b, lp(dp(64), 14));
+                  b.setOnClickListener(v -> startGame(m));
+              }
+
+              // ---------- Permainan ----------
+
+              private void startGame(int m) {
+                  mode = m;
+                  index = 0;
+                  score = 0;
+                  lives = START_LIVES;
+                  correct = 0;
+                  showGame();
+                  nextQuestion();
+              }
+
+              private void showGame() {
+                  screen = 1;
+                  LinearLayout c = column();
+
+                  tvInfo = text("", 18, DARK, true);
+                  c.addView(tvInfo, lp(WRAP, 0));
+
+                  tvQuestion = text("", 48, ORANGE_DARK, true);
+                  c.addView(tvQuestion, lp(WRAP, 40));
+
+                  tvFeedback = text(" ", 20, DARK, true);
+                  c.addView(tvFeedback, lp(WRAP, 16));
+
+                  for (int r = 0; r < 2; r++) {
+                      LinearLayout row = new LinearLayout(this);
+                      row.setOrientation(LinearLayout.HORIZONTAL);
+                      c.addView(row, lp(dp(84), 16));
+                      for (int k = 0; k < 2; k++) {
+                          Button b = button("", BLUE, 28);
+                          LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
+                                  0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+                          p.leftMargin = dp(k == 0 ? 0 : 8);
+                          p.rightMargin = dp(k == 0 ? 8 : 0);
+                          row.addView(b, p);
+                          opts[r * 2 + k] = b;
+                      }
+                  }
+
+                  Button back = button("Menu", PURPLE, 16);
+                  c.addView(back, lp(dp(52), 40));
+                  back.setOnClickListener(v -> showMenu());
+
+                  setContentView(c);
+              }
+
+              private void nextQuestion() {
+                  if (index >= TOTAL || lives <= 0) {
+                      showResult();
+                      return;
+                  }
+                  index++;
+                  locked = false;
+
+                  int max = 10 + (index - 1) * 2;
+                  int op = (mode == 3) ? rnd.nextInt(3) : mode;
+                  int a;
+                  int b;
+                  String sym;
+                  if (op == 0) {
+                      a = 1 + rnd.nextInt(max);
+                      b = 1 + rnd.nextInt(max);
+                      answer = a + b;
+                      sym = "+";
+                  } else if (op == 1) {
+                      a = 1 + rnd.nextInt(max);
+                      b = 1 + rnd.nextInt(a);
+                      answer = a - b;
+                      sym = "-";
+                  } else {
+                      a = 1 + rnd.nextInt(Math.min(10, 2 + index));
+                      b = 1 + rnd.nextInt(10);
+                      answer = a * b;
+                      sym = "×";
+                  }
+
+                  tvQuestion.setText(a + " " + sym + " " + b + " = ?");
+                  tvFeedback.setText(" ");
+
+                  int pos = rnd.nextInt(4);
+                  int[] vals = new int[4];
+                  Arrays.fill(vals, -1);
+                  vals[pos] = answer;
+                  for (int i = 0; i < 4; i++) {
+                      if (i == pos) {
+                          continue;
+                      }
+                      int v;
+                      boolean bad;
+                      do {
+                          v = answer + rnd.nextInt(21) - 10;
+                          bad = (v < 0 || v == answer);
+                          for (int j = 0; j < 4 && !bad; j++) {
+                              if (vals[j] == v) {
+                                  bad = true;
+                              }
+                          }
+                      } while (bad);
+                      vals[i] = v;
+                  }
+
+                  for (int i = 0; i < 4; i++) {
+                      final int value = vals[i];
+                      final Button btn = opts[i];
+                      btn.setText(String.valueOf(value));
+                      btn.setBackground(box(BLUE, 16));
+                      if (i == pos) {
+                          correctBtn = btn;
+                      }
+                      btn.setOnClickListener(v -> choose(value, btn));
+                  }
+                  updateInfo();
+              }
+
+              private void choose(int value, Button btn) {
+                  if (locked) {
+                      return;
+                  }
+                  locked = true;
+                  if (value == answer) {
+                      score += 10;
+                      correct++;
+                      btn.setBackground(box(GREEN, 16));
+                      tvFeedback.setText("Benar! 🎉");
+                      tvFeedback.setTextColor(GREEN);
+                  } else {
+                      lives--;
+                      btn.setBackground(box(RED, 16));
+                      correctBtn.setBackground(box(GREEN, 16));
+                      tvFeedback.setText("Oops! Jawabannya " + answer);
+                      tvFeedback.setTextColor(RED);
+                  }
+                  updateInfo();
+                  handler.postDelayed(this::nextQuestion, 1000);
+              }
+
+              private void updateInfo() {
+                  StringBuilder h = new StringBuilder();
+                  for (int i = 0; i < lives; i++) {
+                      h.append("❤️");
+                  }
+                  tvInfo.setText("Soal " + index + "/" + TOTAL + "    ⭐ " + score + "    " + h);
+              }
+
+              // ---------- Hasil ----------
+
+              private void showResult() {
+                  screen = 2;
+                  int best = prefs.getInt("best", 0);
+                  boolean rekor = score > best;
+                  if (rekor) {
+                      prefs.edit().putInt("best", score).apply();
+                  }
+                  int stars = correct >= 9 ? 3 : correct >= 6 ? 2 : correct >= 3 ? 1 : 0;
+
+                  LinearLayout c = column();
+                  c.setGravity(Gravity.CENTER);
+                  c.addView(text(lives <= 0 ? "Nyawa habis!" : "Selesai!", 32, ORANGE_DARK, true), lp(WRAP, 0));
+
+                  StringBuilder s = new StringBuilder();
+                  for (int i = 0; i < 3; i++) {
+                      s.append(i < stars ? "⭐" : "☆");
+                  }
+                  c.addView(text(s.toString(), 44, ORANGE, false), lp(WRAP, 16));
+                  c.addView(text("Skor: " + score, 28, DARK, true), lp(WRAP, 16));
+                  c.addView(text("Benar " + correct + " dari " + TOTAL, 18, DARK, false), lp(WRAP, 8));
+                  if (rekor) {
+                      c.addView(text("Rekor baru! 🏆", 20, PURPLE, true), lp(WRAP, 12));
+                  }
+
+                  Button again = button("Main Lagi", GREEN, 22);
+                  c.addView(again, lp(dp(64), 28));
+                  again.setOnClickListener(v -> startGame(mode));
+
+                  Button menu = button("Menu Utama", ORANGE, 20);
+                  c.addView(menu, lp(dp(64), 14));
+                  menu.setOnClickListener(v -> showMenu());
+
+                  setContentView(c);
+              }
+          }
+          PB_EOF
+
+      - name: Pasang Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build APK
+        working-directory: proj
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Cek hasil APK
+        run: |
+          ls -l proj/app/build/outputs/apk/debug/
+          SIZE=$(stat -c%s proj/app/build/outputs/apk/debug/app-debug.apk)
+          echo "Ukuran APK: $SIZE byte"
+          test "$SIZE" -gt 8000
+
+      - name: Unggah APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Petualangan-Berhitung-APK
+          path: proj/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
