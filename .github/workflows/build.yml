@@ -68,8 +68,8 @@ jobs:
                   applicationId "com.petualangan.berhitung"
                   minSdk 21
                   targetSdk 34
-                  versionCode 7
-                  versionName "3.3"
+                  versionCode 8
+                  versionName "3.4"
               }
 
               signingConfigs {
@@ -182,6 +182,7 @@ jobs:
               private static final int GOLD = Color.parseColor("#FFB300");
               private static final int SILVER = Color.parseColor("#90A4AE");
               private static final int BRONZE = Color.parseColor("#A1887F");
+              private static final int INDIGO = Color.parseColor("#5C6BC0");
 
               // Tingkat kesulitan = kelas SD (indeks 0..5 untuk kelas 1..6)
               private static final String[] KELAS_LABEL = {"1", "2", "3", "4", "5", "6"};
@@ -227,6 +228,7 @@ jobs:
 
               private static class Q {
                   String text;
+                  String full;
                   int answer;
                   int correctIdx;
                   int trap = -1;
@@ -255,6 +257,11 @@ jobs:
               private final Q[] qs = new Q[TOTAL];
               private final int[] pScore = new int[MAX_PLAYERS];
               private final int[] pCorrect = new int[MAX_PLAYERS];
+              // Catatan tiap soal per pemain: 0 belum dijawab, 1 benar, 2 salah, 3 waktu habis
+              private final int[][] pRes = new int[MAX_PLAYERS][TOTAL];
+              private final int[][] pPick = new int[MAX_PLAYERS][TOTAL];
+              private boolean rekorNow;
+              private int reviewPlayer;
               private int cur;
 
               // Giliran berjalan
@@ -312,6 +319,12 @@ jobs:
               public void onBackPressed() {
                   if (screen == 0) {
                       super.onBackPressed();
+                  } else if (screen == 5) {
+                      if (np == 1) {
+                          renderSoloResult();
+                      } else {
+                          showRanking();
+                      }
                   } else {
                       saveNames();
                       showMenu();
@@ -547,6 +560,10 @@ jobs:
                   c.addView(r3, lp(dp(96), 12));
                   r3.addView(tile("\uD83C\uDFB2", "Campur", PURPLE, 4), weight(0, 6));
                   r3.addView(tile("+\u2212\u00D7", "3 Bilangan", PINK, 5), weight(6, 0));
+                  LinearLayout r4 = new LinearLayout(this);
+                  r4.setOrientation(LinearLayout.HORIZONTAL);
+                  c.addView(r4, lp(dp(96), 12));
+                  r4.addView(tile("?", "Isi Titik", INDIGO, 6), weight(0, 0));
 
                   // Pengaturan (pemain dan waktu)
                   String who = (np == 1) ? "Main sendiri" : np + " pemain";
@@ -669,6 +686,10 @@ jobs:
                   buildQuestions();
                   Arrays.fill(pScore, 0);
                   Arrays.fill(pCorrect, 0);
+                  for (int p = 0; p < MAX_PLAYERS; p++) {
+                      Arrays.fill(pRes[p], 0);
+                      Arrays.fill(pPick[p], 0);
+                  }
                   cur = 0;
                   if (np > 1) {
                       showPass();
@@ -723,7 +744,15 @@ jobs:
               }
 
               private void buildTwo(Q q, int n) {
-                  int op = (mode == 4) ? rnd.nextInt(4) : mode;
+                  int op;
+                  if (mode == 6) {
+                      // Isi titik: Kelas 1-2 hanya tambah dan kurang, Kelas 3-6 semua operasi
+                      op = rnd.nextInt(kelas <= 1 ? 2 : 4);
+                  } else if (mode == 4) {
+                      op = rnd.nextInt(4);
+                  } else {
+                      op = mode;
+                  }
                   int a;
                   int b;
                   int ans;
@@ -760,8 +789,17 @@ jobs:
                           sym = "-";
                       }
                   }
-                  q.text = fmt(a) + " " + sym + " " + fmt(b) + " = ?";
-                  q.answer = ans;
+                  q.full = fmt(a) + " " + sym + " " + fmt(b) + " = " + fmt(ans);
+                  if (mode == 6) {
+                      boolean hideA = rnd.nextBoolean();
+                      String sa = hideA ? "\u2026" : fmt(a);
+                      String sb = hideA ? fmt(b) : "\u2026";
+                      q.text = sa + " " + sym + " " + sb + " = " + fmt(ans);
+                      q.answer = hideA ? a : b;
+                  } else {
+                      q.text = fmt(a) + " " + sym + " " + fmt(b) + " = ?";
+                      q.answer = ans;
+                  }
               }
 
               // Tiga bilangan. Kelas 1-4: tambah dan kurang. Kelas 5-6: ada perkalian (urutan operasi).
@@ -841,6 +879,7 @@ jobs:
                       }
                   }
                   q.text = expr + "\n= ?";
+                  q.full = expr + " = " + fmt(ans);
                   q.answer = ans;
               }
 
@@ -1030,7 +1069,8 @@ jobs:
                   tvQuestion.setText(q.text);
                   int nl = q.text.indexOf('\n');
                   tvQuestion.setTextSize(questionSize(nl >= 0 ? nl : q.text.length()));
-                  tvFeedback.setText(" ");
+                  tvFeedback.setText(mode == 6 ? "Isi titik-titiknya!" : " ");
+                  tvFeedback.setTextColor(DARK);
                   for (int i = 0; i < 4; i++) {
                       final int idx = i;
                       String ot = fmt(q.opts[i]);
@@ -1084,6 +1124,8 @@ jobs:
                       timerFill.animate().cancel();
                   }
                   Q q = qs[qi - 1];
+                  pPick[cur][qi - 1] = q.opts[idx];
+                  pRes[cur][qi - 1] = (idx == q.correctIdx) ? 1 : 2;
                   dimOthers(idx, q.correctIdx);
                   if (idx == q.correctIdx) {
                       score += 10;
@@ -1110,6 +1152,7 @@ jobs:
                   Q q = qs[qi - 1];
                   timerFill.animate().cancel();
                   timerFill.setScaleX(0f);
+                  pRes[cur][qi - 1] = 3;
                   tvTimer.setText("Waktu habis!");
                   tvTimer.setTextColor(RED);
                   dimOthers(q.correctIdx, q.correctIdx);
@@ -1150,10 +1193,16 @@ jobs:
                   screen = 2;
                   String key = bestKey();
                   int best = prefs.getInt(key, 0);
-                  boolean rekor = pScore[0] > best;
-                  if (rekor) {
+                  rekorNow = pScore[0] > best;
+                  if (rekorNow) {
                       prefs.edit().putInt(key, pScore[0]).apply();
                   }
+                  renderSoloResult();
+              }
+
+              private void renderSoloResult() {
+                  screen = 2;
+                  boolean rekor = rekorNow;
                   int stars = pCorrect[0] >= 9 ? 3 : pCorrect[0] >= 6 ? 2 : pCorrect[0] >= 3 ? 1 : 0;
 
                   LinearLayout c = column();
@@ -1246,10 +1295,124 @@ jobs:
                   wrap(c);
               }
 
+              private boolean hasMistakes() {
+                  for (int p = 0; p < np; p++) {
+                      for (int i = 0; i < TOTAL; i++) {
+                          if (pRes[p][i] != 1) {
+                              return true;
+                          }
+                      }
+                  }
+                  return false;
+              }
+
+              // ---------- Pembahasan ----------
+
+              private void showReview() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 5;
+                  int p = reviewPlayer;
+
+                  LinearLayout c = column();
+                  c.setGravity(Gravity.CENTER_HORIZONTAL);
+                  c.addView(text("Pembahasan", 30, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(pill(KELAS_NAMES[kelas] + " \u2022 " + modeLabel(), KELAS_COLOR[kelas]), lpw(10));
+
+                  if (np > 1) {
+                      String[] labels = new String[np];
+                      int[] cols = new int[np];
+                      for (int i = 0; i < np; i++) {
+                          labels[i] = names[i];
+                          cols[i] = PLAYER_COLORS[i];
+                      }
+                      c.addView(chips(labels, p, cols, k -> {
+                          reviewPlayer = k;
+                          showReview();
+                      }), lp(dp(46), 16));
+                  }
+
+                  int wrong = 0;
+                  int skipped = 0;
+                  for (int i = 0; i < TOTAL; i++) {
+                      if (pRes[p][i] == 2 || pRes[p][i] == 3) {
+                          wrong++;
+                      } else if (pRes[p][i] == 0) {
+                          skipped++;
+                      }
+                  }
+
+                  if (wrong == 0) {
+                      LinearLayout ok = card();
+                      ok.setGravity(Gravity.CENTER_HORIZONTAL);
+                      ok.addView(text("\uD83C\uDF89", 44, GREEN, false), lp(WRAP, 0));
+                      ok.addView(text(skipped == 0 ? "Semua jawabanmu benar!"
+                              : "Semua jawaban yang sempat dikerjakan benar!", 18, GREEN, true), lp(WRAP, 8));
+                      c.addView(ok, lp(WRAP, 16));
+                  } else {
+                      c.addView(text("Ini soal yang masih salah. Yuk, lihat jawaban yang benar.", 14, DARK, false),
+                              lp(WRAP, 14));
+                  }
+
+                  for (int i = 0; i < TOTAL; i++) {
+                      int r = pRes[p][i];
+                      if (r != 2 && r != 3) {
+                          continue;
+                      }
+                      Q q = qs[i];
+                      LinearLayout cd = card();
+                      TextView no = text("Soal " + (i + 1), 13, DARK, false);
+                      no.setGravity(Gravity.START);
+                      cd.addView(no, lp(WRAP, 0));
+                      cd.addView(text(q.text.replace("\n", " "), 22, ORANGE_DARK, true), lp(WRAP, 6));
+                      if (r == 3) {
+                          cd.addView(text("Waktu habis \u23F0", 15, RED, true), lp(WRAP, 10));
+                      } else {
+                          cd.addView(text("Jawabanmu: " + fmt(pPick[p][i]), 15, RED, true), lp(WRAP, 10));
+                      }
+                      cd.addView(text("Jawaban yang benar: " + fmt(q.answer), 16, GREEN, true), lp(WRAP, 4));
+                      if (mode == 6) {
+                          cd.addView(text("Jadi: " + q.full, 15, DARK, false), lp(WRAP, 4));
+                      }
+                      if (r == 2 && q.trap >= 1 && pPick[p][i] == q.trap) {
+                          cd.addView(text("Ingat: kerjakan tanda kurung atau perkalian dulu.", 13, PURPLE, true),
+                                  lp(WRAP, 8));
+                      }
+                      c.addView(cd, lp(WRAP, 12));
+                  }
+
+                  if (skipped > 0) {
+                      c.addView(text(skipped + " soal belum sempat dikerjakan karena nyawa habis.", 13, DARK, false),
+                              lp(WRAP, 14));
+                  }
+
+                  Button back = button("Kembali ke hasil", ORANGE, 18);
+                  back.setElevation(dp(4));
+                  c.addView(back, lp(dp(56), 22));
+                  back.setOnClickListener(v -> {
+                      if (np == 1) {
+                          renderSoloResult();
+                      } else {
+                          showRanking();
+                      }
+                  });
+
+                  wrap(c);
+              }
+
               private void addResultButtons(LinearLayout c) {
+                  boolean mistakes = hasMistakes();
+                  if (mistakes) {
+                      Button rev = button("Lihat Pembahasan", BLUE, 20);
+                      rev.setElevation(dp(4));
+                      c.addView(rev, lp(dp(60), 22));
+                      rev.setOnClickListener(v -> {
+                          reviewPlayer = 0;
+                          showReview();
+                      });
+                  }
                   Button again = button("Main Lagi", GREEN, 22);
                   again.setElevation(dp(4));
-                  c.addView(again, lp(dp(64), 26));
+                  c.addView(again, lp(dp(64), mistakes ? 12 : 26));
                   again.setOnClickListener(v -> startGame(mode));
 
                   Button menu = button("Menu Utama", ORANGE, 20);
