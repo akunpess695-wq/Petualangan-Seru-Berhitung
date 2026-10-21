@@ -68,8 +68,8 @@ jobs:
                   applicationId "com.petualangan.berhitung"
                   minSdk 21
                   targetSdk 34
-                  versionCode 3
-                  versionName "2.1"
+                  versionCode 4
+                  versionName "3.0"
               }
 
               signingConfigs {
@@ -96,12 +96,42 @@ jobs:
           mkdir -p app/src/main
           cat > app/src/main/AndroidManifest.xml <<'PB_EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"> <application android:allowBackup="true" android:icon="@drawable/ic_launcher" android:label="Petualangan Berhitung" android:theme="@android:style/Theme.Material.Light.NoActionBar"> <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="portrait"> <intent-filter> <action android:name="android.intent.action.MAIN" /> <category android:name="android.intent.category.LAUNCHER" /> </intent-filter> </activity> </application> </manifest>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="Petualangan Berhitung"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:screenOrientation="portrait">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+
+          </manifest>
           PB_EOF
           mkdir -p app/src/main/res/drawable
           cat > app/src/main/res/drawable/ic_launcher.xml <<'PB_EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="96dp" android:height="96dp" android:viewportWidth="96" android:viewportHeight="96"> <path android:fillColor="#FF9800" android:pathData="M16,0 H80 A16,16 0 0 1 96,16 V80 A16,16 0 0 1 80,96 H16 A16,16 0 0 1 0,80 V16 A16,16 0 0 1 16,0 Z" /> <path android:fillColor="#FFFFFF" android:pathData="M42,20 H54 V42 H76 V54 H54 V76 H42 V54 H20 V42 H42 Z" /> </vector>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="96dp"
+              android:height="96dp"
+              android:viewportWidth="96"
+              android:viewportHeight="96">
+              <path
+                  android:fillColor="#FF9800"
+                  android:pathData="M16,0 H80 A16,16 0 0 1 96,16 V80 A16,16 0 0 1 80,96 H16 A16,16 0 0 1 0,80 V16 A16,16 0 0 1 16,0 Z" />
+              <path
+                  android:fillColor="#FFFFFF"
+                  android:pathData="M42,20 H54 V42 H76 V54 H54 V76 H42 V54 H20 V42 H42 Z" />
+          </vector>
           PB_EOF
           mkdir -p app/src/main/java/com/petualangan/berhitung
           cat > app/src/main/java/com/petualangan/berhitung/MainActivity.java <<'PB_EOF'
@@ -115,9 +145,15 @@ jobs:
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
+          import android.text.InputFilter;
           import android.view.Gravity;
+          import android.view.View;
           import android.view.ViewGroup;
+          import android.view.animation.LinearInterpolator;
+          import android.view.animation.OvershootInterpolator;
           import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.FrameLayout;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
           import android.widget.TextView;
@@ -128,6 +164,7 @@ jobs:
           public class MainActivity extends Activity {
 
               private static final int TOTAL = 10;
+              private static final int MAX_PLAYERS = 4;
               private static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
               private static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
 
@@ -137,9 +174,14 @@ jobs:
               private static final int RED = Color.parseColor("#E53935");
               private static final int BLUE = Color.parseColor("#1E88E5");
               private static final int PURPLE = Color.parseColor("#8E24AA");
-              private static final int BG = Color.parseColor("#FFF8E1");
+              private static final int TEAL = Color.parseColor("#00897B");
+              private static final int PINK = Color.parseColor("#D81B60");
               private static final int DARK = Color.parseColor("#4E342E");
-              private static final int GRAY = Color.parseColor("#E0E0E0");
+              private static final int GRAY = Color.parseColor("#ECEFF1");
+              private static final int GRAY_D = Color.parseColor("#CFD8DC");
+              private static final int GOLD = Color.parseColor("#FFB300");
+              private static final int SILVER = Color.parseColor("#90A4AE");
+              private static final int BRONZE = Color.parseColor("#A1887F");
 
               // Tingkat kesulitan soal: 0 Easy, 1 Normal, 2 Hard, 3 Extreme
               private static final String[] DIFF_NAMES = {"Easy", "Normal", "Hard", "Extreme"};
@@ -156,31 +198,66 @@ jobs:
               private static final int[] DIFF_MUL_A = {5, 0, 12, 20};
               private static final int[] DIFF_MUL_B = {5, 10, 12, 20};
 
+              private static final int[] PLAYER_COLORS = {BLUE, PINK, GREEN, PURPLE};
+              private static final String[] PLAYER_ICON = {
+                      "\uD83D\uDC31", "\uD83D\uDC36", "\uD83D\uDC30", "\uD83D\uDC3C"
+              };
+              private static final int[] OPT_COLORS = {BLUE, PURPLE, TEAL, PINK};
+
               // Batas waktu per soal yang bisa diatur (detik)
               private static final int SECS_MIN = 3;
               private static final int SECS_MAX = 120;
+
+              private static class Q {
+                  String text;
+                  int answer;
+                  int correctIdx;
+                  final int[] opts = new int[4];
+              }
+
+              private interface Pick {
+                  void on(int i);
+              }
 
               private final Random rnd = new Random();
               private final Handler handler = new Handler(Looper.getMainLooper());
               private SharedPreferences prefs;
 
+              // Pengaturan
               private int screen;
               private int mode;
               private int diff = 1;
               private boolean timed = false;
               private int secs = 10;
-              private int index;
+              private int np = 1;
+              private final String[] names = new String[MAX_PLAYERS];
+              private EditText[] nameFields;
+
+              // Hasil per pemain
+              private final Q[] qs = new Q[TOTAL];
+              private final int[] pScore = new int[MAX_PLAYERS];
+              private final int[] pCorrect = new int[MAX_PLAYERS];
+              private int cur;
+
+              // Giliran berjalan
+              private int qi;
               private int score;
-              private int lives;
               private int correct;
-              private int answer;
+              private int lives;
               private int timeLeft;
               private boolean locked;
 
-              private TextView tvInfo;
+              // Tampilan permainan
+              private TextView tvStep;
+              private TextView tvScore;
+              private TextView tvHearts;
               private TextView tvTimer;
               private TextView tvQuestion;
               private TextView tvFeedback;
+              private FrameLayout timerBox;
+              private View timerFill;
+              private LinearLayout cardQ;
+              private final View[] dots = new View[TOTAL];
               private final Button[] opts = new Button[4];
               private Button correctBtn;
 
@@ -235,6 +312,17 @@ jobs:
                   return g;
               }
 
+              private GradientDrawable outline(int color, int radiusDp) {
+                  GradientDrawable g = box(Color.WHITE, radiusDp);
+                  g.setStroke(dp(2), color);
+                  return g;
+              }
+
+              private GradientDrawable background() {
+                  return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                          new int[]{Color.parseColor("#FFF8E1"), Color.parseColor("#FFE0B2")});
+              }
+
               private TextView text(String s, int sp, int color, boolean bold) {
                   TextView t = new TextView(this);
                   t.setText(s);
@@ -244,6 +332,19 @@ jobs:
                   if (bold) {
                       t.setTypeface(Typeface.DEFAULT_BOLD);
                   }
+                  return t;
+              }
+
+              private TextView heading(String s) {
+                  TextView t = text(s, 16, DARK, true);
+                  t.setGravity(Gravity.START);
+                  return t;
+              }
+
+              private TextView pill(String s, int color) {
+                  TextView t = text(s, 15, Color.WHITE, true);
+                  t.setBackground(box(color, 20));
+                  t.setPadding(dp(14), dp(6), dp(14), dp(6));
                   return t;
               }
 
@@ -270,13 +371,35 @@ jobs:
                   LinearLayout l = new LinearLayout(this);
                   l.setOrientation(LinearLayout.VERTICAL);
                   l.setGravity(Gravity.CENTER_HORIZONTAL);
-                  l.setPadding(dp(20), dp(32), dp(20), dp(24));
-                  l.setBackgroundColor(BG);
+                  l.setPadding(dp(18), dp(28), dp(18), dp(24));
                   return l;
+              }
+
+              private LinearLayout card() {
+                  LinearLayout l = new LinearLayout(this);
+                  l.setOrientation(LinearLayout.VERTICAL);
+                  l.setPadding(dp(16), dp(14), dp(16), dp(16));
+                  l.setBackground(box(Color.WHITE, 20));
+                  l.setElevation(dp(4));
+                  return l;
+              }
+
+              private void wrap(LinearLayout c) {
+                  ScrollView sv = new ScrollView(this);
+                  sv.setFillViewport(true);
+                  sv.setBackground(background());
+                  sv.addView(c);
+                  setContentView(sv);
               }
 
               private LinearLayout.LayoutParams lp(int height, int topDp) {
                   LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(MATCH, height);
+                  p.topMargin = dp(topDp);
+                  return p;
+              }
+
+              private LinearLayout.LayoutParams lpw(int topDp) {
+                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(WRAP, WRAP);
                   p.topMargin = dp(topDp);
                   return p;
               }
@@ -295,6 +418,24 @@ jobs:
                   return p;
               }
 
+              private LinearLayout chips(String[] labels, int sel, int[] colors, final Pick pick) {
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  for (int i = 0; i < labels.length; i++) {
+                      final int idx = i;
+                      boolean on = (i == sel);
+                      Button b = button(labels[i], on ? colors[i] : GRAY, 13);
+                      b.setTextColor(on ? Color.WHITE : DARK);
+                      flat(b);
+                      row.addView(b, weight(i == 0 ? 0 : 3, i == labels.length - 1 ? 0 : 3));
+                      b.setOnClickListener(v -> {
+                          saveNames();
+                          pick.on(idx);
+                      });
+                  }
+                  return row;
+              }
+
               private String bestKey() {
                   return "best_" + diff + (timed ? "_t" : "");
               }
@@ -303,95 +444,123 @@ jobs:
                   return timed ? "Berwaktu " + secs + " detik" : "Tanpa waktu";
               }
 
+              private void saveNames() {
+                  if (nameFields == null) {
+                      return;
+                  }
+                  SharedPreferences.Editor ed = prefs.edit();
+                  for (int i = 0; i < nameFields.length; i++) {
+                      String s = nameFields[i].getText().toString().trim();
+                      if (s.isEmpty()) {
+                          s = "Pemain " + (i + 1);
+                      }
+                      names[i] = s;
+                      ed.putString("name" + i, s);
+                  }
+                  ed.apply();
+              }
+
               // ---------- Menu ----------
 
               private void showMenu() {
                   handler.removeCallbacksAndMessages(null);
                   screen = 0;
-                  diff = prefs.getInt("diff", 1);
-                  if (diff < 0 || diff > 3) {
-                      diff = 1;
-                  }
+                  diff = Math.max(0, Math.min(3, prefs.getInt("diff", 1)));
                   timed = prefs.getBoolean("timed", false);
                   secs = Math.max(SECS_MIN, Math.min(SECS_MAX, prefs.getInt("secs", 10)));
+                  np = Math.max(1, Math.min(MAX_PLAYERS, prefs.getInt("np", 1)));
+                  for (int i = 0; i < MAX_PLAYERS; i++) {
+                      names[i] = prefs.getString("name" + i, "Pemain " + (i + 1));
+                  }
 
                   LinearLayout c = column();
-                  c.setGravity(Gravity.CENTER);
-                  c.addView(text("\u2B50", 56, ORANGE, false), lp(WRAP, 0));
-                  c.addView(text("Petualangan Berhitung", 30, ORANGE_DARK, true), lp(WRAP, 4));
-                  c.addView(text("Ayo belajar berhitung sambil bermain!", 16, DARK, false), lp(WRAP, 6));
+                  c.addView(text("\u2B50", 48, ORANGE, false), lp(WRAP, 0));
+                  c.addView(text("Petualangan Berhitung", 28, ORANGE_DARK, true), lp(WRAP, 2));
+                  c.addView(text("Ayo belajar berhitung sambil bermain!", 15, DARK, false), lp(WRAP, 4));
 
-                  // Tingkat kesulitan soal
-                  c.addView(text("Tingkat kesulitan", 16, DARK, true), lp(WRAP, 16));
-                  LinearLayout drow = new LinearLayout(this);
-                  drow.setOrientation(LinearLayout.HORIZONTAL);
-                  c.addView(drow, lp(dp(48), 8));
-                  for (int i = 0; i < 4; i++) {
-                      final int d = i;
-                      Button b = button(DIFF_NAMES[i], i == diff ? DIFF_COLOR[i] : GRAY, 12);
-                      b.setTextColor(i == diff ? Color.WHITE : DARK);
-                      flat(b);
-                      drow.addView(b, weight(i == 0 ? 0 : 3, i == 3 ? 0 : 3));
-                      b.setOnClickListener(v -> {
-                          prefs.edit().putInt("diff", d).apply();
-                          showMenu();
-                      });
+                  // Kartu pemain
+                  LinearLayout cp = card();
+                  cp.addView(heading("Jumlah pemain"), lp(WRAP, 0));
+                  cp.addView(chips(new String[]{"1", "2", "3", "4"}, np - 1, PLAYER_COLORS, k1 -> {
+                      prefs.edit().putInt("np", k1 + 1).apply();
+                      showMenu();
+                  }), lp(dp(46), 10));
+                  cp.addView(text(np == 1 ? "Main sendiri" : np + " pemain, main bergantian di HP ini",
+                          13, DARK, false), lp(WRAP, 8));
+                  if (np > 1) {
+                      nameFields = new EditText[np];
+                      for (int i = 0; i < np; i++) {
+                          EditText e = new EditText(this);
+                          e.setText(names[i]);
+                          e.setHint("Nama pemain " + (i + 1));
+                          e.setSingleLine(true);
+                          e.setFilters(new InputFilter[]{new InputFilter.LengthFilter(10)});
+                          e.setTextSize(16);
+                          e.setTextColor(DARK);
+                          e.setPadding(dp(14), 0, dp(14), 0);
+                          e.setBackground(outline(PLAYER_COLORS[i], 12));
+                          cp.addView(e, lp(dp(46), 8));
+                          nameFields[i] = e;
+                      }
+                  } else {
+                      nameFields = null;
                   }
-                  c.addView(text(DIFF_DESC[diff], 14, DARK, false), lp(WRAP, 8));
+                  c.addView(cp, lp(WRAP, 16));
 
-                  // Mode waktu
-                  c.addView(text("Mode waktu", 16, DARK, true), lp(WRAP, 16));
-                  LinearLayout trow = new LinearLayout(this);
-                  trow.setOrientation(LinearLayout.HORIZONTAL);
-                  c.addView(trow, lp(dp(48), 8));
-                  trow.addView(modeChip("Tanpa waktu", !timed, false), weight(0, 4));
-                  trow.addView(modeChip("Berwaktu", timed, true), weight(4, 0));
+                  // Kartu tingkat kesulitan
+                  LinearLayout cd = card();
+                  cd.addView(heading("Tingkat kesulitan"), lp(WRAP, 0));
+                  cd.addView(chips(DIFF_NAMES, diff, DIFF_COLOR, k2 -> {
+                      prefs.edit().putInt("diff", k2).apply();
+                      showMenu();
+                  }), lp(dp(46), 10));
+                  cd.addView(text(DIFF_DESC[diff], 13, DARK, false), lp(WRAP, 8));
+                  c.addView(cd, lp(WRAP, 14));
 
+                  // Kartu mode waktu
+                  LinearLayout cm = card();
+                  cm.addView(heading("Mode waktu"), lp(WRAP, 0));
+                  cm.addView(chips(new String[]{"Tanpa waktu", "Berwaktu"}, timed ? 1 : 0,
+                          new int[]{PURPLE, PURPLE}, k3 -> {
+                              prefs.edit().putBoolean("timed", k3 == 1).apply();
+                              showMenu();
+                          }), lp(dp(46), 10));
                   if (timed) {
                       LinearLayout srow = new LinearLayout(this);
                       srow.setOrientation(LinearLayout.HORIZONTAL);
-                      c.addView(srow, lp(dp(48), 10));
+                      cm.addView(srow, lp(dp(48), 10));
                       srow.addView(stepButton("\u22125", -5), fixed(52));
                       srow.addView(stepButton("\u22121", -1), fixed(52));
                       srow.addView(text(secs + " detik", 18, PURPLE, true),
                               new LinearLayout.LayoutParams(0, MATCH, 1f));
                       srow.addView(stepButton("+1", 1), fixed(52));
                       srow.addView(stepButton("+5", 5), fixed(52));
-                      c.addView(text("Waktu per soal, atur dengan tombol di atas", 12, DARK, false),
-                              lp(WRAP, 4));
+                      cm.addView(text("Waktu per soal, atur dengan tombol di atas", 12, DARK, false),
+                              lp(WRAP, 6));
+                  }
+                  c.addView(cm, lp(WRAP, 14));
+
+                  if (np == 1) {
+                      c.addView(pill("\uD83C\uDFC6 Skor terbaik: " + prefs.getInt(bestKey(), 0), PURPLE),
+                              lpw(16));
                   }
 
-                  c.addView(text("Skor terbaik (" + DIFF_NAMES[diff] + ", "
-                                  + (timed ? "berwaktu" : "tanpa waktu") + "): " + prefs.getInt(bestKey(), 0),
-                          16, PURPLE, true), lp(WRAP, 14));
+                  c.addView(text("Pilih permainan", 16, DARK, true), lp(WRAP, 18));
+                  addMenuButton(c, "\u2795  Penjumlahan", ORANGE, 0);
+                  addMenuButton(c, "\u2796  Pengurangan", BLUE, 1);
+                  addMenuButton(c, "\u2716  Perkalian", GREEN, 2);
+                  addMenuButton(c, "\uD83C\uDFB2  Campur", PURPLE, 3);
 
-                  addMenuButton(c, "\u2795 Penjumlahan", ORANGE, 0);
-                  addMenuButton(c, "\u2796 Pengurangan", BLUE, 1);
-                  addMenuButton(c, "\u2716 Perkalian", GREEN, 2);
-                  addMenuButton(c, "\uD83C\uDFB2 Campur", PURPLE, 3);
-
-                  ScrollView sv = new ScrollView(this);
-                  sv.setFillViewport(true);
-                  sv.setBackgroundColor(BG);
-                  sv.addView(c);
-                  setContentView(sv);
-              }
-
-              private Button modeChip(String label, boolean selected, final boolean value) {
-                  Button b = button(label, selected ? PURPLE : GRAY, 14);
-                  b.setTextColor(selected ? Color.WHITE : DARK);
-                  flat(b);
-                  b.setOnClickListener(v -> {
-                      prefs.edit().putBoolean("timed", value).apply();
-                      showMenu();
-                  });
-                  return b;
+                  c.setFocusableInTouchMode(true);
+                  c.requestFocus();
+                  wrap(c);
               }
 
               private Button stepButton(String label, final int delta) {
                   Button b = button(label, ORANGE, 14);
                   flat(b);
                   b.setOnClickListener(v -> {
+                      saveNames();
                       int n = Math.max(SECS_MIN, Math.min(SECS_MAX, secs + delta));
                       prefs.edit().putInt("secs", n).apply();
                       showMenu();
@@ -401,221 +570,459 @@ jobs:
 
               private void addMenuButton(LinearLayout c, String label, int color, final int m) {
                   Button b = button(label, color, 20);
+                  b.setElevation(dp(4));
                   c.addView(b, lp(dp(60), 12));
                   b.setOnClickListener(v -> startGame(m));
               }
 
-              // ---------- Permainan ----------
+              // ---------- Persiapan permainan ----------
 
               private void startGame(int m) {
+                  saveNames();
+                  nameFields = null;
                   mode = m;
-                  index = 0;
+                  buildQuestions();
+                  Arrays.fill(pScore, 0);
+                  Arrays.fill(pCorrect, 0);
+                  cur = 0;
+                  if (np > 1) {
+                      showPass();
+                  } else {
+                      startTurn();
+                  }
+              }
+
+              private void buildQuestions() {
+                  for (int i = 0; i < TOTAL; i++) {
+                      int n = i + 1;
+                      int max = DIFF_BASE[diff] + (n - 1) * DIFF_STEP[diff];
+                      int op = (mode == 3) ? rnd.nextInt(3) : mode;
+                      int a;
+                      int b;
+                      int ans;
+                      String sym;
+                      if (op == 0) {
+                          a = 1 + rnd.nextInt(max);
+                          b = 1 + rnd.nextInt(max);
+                          ans = a + b;
+                          sym = "+";
+                      } else if (op == 1) {
+                          a = 1 + rnd.nextInt(max);
+                          b = 1 + rnd.nextInt(a);
+                          ans = a - b;
+                          sym = "-";
+                      } else {
+                          int aMax = (diff == 1) ? Math.min(10, 2 + n) : DIFF_MUL_A[diff];
+                          a = 1 + rnd.nextInt(aMax);
+                          b = 1 + rnd.nextInt(DIFF_MUL_B[diff]);
+                          ans = a * b;
+                          sym = "\u00D7";
+                      }
+
+                      Q q = new Q();
+                      q.text = a + " " + sym + " " + b + " = ?";
+                      q.answer = ans;
+                      int spread = Math.max(10, ans / 4);
+                      int pos = rnd.nextInt(4);
+                      Arrays.fill(q.opts, -1);
+                      q.opts[pos] = ans;
+                      q.correctIdx = pos;
+                      for (int k = 0; k < 4; k++) {
+                          if (k == pos) {
+                              continue;
+                          }
+                          int v;
+                          boolean bad;
+                          do {
+                              v = ans + rnd.nextInt(2 * spread + 1) - spread;
+                              bad = (v < 0 || v == ans);
+                              for (int j = 0; j < 4 && !bad; j++) {
+                                  if (q.opts[j] == v) {
+                                      bad = true;
+                                  }
+                              }
+                          } while (bad);
+                          q.opts[k] = v;
+                      }
+                      qs[i] = q;
+                  }
+              }
+
+              // ---------- Layar giliran (multi pemain) ----------
+
+              private void showPass() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 3;
+                  LinearLayout c = column();
+                  c.setGravity(Gravity.CENTER);
+
+                  TextView av = text(PLAYER_ICON[cur], 60, Color.WHITE, false);
+                  av.setBackground(box(PLAYER_COLORS[cur], 60));
+                  av.setElevation(dp(6));
+                  c.addView(av, new LinearLayout.LayoutParams(dp(120), dp(120)));
+
+                  c.addView(text(cur == 0 ? "Giliran pertama" : "Giliran berikutnya", 16, DARK, false),
+                          lp(WRAP, 18));
+                  c.addView(text(names[cur], 34, PLAYER_COLORS[cur], true), lp(WRAP, 4));
+                  c.addView(text("Pemain " + (cur + 1) + " dari " + np, 14, DARK, false), lp(WRAP, 4));
+                  c.addView(pill(DIFF_NAMES[diff] + " \u2022 " + modeLabel(), DIFF_COLOR[diff]), lpw(14));
+
+                  if (cur > 0) {
+                      LinearLayout board = card();
+                      board.addView(heading("Skor sementara"), lp(WRAP, 0));
+                      for (int i = 0; i < cur; i++) {
+                          board.addView(text(PLAYER_ICON[i] + " " + names[i] + ":  " + pScore[i] + " poin",
+                                  15, DARK, false), lp(WRAP, 6));
+                      }
+                      c.addView(board, lp(WRAP, 18));
+                  }
+
+                  Button go = button("Mulai!", PLAYER_COLORS[cur], 24);
+                  go.setElevation(dp(4));
+                  c.addView(go, lp(dp(66), 24));
+                  go.setOnClickListener(v -> startTurn());
+
+                  Button cancel = button("Batal", GRAY, 14);
+                  cancel.setTextColor(DARK);
+                  c.addView(cancel, lp(dp(46), 14));
+                  cancel.setOnClickListener(v -> showMenu());
+
+                  wrap(c);
+              }
+
+              // ---------- Permainan ----------
+
+              private void startTurn() {
+                  qi = 0;
                   score = 0;
-                  lives = DIFF_LIVES[diff];
                   correct = 0;
+                  lives = DIFF_LIVES[diff];
                   showGame();
-                  nextQuestion();
+                  showQuestion();
               }
 
               private void showGame() {
                   screen = 1;
                   LinearLayout c = column();
 
-                  tvInfo = text("", 18, DARK, true);
-                  c.addView(tvInfo, lp(WRAP, 0));
+                  // Baris atas: nama pemain dan nyawa
+                  LinearLayout top = new LinearLayout(this);
+                  top.setOrientation(LinearLayout.HORIZONTAL);
+                  top.setGravity(Gravity.CENTER_VERTICAL);
+                  c.addView(top, lp(WRAP, 0));
+                  String who = (np > 1) ? PLAYER_ICON[cur] + " " + names[cur] : "\u2B50 Petualang";
+                  top.addView(pill(who, np > 1 ? PLAYER_COLORS[cur] : ORANGE),
+                          new LinearLayout.LayoutParams(WRAP, WRAP));
+                  top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+                  tvHearts = text("", 18, DARK, false);
+                  top.addView(tvHearts, new LinearLayout.LayoutParams(WRAP, WRAP));
 
-                  tvTimer = text(" ", 18, DARK, true);
-                  c.addView(tvTimer, lp(WRAP, 8));
+                  // Penanda kemajuan soal
+                  LinearLayout dotsRow = new LinearLayout(this);
+                  dotsRow.setOrientation(LinearLayout.HORIZONTAL);
+                  c.addView(dotsRow, lp(dp(8), 16));
+                  for (int i = 0; i < TOTAL; i++) {
+                      View d = new View(this);
+                      d.setBackground(box(GRAY_D, 4));
+                      dotsRow.addView(d, weight(i == 0 ? 0 : 2, i == TOTAL - 1 ? 0 : 2));
+                      dots[i] = d;
+                  }
 
-                  tvQuestion = text("", 48, ORANGE_DARK, true);
-                  c.addView(tvQuestion, lp(WRAP, 28));
+                  // Nomor soal dan skor
+                  LinearLayout info = new LinearLayout(this);
+                  info.setOrientation(LinearLayout.HORIZONTAL);
+                  c.addView(info, lp(WRAP, 10));
+                  tvStep = text("", 15, DARK, true);
+                  tvStep.setGravity(Gravity.START);
+                  info.addView(tvStep, new LinearLayout.LayoutParams(0, WRAP, 1f));
+                  tvScore = text("", 15, ORANGE_DARK, true);
+                  tvScore.setGravity(Gravity.END);
+                  info.addView(tvScore, new LinearLayout.LayoutParams(0, WRAP, 1f));
 
-                  tvFeedback = text(" ", 20, DARK, true);
-                  c.addView(tvFeedback, lp(WRAP, 16));
+                  // Penghitung waktu
+                  tvTimer = text(" ", 15, DARK, true);
+                  c.addView(tvTimer, lp(WRAP, 10));
+                  timerBox = new FrameLayout(this);
+                  timerBox.setBackground(box(GRAY, 6));
+                  timerFill = new View(this);
+                  timerFill.setBackground(box(GREEN, 6));
+                  timerFill.setPivotX(0f);
+                  timerBox.addView(timerFill, new FrameLayout.LayoutParams(MATCH, MATCH));
+                  c.addView(timerBox, lp(dp(10), 6));
+                  if (!timed) {
+                      tvTimer.setVisibility(View.GONE);
+                      timerBox.setVisibility(View.GONE);
+                  }
 
+                  // Kartu soal
+                  cardQ = new LinearLayout(this);
+                  cardQ.setOrientation(LinearLayout.VERTICAL);
+                  cardQ.setGravity(Gravity.CENTER);
+                  cardQ.setBackground(box(Color.WHITE, 24));
+                  cardQ.setElevation(dp(6));
+                  cardQ.setPadding(dp(16), dp(28), dp(16), dp(28));
+                  tvQuestion = text("", 46, ORANGE_DARK, true);
+                  cardQ.addView(tvQuestion, new LinearLayout.LayoutParams(MATCH, WRAP));
+                  c.addView(cardQ, lp(WRAP, 18));
+
+                  tvFeedback = text(" ", 18, DARK, true);
+                  c.addView(tvFeedback, lp(WRAP, 12));
+
+                  // Pilihan jawaban
                   for (int r = 0; r < 2; r++) {
                       LinearLayout row = new LinearLayout(this);
                       row.setOrientation(LinearLayout.HORIZONTAL);
-                      c.addView(row, lp(dp(84), 16));
+                      c.addView(row, lp(dp(84), 12));
                       for (int k = 0; k < 2; k++) {
-                          Button b = button("", BLUE, 28);
-                          row.addView(b, weight(k == 0 ? 0 : 8, k == 0 ? 8 : 0));
+                          Button b = button("", OPT_COLORS[r * 2 + k], 28);
+                          b.setElevation(dp(4));
+                          row.addView(b, weight(k == 0 ? 0 : 6, k == 0 ? 6 : 0));
                           opts[r * 2 + k] = b;
                       }
                   }
 
-                  Button back = button("Menu", PURPLE, 16);
-                  c.addView(back, lp(dp(52), 36));
+                  Button back = button("Kembali ke menu", GRAY, 14);
+                  back.setTextColor(DARK);
+                  c.addView(back, lp(dp(46), 22));
                   back.setOnClickListener(v -> showMenu());
 
-                  setContentView(c);
+                  wrap(c);
               }
 
-              private void nextQuestion() {
-                  if (index >= TOTAL || lives <= 0) {
-                      showResult();
+              private void showQuestion() {
+                  if (qi >= TOTAL || lives <= 0) {
+                      endTurn();
                       return;
                   }
-                  index++;
+                  Q q = qs[qi];
+                  qi++;
                   locked = false;
 
-                  int max = DIFF_BASE[diff] + (index - 1) * DIFF_STEP[diff];
-                  int op = (mode == 3) ? rnd.nextInt(3) : mode;
-                  int a;
-                  int b;
-                  String sym;
-                  if (op == 0) {
-                      a = 1 + rnd.nextInt(max);
-                      b = 1 + rnd.nextInt(max);
-                      answer = a + b;
-                      sym = "+";
-                  } else if (op == 1) {
-                      a = 1 + rnd.nextInt(max);
-                      b = 1 + rnd.nextInt(a);
-                      answer = a - b;
-                      sym = "-";
-                  } else {
-                      int aMax = (diff == 1) ? Math.min(10, 2 + index) : DIFF_MUL_A[diff];
-                      a = 1 + rnd.nextInt(aMax);
-                      b = 1 + rnd.nextInt(DIFF_MUL_B[diff]);
-                      answer = a * b;
-                      sym = "\u00D7";
-                  }
-
-                  tvQuestion.setText(a + " " + sym + " " + b + " = ?");
+                  tvQuestion.setText(q.text);
                   tvFeedback.setText(" ");
-
-                  int spread = Math.max(10, answer / 4);
-                  int pos = rnd.nextInt(4);
-                  int[] vals = new int[4];
-                  Arrays.fill(vals, -1);
-                  vals[pos] = answer;
                   for (int i = 0; i < 4; i++) {
-                      if (i == pos) {
-                          continue;
-                      }
-                      int v;
-                      boolean bad;
-                      do {
-                          v = answer + rnd.nextInt(2 * spread + 1) - spread;
-                          bad = (v < 0 || v == answer);
-                          for (int j = 0; j < 4 && !bad; j++) {
-                              if (vals[j] == v) {
-                                  bad = true;
-                              }
-                          }
-                      } while (bad);
-                      vals[i] = v;
+                      final int idx = i;
+                      opts[i].setText(String.valueOf(q.opts[i]));
+                      opts[i].setBackground(box(OPT_COLORS[i], 16));
+                      opts[i].setAlpha(1f);
+                      opts[i].setOnClickListener(v -> choose(idx));
                   }
+                  correctBtn = opts[q.correctIdx];
+                  dots[qi - 1].setBackground(box(ORANGE, 4));
 
-                  for (int i = 0; i < 4; i++) {
-                      final int value = vals[i];
-                      final Button btn = opts[i];
-                      btn.setText(String.valueOf(value));
-                      btn.setBackground(box(BLUE, 16));
-                      if (i == pos) {
-                          correctBtn = btn;
-                      }
-                      btn.setOnClickListener(v -> choose(value, btn));
-                  }
+                  cardQ.setScaleX(0.88f);
+                  cardQ.setScaleY(0.88f);
+                  cardQ.setAlpha(0.4f);
+                  cardQ.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(280)
+                          .setInterpolator(new OvershootInterpolator()).start();
 
                   handler.removeCallbacks(tick);
                   if (timed) {
                       timeLeft = secs;
                       showTime();
+                      timerFill.animate().cancel();
+                      timerFill.setScaleX(1f);
+                      timerFill.animate().scaleX(0f).setDuration(secs * 1000L)
+                              .setInterpolator(new LinearInterpolator()).start();
                       handler.postDelayed(tick, 1000);
-                  } else {
-                      tvTimer.setText(" ");
                   }
-                  updateInfo();
+                  updateHud();
               }
 
               private void showTime() {
-                  tvTimer.setText("Waktu: " + timeLeft + " detik");
+                  tvTimer.setText("Sisa waktu: " + timeLeft + " detik");
                   tvTimer.setTextColor(timeLeft <= 3 ? RED : DARK);
+                  timerFill.setBackground(box(timeLeft <= 3 ? RED : GREEN, 6));
               }
 
-              private void choose(int value, Button btn) {
+              private void dimOthers(int keep1, int keep2) {
+                  for (int i = 0; i < 4; i++) {
+                      opts[i].setAlpha(i == keep1 || i == keep2 ? 1f : 0.45f);
+                  }
+              }
+
+              private void choose(int idx) {
                   if (locked) {
                       return;
                   }
                   locked = true;
                   handler.removeCallbacks(tick);
-                  if (value == answer) {
+                  if (timed) {
+                      timerFill.animate().cancel();
+                  }
+                  Q q = qs[qi - 1];
+                  dimOthers(idx, q.correctIdx);
+                  if (idx == q.correctIdx) {
                       score += 10;
                       correct++;
-                      btn.setBackground(box(GREEN, 16));
+                      opts[idx].setBackground(box(GREEN, 16));
+                      dots[qi - 1].setBackground(box(GREEN, 4));
                       tvFeedback.setText("Benar! \uD83C\uDF89");
                       tvFeedback.setTextColor(GREEN);
                   } else {
                       lives--;
-                      btn.setBackground(box(RED, 16));
+                      opts[idx].setBackground(box(RED, 16));
                       correctBtn.setBackground(box(GREEN, 16));
-                      tvFeedback.setText("Oops! Jawabannya " + answer);
+                      dots[qi - 1].setBackground(box(RED, 4));
+                      tvFeedback.setText("Oops! Jawabannya " + q.answer);
                       tvFeedback.setTextColor(RED);
                   }
-                  updateInfo();
-                  handler.postDelayed(this::nextQuestion, 1000);
+                  updateHud();
+                  handler.postDelayed(this::showQuestion, 1000);
               }
 
               private void timeout() {
                   locked = true;
                   lives--;
+                  Q q = qs[qi - 1];
+                  timerFill.animate().cancel();
+                  timerFill.setScaleX(0f);
                   tvTimer.setText("Waktu habis!");
                   tvTimer.setTextColor(RED);
+                  dimOthers(q.correctIdx, q.correctIdx);
                   correctBtn.setBackground(box(GREEN, 16));
-                  tvFeedback.setText("Jawabannya " + answer);
+                  dots[qi - 1].setBackground(box(RED, 4));
+                  tvFeedback.setText("Jawabannya " + q.answer);
                   tvFeedback.setTextColor(RED);
-                  updateInfo();
-                  handler.postDelayed(this::nextQuestion, 1000);
+                  updateHud();
+                  handler.postDelayed(this::showQuestion, 1000);
               }
 
-              private void updateInfo() {
+              private void updateHud() {
                   StringBuilder h = new StringBuilder();
                   for (int i = 0; i < lives; i++) {
                       h.append("\u2764\uFE0F");
                   }
-                  tvInfo.setText("Soal " + index + "/" + TOTAL + " \u2B50 " + score + " " + h);
+                  tvHearts.setText(h.toString());
+                  tvStep.setText("Soal " + qi + " dari " + TOTAL);
+                  tvScore.setText("\u2B50 " + score);
+              }
+
+              private void endTurn() {
+                  pScore[cur] = score;
+                  pCorrect[cur] = correct;
+                  cur++;
+                  if (cur < np) {
+                      showPass();
+                  } else if (np == 1) {
+                      showSoloResult();
+                  } else {
+                      showRanking();
+                  }
               }
 
               // ---------- Hasil ----------
 
-              private void showResult() {
+              private void showSoloResult() {
                   screen = 2;
                   String key = bestKey();
                   int best = prefs.getInt(key, 0);
-                  boolean rekor = score > best;
+                  boolean rekor = pScore[0] > best;
                   if (rekor) {
-                      prefs.edit().putInt(key, score).apply();
+                      prefs.edit().putInt(key, pScore[0]).apply();
                   }
-                  int stars = correct >= 9 ? 3 : correct >= 6 ? 2 : correct >= 3 ? 1 : 0;
+                  int stars = pCorrect[0] >= 9 ? 3 : pCorrect[0] >= 6 ? 2 : pCorrect[0] >= 3 ? 1 : 0;
 
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
                   c.addView(text(lives <= 0 ? "Nyawa habis!" : "Selesai!", 32, ORANGE_DARK, true), lp(WRAP, 0));
-                  c.addView(text("Tingkat: " + DIFF_NAMES[diff] + " \u2022 " + modeLabel(), 16,
-                          DIFF_COLOR[diff], true), lp(WRAP, 6));
+                  c.addView(pill(DIFF_NAMES[diff] + " \u2022 " + modeLabel(), DIFF_COLOR[diff]), lpw(10));
 
+                  LinearLayout card = card();
+                  card.setGravity(Gravity.CENTER_HORIZONTAL);
                   StringBuilder s = new StringBuilder();
                   for (int i = 0; i < 3; i++) {
                       s.append(i < stars ? "\u2B50" : "\u2606");
                   }
-                  c.addView(text(s.toString(), 44, ORANGE, false), lp(WRAP, 14));
-                  c.addView(text("Skor: " + score, 28, DARK, true), lp(WRAP, 14));
-                  c.addView(text("Benar " + correct + " dari " + TOTAL, 18, DARK, false), lp(WRAP, 8));
+                  card.addView(text(s.toString(), 44, ORANGE, false), lp(WRAP, 0));
+                  card.addView(text("Skor: " + pScore[0], 30, DARK, true), lp(WRAP, 10));
+                  card.addView(text("Benar " + pCorrect[0] + " dari " + TOTAL, 16, DARK, false), lp(WRAP, 6));
                   if (rekor) {
-                      c.addView(text("Rekor baru! \uD83C\uDFC6", 20, PURPLE, true), lp(WRAP, 12));
+                      card.addView(pill("Rekor baru! \uD83C\uDFC6", PURPLE), lpw(12));
+                  }
+                  c.addView(card, lp(WRAP, 18));
+
+                  addResultButtons(c);
+                  wrap(c);
+              }
+
+              private void showRanking() {
+                  screen = 2;
+                  Integer[] order = new Integer[np];
+                  for (int i = 0; i < np; i++) {
+                      order[i] = i;
+                  }
+                  Arrays.sort(order, (x, y) -> {
+                      int a = x;
+                      int b = y;
+                      if (pScore[a] != pScore[b]) {
+                          return pScore[b] - pScore[a];
+                      }
+                      return pCorrect[b] - pCorrect[a];
+                  });
+
+                  int top = pScore[order[0]];
+                  int winners = 0;
+                  for (int i = 0; i < np; i++) {
+                      if (pScore[i] == top) {
+                          winners++;
+                      }
                   }
 
+                  LinearLayout c = column();
+                  c.setGravity(Gravity.CENTER);
+                  c.addView(text("Hasil Akhir", 32, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(pill(DIFF_NAMES[diff] + " \u2022 " + modeLabel(), DIFF_COLOR[diff]), lpw(10));
+
+                  TextView banner = text(winners > 1 ? "Seri! Skor sama \uD83E\uDD1D"
+                          : "\uD83C\uDFC6 " + names[order[0]] + " menang!", 22, Color.WHITE, true);
+                  banner.setBackground(box(winners > 1 ? PURPLE : GOLD, 20));
+                  banner.setPadding(dp(16), dp(14), dp(16), dp(14));
+                  banner.setElevation(dp(4));
+                  c.addView(banner, lp(WRAP, 18));
+
+                  int[] rankColor = {GOLD, SILVER, BRONZE, GRAY_D};
+                  for (int r = 0; r < np; r++) {
+                      int p = order[r];
+                      LinearLayout row = new LinearLayout(this);
+                      row.setOrientation(LinearLayout.HORIZONTAL);
+                      row.setGravity(Gravity.CENTER_VERTICAL);
+                      row.setBackground(box(Color.WHITE, 18));
+                      row.setElevation(dp(3));
+                      row.setPadding(dp(12), dp(10), dp(14), dp(10));
+
+                      TextView rank = text(String.valueOf(r + 1), 18, Color.WHITE, true);
+                      rank.setBackground(box(rankColor[r], 18));
+                      row.addView(rank, new LinearLayout.LayoutParams(dp(36), dp(36)));
+
+                      TextView nm = text(PLAYER_ICON[p] + " " + names[p], 18, DARK, true);
+                      nm.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+                      LinearLayout.LayoutParams nmp = new LinearLayout.LayoutParams(0, WRAP, 1f);
+                      nmp.leftMargin = dp(12);
+                      row.addView(nm, nmp);
+
+                      TextView sc = text(pScore[p] + " poin\nbenar " + pCorrect[p] + "/" + TOTAL,
+                              14, PURPLE, true);
+                      sc.setGravity(Gravity.END);
+                      row.addView(sc, new LinearLayout.LayoutParams(WRAP, WRAP));
+
+                      c.addView(row, lp(WRAP, 10));
+                  }
+
+                  addResultButtons(c);
+                  wrap(c);
+              }
+
+              private void addResultButtons(LinearLayout c) {
                   Button again = button("Main Lagi", GREEN, 22);
-                  c.addView(again, lp(dp(64), 28));
+                  again.setElevation(dp(4));
+                  c.addView(again, lp(dp(64), 26));
                   again.setOnClickListener(v -> startGame(mode));
 
                   Button menu = button("Menu Utama", ORANGE, 20);
-                  c.addView(menu, lp(dp(64), 14));
+                  menu.setElevation(dp(4));
+                  c.addView(menu, lp(dp(60), 12));
                   menu.setOnClickListener(v -> showMenu());
-
-                  setContentView(c);
               }
           }
           PB_EOF
