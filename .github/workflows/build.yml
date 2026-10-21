@@ -60,6 +60,8 @@ jobs:
               id 'com.android.application'
           }
 
+          def runNo = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInteger()
+
           android {
               namespace 'com.petualangan.berhitung'
               compileSdk 34
@@ -68,8 +70,8 @@ jobs:
                   applicationId "com.petualangan.berhitung"
                   minSdk 21
                   targetSdk 34
-                  versionCode 11
-                  versionName "4.2"
+                  versionCode 100 + runNo
+                  versionName "5.0"
               }
 
               signingConfigs {
@@ -97,6 +99,8 @@ jobs:
           cat > app/src/main/AndroidManifest.xml <<'PB_EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
 
               <application
                   android:allowBackup="true"
@@ -460,6 +464,7 @@ jobs:
           import android.os.Handler;
           import android.os.Looper;
           import android.text.InputFilter;
+          import android.text.InputType;
           import android.view.Gravity;
           import android.view.View;
           import android.view.ViewGroup;
@@ -482,6 +487,13 @@ jobs:
           import java.io.InputStream;
           import java.io.OutputStream;
           import java.nio.charset.StandardCharsets;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.net.URLEncoder;
+          import java.text.SimpleDateFormat;
+          import java.util.Date;
+          import java.util.HashSet;
+          import java.util.TimeZone;
           import java.util.ArrayList;
           import java.util.Arrays;
           import java.util.Collections;
@@ -492,6 +504,16 @@ jobs:
 
               private static final String APP_NAME = "Belajar Bersama";
               private static final String BANK_FILE = "bank.json";
+              private static final String MATERI_FILE = "materi.json";
+              private static final String SCHOOL = "SD Alam Muhammadiyah Kandangan";
+              // PENGATURAN SEKOLAH: ubah nilai di bawah ini sebelum aplikasi dibagikan
+              private static final String GURU_PIN = "1234";
+              private static final String SOAL_URL = "";
+              private static final String MATERI_URL = "";
+              private static final String GURU_WA = "";
+              private static final String[] MODE_NAMES = {
+                      "Tambah", "Kurang", "Kali", "Bagi", "Campur", "3 Bilangan", "Isi Titik", "Soal Guru"
+              };
               private static final int REQ_IMPORT = 41;
               private static final int TOTAL = 10;
               private static final int MAX_PLAYERS = 4;
@@ -579,6 +601,15 @@ jobs:
                   final String[] opt = new String[4];
                   int key;
                   String expl = "";
+                  boolean web;
+              }
+
+              private static class M {
+                  int subj;
+                  int kelas;
+                  String title;
+                  String url;
+                  String note = "";
               }
 
               private interface Pick {
@@ -609,6 +640,11 @@ jobs:
               private boolean rekorNow;
               private int reviewPlayer;
               private final ArrayList<B> bank = new ArrayList<>();
+              private final ArrayList<M> materi = new ArrayList<>();
+              private String profName = "";
+              private int profKelas = 0;
+              private boolean profFirst = false;
+              private EditText profField;
               private String importMsg = "";
               private int total = TOTAL;
               private int subj = 0;
@@ -657,7 +693,11 @@ jobs:
                   super.onCreate(savedInstanceState);
                   prefs = getSharedPreferences("berhitung", MODE_PRIVATE);
                   loadBank();
-                  showMenu();
+                  loadMateri();
+                  showSplash();
+                  if (System.currentTimeMillis() - prefs.getLong("lastupd", 0L) > 6L * 3600L * 1000L) {
+                      refreshOnline(true);
+                  }
               }
 
               @Override
@@ -668,8 +708,10 @@ jobs:
 
               @Override
               public void onBackPressed() {
-                  if (screen == 0) {
+                  if (screen == 0 || screen == 8 || (screen == 9 && profFirst)) {
                       super.onBackPressed();
+                  } else if (screen == 1) {
+                      confirmExit();
                   } else if (screen == 5) {
                       if (np == 1) {
                           renderSoloResult();
@@ -966,6 +1008,742 @@ jobs:
                   ed.apply();
               }
 
+              // ---------- Profil, riwayat, laporan ----------
+
+              private String profileName() {
+                  return prefs.getString("pname", "").trim();
+              }
+
+              private String firstName(String full) {
+                  String f = full.trim();
+                  int sp = f.indexOf(' ');
+                  if (sp > 0) {
+                      f = f.substring(0, sp);
+                  }
+                  return f.length() > 10 ? f.substring(0, 10) : f;
+              }
+
+              private String soalUrl() {
+                  String u = prefs.getString("url_soal", "").trim();
+                  return u.isEmpty() ? SOAL_URL : u;
+              }
+
+              private String materiUrl() {
+                  String u = prefs.getString("url_materi", "").trim();
+                  return u.isEmpty() ? MATERI_URL : u;
+              }
+
+              private String teacherWa() {
+                  String w = prefs.getString("wa", "").trim();
+                  return w.isEmpty() ? GURU_WA : w;
+              }
+
+              private String stamp(long t) {
+                  return new SimpleDateFormat("d MMM yyyy, HH:mm", new Locale("id", "ID")).format(new Date(t));
+              }
+
+              private String gameName() {
+                  return mode == 7 ? SUBJ_NAMES[subj] + " (soal guru)" : "Matematika - " + MODE_NAMES[mode];
+              }
+
+              private String versionName() {
+                  try {
+                      return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+                  } catch (Exception e) {
+                      return "-";
+                  }
+              }
+
+              private String digits(String s) {
+                  StringBuilder d = new StringBuilder();
+                  for (int i = 0; i < s.length(); i++) {
+                      if (Character.isDigit(s.charAt(i))) {
+                          d.append(s.charAt(i));
+                      }
+                  }
+                  return d.toString();
+              }
+
+              private long dayOf(long t) {
+                  return (t + TimeZone.getDefault().getOffset(t)) / 86400000L;
+              }
+
+              private int streak() {
+                  try {
+                      JSONArray a = new JSONArray(prefs.getString("hist", "[]"));
+                      HashSet<Long> days = new HashSet<>();
+                      for (int i = 0; i < a.length(); i++) {
+                          days.add(dayOf(a.getJSONObject(i).getLong("t")));
+                      }
+                      long day = dayOf(System.currentTimeMillis());
+                      if (!days.contains(day)) {
+                          day--;
+                      }
+                      int n = 0;
+                      while (days.contains(day)) {
+                          n++;
+                          day--;
+                      }
+                      return n;
+                  } catch (Exception e) {
+                      return 0;
+                  }
+              }
+
+              private void addHistory(int sc, int ok, int n) {
+                  try {
+                      JSONArray old = new JSONArray(prefs.getString("hist", "[]"));
+                      JSONArray arr = new JSONArray();
+                      for (int i = Math.max(0, old.length() - 59); i < old.length(); i++) {
+                          arr.put(old.get(i));
+                      }
+                      JSONObject o = new JSONObject();
+                      o.put("t", System.currentTimeMillis());
+                      o.put("g", gameName());
+                      o.put("k", kelas + 1);
+                      o.put("s", sc);
+                      o.put("c", ok);
+                      o.put("n", n);
+                      arr.put(o);
+                      prefs.edit().putString("hist", arr.toString()).apply();
+                  } catch (Exception e) {
+                      // Riwayat gagal disimpan: permainan tetap berjalan
+                  }
+              }
+
+              private void confirmExit() {
+                  new AlertDialog.Builder(this)
+                          .setTitle("Keluar dari permainan?")
+                          .setMessage("Skor yang sedang berjalan tidak akan disimpan.")
+                          .setPositiveButton("Keluar", (d, w) -> showMenu())
+                          .setNegativeButton("Lanjut main", null)
+                          .show();
+              }
+
+              private void askPin(final Runnable ok) {
+                  final EditText e = new EditText(this);
+                  e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+                  e.setHint("PIN guru");
+                  e.setGravity(Gravity.CENTER);
+                  e.setFilters(new InputFilter[]{new InputFilter.LengthFilter(8)});
+                  new AlertDialog.Builder(this)
+                          .setTitle("Khusus guru")
+                          .setMessage("Masukkan PIN guru untuk membuka menu ini.")
+                          .setView(e)
+                          .setPositiveButton("Masuk", (d, w) -> {
+                              if (e.getText().toString().equals(GURU_PIN)) {
+                                  ok.run();
+                              } else {
+                                  Toast.makeText(this, "PIN salah", Toast.LENGTH_SHORT).show();
+                              }
+                          })
+                          .setNegativeButton("Batal", null)
+                          .show();
+              }
+
+              private Button smallButton(String label, View.OnClickListener l) {
+                  Button b = button(label, Color.WHITE, 13);
+                  b.setTextColor(DARK);
+                  b.setElevation(dp(3));
+                  flat(b);
+                  b.setOnClickListener(l);
+                  return b;
+              }
+
+              private EditText linkField(String hint, String value) {
+                  EditText e = new EditText(this);
+                  e.setText(value);
+                  e.setHint(hint);
+                  e.setSingleLine(true);
+                  e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+                  e.setTextSize(13);
+                  e.setTextColor(DARK);
+                  e.setPadding(dp(14), 0, dp(14), 0);
+                  e.setBackground(outline(BLUE, 12));
+                  return e;
+              }
+
+              private ImageView makeLogo() {
+                  ImageView logo = new ImageView(this);
+                  logo.setImageResource(R.drawable.logo);
+                  logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                  logo.setPadding(dp(6), dp(6), dp(6), dp(6));
+                  logo.setBackground(box(Color.WHITE, 24));
+                  logo.setElevation(dp(4));
+                  return logo;
+              }
+
+              private String shareText() {
+                  StringBuilder s = new StringBuilder();
+                  s.append("Laporan Belajar - ").append(APP_NAME).append("\n");
+                  s.append(SCHOOL).append("\n\n");
+                  s.append("Kelas: ").append(kelas + 1).append("\n");
+                  s.append("Latihan: ").append(gameName()).append(" (").append(timeLabel()).append(")\n");
+                  s.append("Tanggal: ").append(stamp(System.currentTimeMillis())).append("\n\n");
+                  if (np == 1) {
+                      String nm = profileName();
+                      s.append("Nama: ").append(nm.isEmpty() ? "Siswa" : nm).append("\n");
+                      s.append("Skor: ").append(pScore[0]).append("\n");
+                      s.append("Benar: ").append(pCorrect[0]).append(" dari ").append(total);
+                  } else {
+                      for (int i = 0; i < np; i++) {
+                          s.append(names[i]).append(": ").append(pScore[i]).append(" poin, benar ")
+                                  .append(pCorrect[i]).append(" dari ").append(total).append("\n");
+                      }
+                  }
+                  return s.toString().trim();
+              }
+
+              private void sendReport() {
+                  String msg = shareText();
+                  String wa = digits(teacherWa());
+                  try {
+                      if (!wa.isEmpty()) {
+                          if (wa.startsWith("0")) {
+                              wa = "62" + wa.substring(1);
+                          }
+                          String q = URLEncoder.encode(msg, "UTF-8").replace("+", "%20");
+                          startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/" + wa + "?text=" + q)));
+                      } else {
+                          Intent it = new Intent(Intent.ACTION_SEND);
+                          it.setType("text/plain");
+                          it.putExtra(Intent.EXTRA_TEXT, msg);
+                          startActivity(Intent.createChooser(it, "Kirim laporan lewat"));
+                      }
+                  } catch (Exception e) {
+                      Toast.makeText(this, "Tidak bisa membuka WhatsApp atau aplikasi berbagi", Toast.LENGTH_LONG).show();
+                  }
+              }
+
+              private void openLink(String u) {
+                  try {
+                      startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(u)));
+                  } catch (Exception e) {
+                      Toast.makeText(this, "Tautan tidak bisa dibuka", Toast.LENGTH_SHORT).show();
+                  }
+              }
+
+              // ---------- Splash, profil, tentang ----------
+
+              private void showSplash() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 8;
+                  nameFields = null;
+                  LinearLayout c = column();
+                  c.setGravity(Gravity.CENTER);
+                  ImageView logo = makeLogo();
+                  c.addView(logo, new LinearLayout.LayoutParams(dp(130), dp(130)));
+                  c.addView(text(APP_NAME, 30, ORANGE_DARK, true), lp(WRAP, 18));
+                  c.addView(text(SCHOOL, 15, DARK, true), lp(WRAP, 6));
+                  c.addView(text("Ayo belajar sambil bermain!", 14, DARK, false), lp(WRAP, 6));
+                  wrap(c);
+                  logo.setScaleX(0.6f);
+                  logo.setScaleY(0.6f);
+                  logo.setAlpha(0f);
+                  logo.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(700)
+                          .setInterpolator(new OvershootInterpolator()).start();
+                  handler.postDelayed(() -> {
+                      if (screen == 8) {
+                          afterSplash();
+                      }
+                  }, 1800);
+              }
+
+              private void afterSplash() {
+                  if (profileName().isEmpty()) {
+                      openProfile(true);
+                  } else {
+                      showMenu();
+                  }
+              }
+
+              private void openProfile(boolean first) {
+                  profName = profileName();
+                  profKelas = Math.max(0, Math.min(5, prefs.getInt("kelas", 0)));
+                  profFirst = first;
+                  showProfile();
+              }
+
+              private void showProfile() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 9;
+                  nameFields = null;
+
+                  LinearLayout c = column();
+                  c.addView(text(profFirst ? "Selamat datang!" : "Profil Siswa", 28, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(text(profFirst ? "Isi data dulu ya, supaya hasil belajarmu dikenali guru."
+                          : "Ubah nama atau kelasmu di sini.", 14, DARK, false), lp(WRAP, 8));
+
+                  LinearLayout cd = card();
+                  cd.addView(heading("Nama lengkap"), lp(WRAP, 0));
+                  profField = new EditText(this);
+                  profField.setText(profName);
+                  profField.setHint("Contoh: Ahmad Fauzan");
+                  profField.setSingleLine(true);
+                  profField.setFilters(new InputFilter[]{new InputFilter.LengthFilter(30)});
+                  profField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+                  profField.setTextSize(16);
+                  profField.setTextColor(DARK);
+                  profField.setPadding(dp(14), 0, dp(14), 0);
+                  profField.setBackground(outline(ORANGE, 12));
+                  cd.addView(profField, lp(dp(48), 8));
+                  cd.addView(heading("Kelas"), lp(WRAP, 16));
+                  cd.addView(chips(KELAS_LABEL, profKelas, KELAS_COLOR, k -> {
+                      profName = profField.getText().toString();
+                      profKelas = k;
+                      showProfile();
+                  }), lp(dp(46), 8));
+                  c.addView(cd, lp(WRAP, 18));
+
+                  Button save = button(profFirst ? "Mulai belajar" : "Simpan", GREEN, 20);
+                  save.setElevation(dp(4));
+                  c.addView(save, lp(dp(58), 24));
+                  save.setOnClickListener(v -> saveProfile());
+
+                  if (!profFirst) {
+                      Button back = button("Kembali", GRAY, 14);
+                      back.setTextColor(DARK);
+                      c.addView(back, lp(dp(46), 14));
+                      back.setOnClickListener(v -> showMenu());
+                  }
+
+                  c.setFocusableInTouchMode(true);
+                  c.requestFocus();
+                  wrap(c);
+              }
+
+              private void saveProfile() {
+                  String nm = profField.getText().toString().trim();
+                  if (nm.isEmpty()) {
+                      Toast.makeText(this, "Tulis namamu dulu ya", Toast.LENGTH_SHORT).show();
+                      return;
+                  }
+                  prefs.edit().putString("pname", nm).putInt("kelas", profKelas)
+                          .putString("name0", firstName(nm)).apply();
+                  profFirst = false;
+                  showMenu();
+              }
+
+              private void showAbout() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 10;
+                  nameFields = null;
+
+                  LinearLayout c = column();
+                  c.setGravity(Gravity.CENTER_HORIZONTAL);
+                  c.addView(makeLogo(), new LinearLayout.LayoutParams(dp(110), dp(110)));
+                  c.addView(text(APP_NAME, 28, ORANGE_DARK, true), lp(WRAP, 12));
+                  c.addView(text(SCHOOL, 15, DARK, true), lp(WRAP, 4));
+                  c.addView(pill("Versi " + versionName(), ORANGE), lpw(10));
+
+                  LinearLayout cd = card();
+                  cd.addView(heading("Tentang aplikasi"), lp(WRAP, 0));
+                  TextView t1 = text("Aplikasi belajar untuk siswa " + SCHOOL + ". Siswa bisa berlatih Matematika, "
+                          + "Bahasa Indonesia, dan Bahasa Inggris di rumah, termasuk saat pembelajaran jarak jauh (PJJ).",
+                          14, DARK, false);
+                  t1.setGravity(Gravity.START);
+                  cd.addView(t1, lp(WRAP, 8));
+                  cd.addView(heading("Privasi"), lp(WRAP, 16));
+                  TextView t2 = text("Aplikasi hanya menyimpan nama, kelas, dan riwayat belajar di HP ini. "
+                          + "Data tidak dikirim ke server aplikasi. Hasil belajar hanya terkirim kalau siswa "
+                          + "menekan tombol Bagikan atau Kirim hasil ke guru. Internet dipakai hanya untuk "
+                          + "mengunduh soal dan materi dari guru.", 14, DARK, false);
+                  t2.setGravity(Gravity.START);
+                  cd.addView(t2, lp(WRAP, 8));
+                  if (!teacherWa().isEmpty()) {
+                      cd.addView(heading("Kontak guru (WhatsApp)"), lp(WRAP, 16));
+                      TextView t3 = text(teacherWa(), 14, DARK, false);
+                      t3.setGravity(Gravity.START);
+                      cd.addView(t3, lp(WRAP, 8));
+                  }
+                  c.addView(cd, lp(WRAP, 18));
+
+                  Button back = button("Kembali", ORANGE, 18);
+                  back.setElevation(dp(4));
+                  c.addView(back, lp(dp(54), 22));
+                  back.setOnClickListener(v -> showMenu());
+                  wrap(c);
+              }
+
+              // ---------- Riwayat ----------
+
+              private void showHistory() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 11;
+                  nameFields = null;
+
+                  LinearLayout c = column();
+                  c.addView(text("📈 Riwayat Belajar", 26, ORANGE_DARK, true), lp(WRAP, 0));
+                  String pn = profileName();
+                  if (!pn.isEmpty()) {
+                      c.addView(pill(pn, ORANGE), lpw(10));
+                  }
+
+                  JSONArray a;
+                  try {
+                      a = new JSONArray(prefs.getString("hist", "[]"));
+                  } catch (Exception e) {
+                      a = new JSONArray();
+                  }
+                  int sumC = 0;
+                  int sumN = 0;
+                  for (int i = 0; i < a.length(); i++) {
+                      JSONObject o = a.optJSONObject(i);
+                      if (o != null) {
+                          sumC += o.optInt("c");
+                          sumN += o.optInt("n");
+                      }
+                  }
+                  boolean has = a.length() > 0;
+
+                  LinearLayout cs = card();
+                  cs.addView(heading("Ringkasan"), lp(WRAP, 0));
+                  TextView sm = text("Latihan selesai: " + a.length()
+                          + "\nRata-rata benar: " + (sumN > 0 ? sumC * 100 / sumN : 0) + "%"
+                          + "\nBelajar berturut-turut: " + streak() + " hari", 14, DARK, false);
+                  sm.setGravity(Gravity.START);
+                  cs.addView(sm, lp(WRAP, 8));
+                  c.addView(cs, lp(WRAP, 16));
+
+                  if (!has) {
+                      c.addView(text("Belum ada latihan. Ayo mulai belajar!", 14, DARK, false), lp(WRAP, 18));
+                  }
+                  int shown = 0;
+                  for (int i = a.length() - 1; i >= 0 && shown < 30; i--) {
+                      JSONObject o = a.optJSONObject(i);
+                      if (o == null) {
+                          continue;
+                      }
+                      LinearLayout row = card();
+                      TextView t = text(stamp(o.optLong("t")) + "\n" + o.optString("g") + " • Kelas " + o.optInt("k")
+                              + "\nSkor " + o.optInt("s") + " • Benar " + o.optInt("c") + "/" + o.optInt("n"),
+                              14, DARK, false);
+                      t.setGravity(Gravity.START);
+                      row.addView(t, new LinearLayout.LayoutParams(MATCH, WRAP));
+                      c.addView(row, lp(WRAP, 10));
+                      shown++;
+                  }
+
+                  if (has) {
+                      Button del = button("Hapus riwayat", RED, 14);
+                      c.addView(del, lp(dp(46), 20));
+                      del.setOnClickListener(v -> new AlertDialog.Builder(this)
+                              .setTitle("Hapus riwayat?")
+                              .setMessage("Semua catatan latihan di HP ini akan dihapus.")
+                              .setPositiveButton("Hapus", (dl, w) -> {
+                                  prefs.edit().remove("hist").apply();
+                                  showHistory();
+                              })
+                              .setNegativeButton("Batal", null)
+                              .show());
+                  }
+
+                  Button back = button("Kembali", GRAY, 14);
+                  back.setTextColor(DARK);
+                  c.addView(back, lp(dp(46), has ? 12 : 22));
+                  back.setOnClickListener(v -> showMenu());
+                  wrap(c);
+              }
+
+              // ---------- Materi ----------
+
+              private void loadMateri() {
+                  materi.clear();
+                  try {
+                      JSONArray arr = new JSONArray(readAll(openFileInput(MATERI_FILE)));
+                      for (int i = 0; i < arr.length(); i++) {
+                          JSONObject o = arr.getJSONObject(i);
+                          M m = new M();
+                          m.subj = o.getInt("s");
+                          m.kelas = o.getInt("k");
+                          m.title = o.getString("j");
+                          m.url = o.getString("u");
+                          m.note = o.optString("n", "");
+                          materi.add(m);
+                      }
+                  } catch (Exception e) {
+                      // Belum ada materi tersimpan
+                  }
+              }
+
+              private boolean saveMateri() {
+                  try {
+                      JSONArray arr = new JSONArray();
+                      for (M m : materi) {
+                          JSONObject o = new JSONObject();
+                          o.put("s", m.subj);
+                          o.put("k", m.kelas);
+                          o.put("j", m.title);
+                          o.put("u", m.url);
+                          o.put("n", m.note);
+                          arr.put(o);
+                      }
+                      OutputStream out = openFileOutput(MATERI_FILE, MODE_PRIVATE);
+                      try {
+                          out.write(arr.toString().getBytes(StandardCharsets.UTF_8));
+                      } finally {
+                          out.close();
+                      }
+                      return true;
+                  } catch (Exception e) {
+                      return false;
+                  }
+              }
+
+              private char delim(String s) {
+                  int nl = s.indexOf('\n');
+                  String first = nl >= 0 ? s.substring(0, nl) : s;
+                  char d = ',';
+                  int most = cnt(first, ',');
+                  if (cnt(first, ';') > most) {
+                      d = ';';
+                      most = cnt(first, ';');
+                  }
+                  if (cnt(first, '\t') > most) {
+                      d = '\t';
+                  }
+                  return d;
+              }
+
+              private String importMateri(String s) {
+                  if (s.length() > 0 && s.charAt(0) == '﻿') {
+                      s = s.substring(1);
+                  }
+                  ArrayList<ArrayList<String>> rows = parseCsv(s, delim(s));
+                  if (rows.isEmpty()) {
+                      return "Berkas materi kosong.";
+                  }
+                  ArrayList<String> head = rows.get(0);
+                  int cm = col(head, "mapel");
+                  int ck = col(head, "kelas");
+                  int cj = col(head, "judul");
+                  int ct = col(head, "tautan");
+                  int cn = col(head, "keterangan");
+                  if (cm < 0 || ck < 0 || cj < 0 || ct < 0) {
+                      return "Judul kolom materi tidak cocok. Pakai: mapel, kelas, judul, tautan, keterangan.";
+                  }
+                  ArrayList<M> fresh = new ArrayList<>();
+                  int skipped = 0;
+                  for (int r = 1; r < rows.size(); r++) {
+                      ArrayList<String> row = rows.get(r);
+                      if (isBlank(row)) {
+                          continue;
+                      }
+                      int sj = parseSubject(cell(row, cm));
+                      int kl = parseKelas(cell(row, ck));
+                      String jd = cell(row, cj);
+                      String ur = cell(row, ct);
+                      if (sj < 0 || kl < 1 || kl > 6 || jd.isEmpty() || !ur.startsWith("http")) {
+                          skipped++;
+                          continue;
+                      }
+                      M m = new M();
+                      m.subj = sj;
+                      m.kelas = kl;
+                      m.title = jd;
+                      m.url = ur;
+                      m.note = cell(row, cn);
+                      fresh.add(m);
+                  }
+                  if (fresh.isEmpty()) {
+                      return "Tidak ada materi yang valid di berkas.";
+                  }
+                  materi.clear();
+                  materi.addAll(fresh);
+                  saveMateri();
+                  return "Berhasil: " + fresh.size() + " materi dimuat."
+                          + (skipped > 0 ? " " + skipped + " baris dilewati." : "");
+              }
+
+              private void showMateri() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 12;
+                  nameFields = null;
+                  kelas = Math.max(0, Math.min(5, prefs.getInt("kelas", 0)));
+
+                  LinearLayout c = column();
+                  c.addView(text("📖 Materi", 26, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(chips(KELAS_LABEL, kelas, KELAS_COLOR, k -> {
+                      kelas = k;
+                      prefs.edit().putInt("kelas", k).apply();
+                      showMateri();
+                  }), lp(dp(46), 14));
+
+                  int found = 0;
+                  for (int sj = 0; sj < 3; sj++) {
+                      boolean head = false;
+                      for (final M m : materi) {
+                          if (m.subj != sj || m.kelas != kelas + 1) {
+                              continue;
+                          }
+                          if (!head) {
+                              c.addView(text(SUBJ_ICON[sj] + " " + SUBJ_NAMES[sj], 18, SUBJ_COLOR[sj], true), lp(WRAP, 18));
+                              head = true;
+                          }
+                          LinearLayout cd = card();
+                          TextView t = text(m.title, 16, DARK, true);
+                          t.setGravity(Gravity.START);
+                          cd.addView(t, new LinearLayout.LayoutParams(MATCH, WRAP));
+                          if (!m.note.isEmpty()) {
+                              TextView nt = text(m.note, 13, DARK, false);
+                              nt.setGravity(Gravity.START);
+                              cd.addView(nt, lp(WRAP, 4));
+                          }
+                          TextView go = text("Ketuk untuk membuka ›", 12, BLUE, true);
+                          go.setGravity(Gravity.START);
+                          cd.addView(go, lp(WRAP, 6));
+                          cd.setClickable(true);
+                          cd.setOnClickListener(v -> openLink(m.url));
+                          c.addView(cd, lp(WRAP, 8));
+                          found++;
+                      }
+                  }
+                  if (found == 0) {
+                      c.addView(text("Belum ada materi untuk " + KELAS_NAMES[kelas]
+                              + ".\nGuru bisa menambahkan materi lewat Google Sheet.", 14, DARK, false), lp(WRAP, 20));
+                  }
+
+                  if (!materiUrl().isEmpty()) {
+                      Button up = button("🔄  Perbarui materi", TEAL, 16);
+                      up.setElevation(dp(4));
+                      c.addView(up, lp(dp(52), 22));
+                      up.setOnClickListener(v -> refreshOnline(false));
+                  }
+                  Button back = button("Kembali", GRAY, 14);
+                  back.setTextColor(DARK);
+                  c.addView(back, lp(dp(46), 14));
+                  back.setOnClickListener(v -> showMenu());
+                  wrap(c);
+              }
+
+              // ---------- Pembaruan online ----------
+
+              private String download(String link) throws IOException {
+                  if (!link.startsWith("http")) {
+                      throw new IOException("Tautan tidak valid");
+                  }
+                  HttpURLConnection conn = (HttpURLConnection) new URL(link).openConnection();
+                  conn.setConnectTimeout(10000);
+                  conn.setReadTimeout(15000);
+                  conn.setInstanceFollowRedirects(true);
+                  try {
+                      if (conn.getResponseCode() != 200) {
+                          throw new IOException("HTTP " + conn.getResponseCode());
+                      }
+                      return readAll(conn.getInputStream());
+                  } finally {
+                      conn.disconnect();
+                  }
+              }
+
+              private void refreshOnline(final boolean silent) {
+                  final String us = soalUrl();
+                  final String um = materiUrl();
+                  if (us.isEmpty() && um.isEmpty()) {
+                      if (!silent) {
+                          new AlertDialog.Builder(this)
+                                  .setTitle("Tautan belum diatur")
+                                  .setMessage("Guru bisa mengatur tautan soal dan materi lewat tombol Soal dari Guru (pakai PIN).")
+                                  .setPositiveButton("OK", null)
+                                  .show();
+                      }
+                      return;
+                  }
+                  final AlertDialog[] dlg = new AlertDialog[1];
+                  if (!silent) {
+                      dlg[0] = new AlertDialog.Builder(this)
+                              .setTitle("Memperbarui...")
+                              .setMessage("Mohon tunggu sebentar.")
+                              .setCancelable(false)
+                              .show();
+                  }
+                  new Thread(() -> {
+                      String t1 = null;
+                      String t2 = null;
+                      String er1 = null;
+                      String er2 = null;
+                      if (!us.isEmpty()) {
+                          try {
+                              t1 = download(us);
+                          } catch (Exception e) {
+                              er1 = "Soal: gagal mengunduh. Cek internet atau tautannya.";
+                          }
+                      }
+                      if (!um.isEmpty()) {
+                          try {
+                              t2 = download(um);
+                          } catch (Exception e) {
+                              er2 = "Materi: gagal mengunduh. Cek internet atau tautannya.";
+                          }
+                      }
+                      final String f1 = t1;
+                      final String f2 = t2;
+                      final String g1 = er1;
+                      final String g2 = er2;
+                      runOnUiThread(() -> finishRefresh(silent, dlg[0], f1, f2, g1, g2));
+                  }).start();
+              }
+
+              private void finishRefresh(boolean silent, AlertDialog dlg, String t1, String t2, String er1, String er2) {
+                  if (dlg != null && dlg.isShowing()) {
+                      try {
+                          dlg.dismiss();
+                      } catch (Exception e) {
+                          // Dialog sudah tertutup
+                      }
+                  }
+                  if (isFinishing()) {
+                      return;
+                  }
+                  StringBuilder m = new StringBuilder();
+                  boolean ok = false;
+                  if (t1 != null) {
+                      String r = importCsv(t1, true);
+                      m.append("Soal: ").append(r).append("\n");
+                      if (r.startsWith("Berhasil")) {
+                          ok = true;
+                      }
+                  } else if (er1 != null) {
+                      m.append(er1).append("\n");
+                  }
+                  if (t2 != null) {
+                      String r = importMateri(t2);
+                      m.append("Materi: ").append(r).append("\n");
+                      if (r.startsWith("Berhasil")) {
+                          ok = true;
+                      }
+                  } else if (er2 != null) {
+                      m.append(er2).append("\n");
+                  }
+                  if (ok) {
+                      prefs.edit().putLong("lastupd", System.currentTimeMillis()).apply();
+                  }
+                  if (silent) {
+                      if (ok) {
+                          Toast.makeText(this, "Soal dan materi diperbarui", Toast.LENGTH_SHORT).show();
+                          redraw();
+                      }
+                  } else {
+                      new AlertDialog.Builder(this)
+                              .setTitle("Hasil pembaruan")
+                              .setMessage(m.toString().trim())
+                              .setPositiveButton("OK", (d, w) -> redraw())
+                              .show();
+                  }
+              }
+
+              private void redraw() {
+                  if (screen == 0) {
+                      showMenu();
+                  } else if (screen == 12) {
+                      showMateri();
+                  } else if (screen == 7) {
+                      importMsg = "";
+                      showGuru();
+                  }
+              }
+
+
               // ---------- Menu ----------
 
               private void loadPrefs() {
@@ -974,7 +1752,8 @@ jobs:
                   secs = Math.max(SECS_MIN, Math.min(SECS_MAX, prefs.getInt("secs", 10)));
                   np = Math.max(1, Math.min(MAX_PLAYERS, prefs.getInt("np", 1)));
                   for (int i = 0; i < MAX_PLAYERS; i++) {
-                      names[i] = prefs.getString("name" + i, "Pemain " + (i + 1));
+                      names[i] = prefs.getString("name" + i, i == 0 && !profileName().isEmpty()
+                              ? firstName(profileName()) : "Pemain " + (i + 1));
                   }
               }
 
@@ -1005,8 +1784,15 @@ jobs:
                   hero.addView(logo, new LinearLayout.LayoutParams(dp(96), dp(96)));
                   hero.addView(text(APP_NAME, 26, Color.WHITE, true), lp(WRAP, 10));
                   hero.addView(text("SD Alam Muhammadiyah Kandangan", 14, Color.WHITE, true), lp(WRAP, 4));
-                  hero.addView(text("Ayo belajar sambil bermain!", 14,
-                          Color.parseColor("#FFF3E0"), false), lp(WRAP, 4));
+                  String pn = prefs.getString("pname", "");
+                  hero.addView(text(pn.isEmpty() ? "Ayo belajar sambil bermain!" : "Halo, " + pn + "! ✏️", 15,
+                          Color.parseColor("#FFF3E0"), true), lp(WRAP, 6));
+                  int streakN = streak();
+                  if (streakN > 0) {
+                      hero.addView(text("🔥 " + streakN + " hari belajar berturut-turut", 13,
+                              Color.parseColor("#FFF3E0"), false), lp(WRAP, 4));
+                  }
+                  hero.setOnClickListener(v -> openProfile(false));
                   c.addView(hero, lp(WRAP, 0));
 
                   // Pilih kelas
@@ -1034,6 +1820,14 @@ jobs:
                       c.addView(t, lp(dp(84), 12));
                   }
 
+                  // Riwayat, Materi, Tentang
+                  LinearLayout rx = new LinearLayout(this);
+                  rx.setOrientation(LinearLayout.HORIZONTAL);
+                  c.addView(rx, lp(dp(50), 20));
+                  rx.addView(smallButton("📈 Riwayat", v -> showHistory()), weight(0, 4));
+                  rx.addView(smallButton("📖 Materi", v -> showMateri()), weight(4, 4));
+                  rx.addView(smallButton("ℹ️ Tentang", v -> showAbout()), weight(4, 0));
+
                   // Pengaturan (pemain dan waktu)
                   String who = (np == 1) ? "Main sendiri" : np + " pemain";
                   Button st = button("\u2699  " + who + " \u2022 " + timeLabel() + "  \u203A", Color.WHITE, 14);
@@ -1042,15 +1836,26 @@ jobs:
                   c.addView(st, lp(dp(52), 22));
                   st.setOnClickListener(v -> showSettings());
 
+                  // Perbarui soal dan materi dari internet
+                  if (!soalUrl().isEmpty() || !materiUrl().isEmpty()) {
+                      long lu = prefs.getLong("lastupd", 0L);
+                      String lt = lu == 0L ? "belum pernah" : stamp(lu);
+                      Button up = button("🔄  Perbarui soal & materi\nTerakhir: " + lt, Color.WHITE, 14);
+                      up.setTextColor(DARK);
+                      up.setElevation(dp(3));
+                      c.addView(up, lp(dp(64), 12));
+                      up.setOnClickListener(v -> refreshOnline(false));
+                  }
+
                   // Soal dari guru
                   Button gr = button("\uD83D\uDCDA  Soal dari Guru  \u203A", Color.WHITE, 14);
                   gr.setTextColor(DARK);
                   gr.setElevation(dp(3));
                   c.addView(gr, lp(dp(52), 12));
-                  gr.setOnClickListener(v -> {
+                  gr.setOnClickListener(v -> askPin(() -> {
                       importMsg = "";
                       showGuru();
-                  });
+                  }));
 
                   c.setFocusableInTouchMode(true);
                   c.requestFocus();
@@ -1194,6 +1999,7 @@ jobs:
                           }
                           b.key = o.getInt("a");
                           b.expl = o.optString("e", "");
+                          b.web = o.optBoolean("w", false);
                           bank.add(b);
                       }
                   } catch (Exception e) {
@@ -1216,6 +2022,7 @@ jobs:
                           o.put("o", op);
                           o.put("a", b.key);
                           o.put("e", b.expl);
+                          o.put("w", b.web);
                           arr.put(o);
                       }
                       OutputStream out = openFileOutput(BANK_FILE, MODE_PRIVATE);
@@ -1260,7 +2067,7 @@ jobs:
                       showGuru();
                       return;
                   }
-                  importMsg = importCsv(s);
+                  importMsg = importCsv(s, false);
                   showGuru();
               }
 
@@ -1416,7 +2223,7 @@ jobs:
                   return -1;
               }
 
-              private String importCsv(String s) {
+              private String importCsv(String s, boolean web) {
                   if (s.length() > 0 && s.charAt(0) == '\uFEFF') {
                       s = s.substring(1);
                   }
@@ -1448,6 +2255,15 @@ jobs:
                       }
                   }
 
+                  ArrayList<B> snapshot = null;
+                  if (web) {
+                      snapshot = new ArrayList<>(bank);
+                      for (int i = bank.size() - 1; i >= 0; i--) {
+                          if (bank.get(i).web) {
+                              bank.remove(i);
+                          }
+                      }
+                  }
                   int added = 0;
                   int updated = 0;
                   int skipped = 0;
@@ -1458,6 +2274,9 @@ jobs:
                           continue;
                       }
                       B b = toBank(row, c);
+                      if (b != null) {
+                          b.web = web;
+                      }
                       if (b == null) {
                           if (skipped < 5) {
                               if (where.length() > 0) {
@@ -1477,6 +2296,10 @@ jobs:
                           added++;
                       }
                   }
+                  if (added + updated == 0 && snapshot != null) {
+                      bank.clear();
+                      bank.addAll(snapshot);
+                  }
                   if (added + updated > 0 && !saveBank()) {
                       return "Gagal menyimpan soal di HP ini.";
                   }
@@ -1484,7 +2307,9 @@ jobs:
                       return "Tidak ada soal di berkas.";
                   }
                   StringBuilder msg = new StringBuilder();
-                  if (added + updated > 0) {
+                  if (added + updated > 0 && web) {
+                      msg.append("Berhasil: ").append(added + updated).append(" soal dimuat.");
+                  } else if (added + updated > 0) {
                       msg.append("Berhasil: ").append(added).append(" soal baru");
                       if (updated > 0) {
                           msg.append(", ").append(updated).append(" diperbarui");
@@ -1560,6 +2385,28 @@ jobs:
                   }
                   c.addView(cs, lp(WRAP, 14));
 
+                  LinearLayout co = card();
+                  co.addView(heading("Pengaturan online"), lp(WRAP, 0));
+                  final EditText eS = linkField("Tautan CSV soal", prefs.getString("url_soal", ""));
+                  co.addView(eS, lp(dp(46), 8));
+                  final EditText eM = linkField("Tautan CSV materi", prefs.getString("url_materi", ""));
+                  co.addView(eM, lp(dp(46), 8));
+                  final EditText eW = linkField("Nomor WhatsApp guru (08...)", prefs.getString("wa", ""));
+                  eW.setInputType(InputType.TYPE_CLASS_PHONE);
+                  co.addView(eW, lp(dp(46), 8));
+                  TextView coHint = text("Kosongkan kolom untuk memakai pengaturan bawaan aplikasi.", 12, DARK, false);
+                  coHint.setGravity(Gravity.START);
+                  co.addView(coHint, lp(WRAP, 6));
+                  Button sv = button("Simpan dan perbarui sekarang", TEAL, 15);
+                  co.addView(sv, lp(dp(48), 10));
+                  sv.setOnClickListener(v -> {
+                      prefs.edit().putString("url_soal", eS.getText().toString().trim())
+                              .putString("url_materi", eM.getText().toString().trim())
+                              .putString("wa", eW.getText().toString().trim()).apply();
+                      refreshOnline(false);
+                  });
+                  c.addView(co, lp(WRAP, 16));
+
                   Button imp = button("Impor soal dari file", BLUE, 20);
                   imp.setElevation(dp(4));
                   c.addView(imp, lp(dp(60), 16));
@@ -1578,6 +2425,19 @@ jobs:
                   how.setGravity(Gravity.START);
                   ch.addView(how, lp(WRAP, 8));
                   c.addView(ch, lp(WRAP, 14));
+
+                  LinearLayout cg = card();
+                  cg.addView(heading("Cara pakai Google Sheet"), lp(WRAP, 0));
+                  TextView gs = text("1. Buat Google Sheet dengan kolom yang sama seperti file soal.\n"
+                          + "2. Klik File > Bagikan > Publikasikan ke web, pilih lembar itu dan format CSV.\n"
+                          + "3. Salin tautannya ke kolom tautan soal di atas.\n"
+                          + "4. Untuk materi, buat lembar lain dengan kolom: mapel, kelas, judul, tautan, keterangan.\n"
+                          + "5. Siswa menekan Perbarui soal & materi di menu utama. Soal dari tautan menggantikan "
+                          + "soal tautan sebelumnya, sedangkan soal dari file tetap ada.",
+                          13, DARK, false);
+                  gs.setGravity(Gravity.START);
+                  cg.addView(gs, lp(WRAP, 8));
+                  c.addView(cg, lp(WRAP, 14));
 
                   if (!bank.isEmpty()) {
                       Button del = button("Hapus semua soal guru", RED, 14);
@@ -2011,7 +2871,8 @@ jobs:
                   top.setOrientation(LinearLayout.HORIZONTAL);
                   top.setGravity(Gravity.CENTER_VERTICAL);
                   c.addView(top, lp(WRAP, 0));
-                  String who = (np > 1) ? PLAYER_ICON[cur] + " " + names[cur] : "\u2B50 Petualang";
+                  String who = (np > 1) ? PLAYER_ICON[cur] + " " + names[cur]
+                          : "\u2B50 " + (profileName().isEmpty() ? "Petualang" : firstName(profileName()));
                   top.addView(pill(who, np > 1 ? PLAYER_COLORS[cur] : ORANGE),
                           new LinearLayout.LayoutParams(WRAP, WRAP));
                   top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
@@ -2085,7 +2946,7 @@ jobs:
                   Button back = button("Kembali ke menu", GRAY, 14);
                   back.setTextColor(DARK);
                   c.addView(back, lp(dp(46), 22));
-                  back.setOnClickListener(v -> showMenu());
+                  back.setOnClickListener(v -> confirmExit());
 
                   wrap(c);
               }
@@ -2231,6 +3092,7 @@ jobs:
                   if (rekorNow) {
                       prefs.edit().putInt(key, pScore[0]).apply();
                   }
+                  addHistory(pScore[0], pCorrect[0], total);
                   renderSoloResult();
               }
 
@@ -2449,9 +3311,14 @@ jobs:
                           showReview();
                       });
                   }
+                  Button share = button(teacherWa().isEmpty() ? "💬  Bagikan hasil"
+                          : "💬  Kirim hasil ke guru", TEAL, 20);
+                  share.setElevation(dp(4));
+                  c.addView(share, lp(dp(60), mistakes ? 12 : 22));
+                  share.setOnClickListener(v -> sendReport());
                   Button again = button("Main Lagi", GREEN, 22);
                   again.setElevation(dp(4));
-                  c.addView(again, lp(dp(64), mistakes ? 12 : 26));
+                  c.addView(again, lp(dp(64), 12));
                   again.setOnClickListener(v -> startGame(mode));
 
                   Button menu = button("Menu Utama", ORANGE, 20);
