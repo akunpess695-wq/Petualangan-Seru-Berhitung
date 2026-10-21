@@ -68,8 +68,8 @@ jobs:
                   applicationId "com.petualangan.berhitung"
                   minSdk 21
                   targetSdk 34
-                  versionCode 4
-                  versionName "3.0"
+                  versionCode 6
+                  versionName "3.2"
               }
 
               signingConfigs {
@@ -183,21 +183,38 @@ jobs:
               private static final int SILVER = Color.parseColor("#90A4AE");
               private static final int BRONZE = Color.parseColor("#A1887F");
 
-              // Tingkat kesulitan soal: 0 Easy, 1 Normal, 2 Hard, 3 Extreme
-              private static final String[] DIFF_NAMES = {"Easy", "Normal", "Hard", "Extreme"};
-              private static final String[] DIFF_DESC = {
-                      "Angka kecil \u2022 4 nyawa",
-                      "Angka sedang \u2022 3 nyawa",
-                      "Angka besar \u2022 2 nyawa",
-                      "Angka sangat besar \u2022 1 nyawa"
+              // Tingkat kesulitan = kelas SD (indeks 0..5 untuk kelas 1..6)
+              private static final String[] KELAS_LABEL = {"1", "2", "3", "4", "5", "6"};
+              private static final String[] KELAS_NAMES = {
+                      "Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"
               };
-              private static final int[] DIFF_COLOR = {GREEN, BLUE, ORANGE, RED};
-              private static final int[] DIFF_LIVES = {4, 3, 2, 1};
-              private static final int[] DIFF_BASE = {5, 10, 25, 50};
-              private static final int[] DIFF_STEP = {1, 2, 5, 15};
-              private static final int[] DIFF_MUL_A = {5, 0, 12, 20};
-              private static final int[] DIFF_MUL_B = {5, 10, 12, 20};
-
+              private static final String[] KELAS_DESC = {
+                      "Sampai 20 \u2022 perkalian kecil (1\u20135)",
+                      "Sampai 100 \u2022 perkalian tabel 2\u20135",
+                      "Sampai 1.000 \u2022 perkalian tabel 2\u201310",
+                      "Sampai 10.000 \u2022 perkalian 2 angka \u00D7 1 angka",
+                      "Sampai 100.000 \u2022 perkalian 2 angka \u00D7 2 angka",
+                      "Sampai 1.000.000 \u2022 perkalian 3 angka \u00D7 2 angka"
+              };
+              private static final int[] KELAS_COLOR = {GREEN, TEAL, BLUE, PURPLE, ORANGE, RED};
+              private static final int[] KELAS_LIVES = {5, 5, 4, 4, 3, 3};
+              // Penjumlahan dan pengurangan: batas bilangan di soal 1 dan di soal 10
+              private static final int[] ADD_LO = {10, 20, 100, 1000, 10000, 100000};
+              private static final int[] ADD_HI = {20, 100, 1000, 10000, 100000, 1000000};
+              // Perkalian: faktor pertama (a) dan kedua (b); batas atas naik dari soal 1 ke soal 10
+              private static final int[] MUL_A_LO = {1, 2, 2, 11, 12, 101};
+              private static final int[] MUL_A_S = {2, 3, 6, 30, 30, 200};
+              private static final int[] MUL_A_E = {5, 5, 10, 99, 99, 500};
+              private static final int[] MUL_B_LO = {1, 1, 2, 2, 11, 11};
+              private static final int[] MUL_B_S = {3, 5, 6, 5, 15, 20};
+              private static final int[] MUL_B_E = {5, 10, 10, 9, 30, 50};
+              // Soal 3 bilangan Kelas 4-6: faktor kecil x, y dan bilangan z (naik dari soal 1 ke soal 10)
+              private static final int[] X_S = {0, 0, 0, 4, 6, 10};
+              private static final int[] X_E = {0, 0, 0, 9, 12, 25};
+              private static final int[] Y_S = {0, 0, 0, 3, 4, 5};
+              private static final int[] Y_E = {0, 0, 0, 9, 12, 15};
+              private static final int[] Z_S = {0, 0, 0, 20, 100, 500};
+              private static final int[] Z_E = {0, 0, 0, 200, 2000, 10000};
               private static final int[] PLAYER_COLORS = {BLUE, PINK, GREEN, PURPLE};
               private static final String[] PLAYER_ICON = {
                       "\uD83D\uDC31", "\uD83D\uDC36", "\uD83D\uDC30", "\uD83D\uDC3C"
@@ -212,6 +229,7 @@ jobs:
                   String text;
                   int answer;
                   int correctIdx;
+                  int trap = -1;
                   final int[] opts = new int[4];
               }
 
@@ -226,7 +244,7 @@ jobs:
               // Pengaturan
               private int screen;
               private int mode;
-              private int diff = 1;
+              private int kelas = 0;
               private boolean timed = false;
               private int secs = 10;
               private int np = 1;
@@ -295,6 +313,7 @@ jobs:
                   if (screen == 0) {
                       super.onBackPressed();
                   } else {
+                      saveNames();
                       showMenu();
                   }
               }
@@ -437,7 +456,7 @@ jobs:
               }
 
               private String bestKey() {
-                  return "best_" + diff + (timed ? "_t" : "");
+                  return "best_k" + kelas + (timed ? "_t" : "");
               }
 
               private String modeLabel() {
@@ -462,28 +481,126 @@ jobs:
 
               // ---------- Menu ----------
 
-              private void showMenu() {
-                  handler.removeCallbacksAndMessages(null);
-                  screen = 0;
-                  diff = Math.max(0, Math.min(3, prefs.getInt("diff", 1)));
+              private void loadPrefs() {
+                  kelas = Math.max(0, Math.min(5, prefs.getInt("kelas", 0)));
                   timed = prefs.getBoolean("timed", false);
                   secs = Math.max(SECS_MIN, Math.min(SECS_MAX, prefs.getInt("secs", 10)));
                   np = Math.max(1, Math.min(MAX_PLAYERS, prefs.getInt("np", 1)));
                   for (int i = 0; i < MAX_PLAYERS; i++) {
                       names[i] = prefs.getString("name" + i, "Pemain " + (i + 1));
                   }
+              }
+
+              private void showMenu() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 0;
+                  nameFields = null;
+                  loadPrefs();
 
                   LinearLayout c = column();
-                  c.addView(text("\u2B50", 48, ORANGE, false), lp(WRAP, 0));
-                  c.addView(text("Petualangan Berhitung", 28, ORANGE_DARK, true), lp(WRAP, 2));
-                  c.addView(text("Ayo belajar berhitung sambil bermain!", 15, DARK, false), lp(WRAP, 4));
 
-                  // Kartu pemain
+                  // Spanduk judul
+                  LinearLayout hero = new LinearLayout(this);
+                  hero.setOrientation(LinearLayout.VERTICAL);
+                  hero.setGravity(Gravity.CENTER_HORIZONTAL);
+                  hero.setPadding(dp(16), dp(20), dp(16), dp(20));
+                  GradientDrawable hg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                          new int[]{Color.parseColor("#FFA726"), Color.parseColor("#F4511E")});
+                  hg.setCornerRadius(dp(28));
+                  hero.setBackground(hg);
+                  hero.setElevation(dp(6));
+                  hero.addView(text("\u2B50", 40, Color.WHITE, false), lp(WRAP, 0));
+                  hero.addView(text("Petualangan Berhitung", 26, Color.WHITE, true), lp(WRAP, 2));
+                  hero.addView(text("Ayo belajar berhitung sambil bermain!", 14,
+                          Color.parseColor("#FFF3E0"), false), lp(WRAP, 4));
+                  c.addView(hero, lp(WRAP, 0));
+
+                  // Pilih kelas
+                  LinearLayout ck = card();
+                  ck.addView(heading("Kelas berapa?"), lp(WRAP, 0));
+                  ck.addView(chips(KELAS_LABEL, kelas, KELAS_COLOR, k -> {
+                      prefs.edit().putInt("kelas", k).apply();
+                      showMenu();
+                  }), lp(dp(46), 10));
+                  ck.addView(text(KELAS_DESC[kelas] + " \u2022 " + KELAS_LIVES[kelas] + " nyawa",
+                          13, DARK, false), lp(WRAP, 8));
+                  if (np == 1) {
+                      ck.addView(text("\uD83C\uDFC6 Rekor: " + prefs.getInt(bestKey(), 0), 13, PURPLE, true),
+                              lp(WRAP, 4));
+                  }
+                  c.addView(ck, lp(WRAP, 18));
+
+                  // Pilih permainan
+                  c.addView(text("Pilih permainan", 16, DARK, true), lp(WRAP, 20));
+                  LinearLayout r1 = new LinearLayout(this);
+                  r1.setOrientation(LinearLayout.HORIZONTAL);
+                  c.addView(r1, lp(dp(104), 10));
+                  r1.addView(tile("+", "Tambah", ORANGE, 0), weight(0, 6));
+                  r1.addView(tile("\u2212", "Kurang", BLUE, 1), weight(6, 0));
+                  LinearLayout r2 = new LinearLayout(this);
+                  r2.setOrientation(LinearLayout.HORIZONTAL);
+                  c.addView(r2, lp(dp(104), 12));
+                  r2.addView(tile("\u00D7", "Kali", GREEN, 2), weight(0, 6));
+                  r2.addView(tile("\uD83C\uDFB2", "Campur", PURPLE, 3), weight(6, 0));
+                  c.addView(wideTile("+ \u2212 \u00D7", "Campur 3 Bilangan", PINK, 4), lp(dp(72), 12));
+
+                  // Pengaturan (pemain dan waktu)
+                  String who = (np == 1) ? "Main sendiri" : np + " pemain";
+                  Button st = button("\u2699  " + who + " \u2022 " + modeLabel() + "  \u203A", Color.WHITE, 14);
+                  st.setTextColor(DARK);
+                  st.setElevation(dp(3));
+                  c.addView(st, lp(dp(52), 22));
+                  st.setOnClickListener(v -> showSettings());
+
+                  c.setFocusableInTouchMode(true);
+                  c.requestFocus();
+                  wrap(c);
+              }
+
+              private LinearLayout tile(String sym, String label, int color, final int m) {
+                  LinearLayout t = new LinearLayout(this);
+                  t.setOrientation(LinearLayout.VERTICAL);
+                  t.setGravity(Gravity.CENTER);
+                  t.setBackground(box(color, 22));
+                  t.setElevation(dp(5));
+                  t.addView(text(sym, 36, Color.WHITE, true), new LinearLayout.LayoutParams(WRAP, WRAP));
+                  t.addView(text(label, 17, Color.WHITE, true), new LinearLayout.LayoutParams(WRAP, WRAP));
+                  t.setClickable(true);
+                  t.setOnClickListener(v -> startGame(m));
+                  return t;
+              }
+
+              private LinearLayout wideTile(String sym, String label, int color, final int m) {
+                  LinearLayout t = new LinearLayout(this);
+                  t.setOrientation(LinearLayout.HORIZONTAL);
+                  t.setGravity(Gravity.CENTER);
+                  t.setBackground(box(color, 22));
+                  t.setElevation(dp(5));
+                  t.addView(text(sym, 22, Color.WHITE, true), new LinearLayout.LayoutParams(WRAP, WRAP));
+                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(WRAP, WRAP);
+                  p.leftMargin = dp(14);
+                  t.addView(text(label, 19, Color.WHITE, true), p);
+                  t.setClickable(true);
+                  t.setOnClickListener(v -> startGame(m));
+                  return t;
+              }
+
+              // ---------- Pengaturan ----------
+
+              private void showSettings() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 4;
+                  loadPrefs();
+
+                  LinearLayout c = column();
+                  c.addView(text("\u2699 Pengaturan", 26, ORANGE_DARK, true), lp(WRAP, 0));
+
+                  // Jumlah pemain
                   LinearLayout cp = card();
                   cp.addView(heading("Jumlah pemain"), lp(WRAP, 0));
                   cp.addView(chips(new String[]{"1", "2", "3", "4"}, np - 1, PLAYER_COLORS, k1 -> {
                       prefs.edit().putInt("np", k1 + 1).apply();
-                      showMenu();
+                      showSettings();
                   }), lp(dp(46), 10));
                   cp.addView(text(np == 1 ? "Main sendiri" : np + " pemain, main bergantian di HP ini",
                           13, DARK, false), lp(WRAP, 8));
@@ -505,25 +622,15 @@ jobs:
                   } else {
                       nameFields = null;
                   }
-                  c.addView(cp, lp(WRAP, 16));
+                  c.addView(cp, lp(WRAP, 18));
 
-                  // Kartu tingkat kesulitan
-                  LinearLayout cd = card();
-                  cd.addView(heading("Tingkat kesulitan"), lp(WRAP, 0));
-                  cd.addView(chips(DIFF_NAMES, diff, DIFF_COLOR, k2 -> {
-                      prefs.edit().putInt("diff", k2).apply();
-                      showMenu();
-                  }), lp(dp(46), 10));
-                  cd.addView(text(DIFF_DESC[diff], 13, DARK, false), lp(WRAP, 8));
-                  c.addView(cd, lp(WRAP, 14));
-
-                  // Kartu mode waktu
+                  // Mode waktu
                   LinearLayout cm = card();
                   cm.addView(heading("Mode waktu"), lp(WRAP, 0));
                   cm.addView(chips(new String[]{"Tanpa waktu", "Berwaktu"}, timed ? 1 : 0,
                           new int[]{PURPLE, PURPLE}, k3 -> {
                               prefs.edit().putBoolean("timed", k3 == 1).apply();
-                              showMenu();
+                              showSettings();
                           }), lp(dp(46), 10));
                   if (timed) {
                       LinearLayout srow = new LinearLayout(this);
@@ -540,16 +647,13 @@ jobs:
                   }
                   c.addView(cm, lp(WRAP, 14));
 
-                  if (np == 1) {
-                      c.addView(pill("\uD83C\uDFC6 Skor terbaik: " + prefs.getInt(bestKey(), 0), PURPLE),
-                              lpw(16));
-                  }
-
-                  c.addView(text("Pilih permainan", 16, DARK, true), lp(WRAP, 18));
-                  addMenuButton(c, "\u2795  Penjumlahan", ORANGE, 0);
-                  addMenuButton(c, "\u2796  Pengurangan", BLUE, 1);
-                  addMenuButton(c, "\u2716  Perkalian", GREEN, 2);
-                  addMenuButton(c, "\uD83C\uDFB2  Campur", PURPLE, 3);
+                  Button done = button("Selesai", GREEN, 20);
+                  done.setElevation(dp(4));
+                  c.addView(done, lp(dp(58), 24));
+                  done.setOnClickListener(v -> {
+                      saveNames();
+                      showMenu();
+                  });
 
                   c.setFocusableInTouchMode(true);
                   c.requestFocus();
@@ -563,18 +667,10 @@ jobs:
                       saveNames();
                       int n = Math.max(SECS_MIN, Math.min(SECS_MAX, secs + delta));
                       prefs.edit().putInt("secs", n).apply();
-                      showMenu();
+                      showSettings();
                   });
                   return b;
               }
-
-              private void addMenuButton(LinearLayout c, String label, int color, final int m) {
-                  Button b = button(label, color, 20);
-                  b.setElevation(dp(4));
-                  c.addView(b, lp(dp(60), 12));
-                  b.setOnClickListener(v -> startGame(m));
-              }
-
               // ---------- Persiapan permainan ----------
 
               private void startGame(int m) {
@@ -592,62 +688,194 @@ jobs:
                   }
               }
 
+              private int range(int lo, int hi) {
+                  return lo + rnd.nextInt(hi - lo + 1);
+              }
+
+              // Nilai yang naik pelan-pelan dari s (soal 1) ke e (soal 10)
+              private int grow(int s, int e, int n) {
+                  return s + (e - s) * (n - 1) / (TOTAL - 1);
+              }
+
+              // Titik pemisah ribuan gaya Indonesia: 1250000 -> 1.250.000
+              private String fmt(int v) {
+                  String s = String.valueOf(v);
+                  StringBuilder out = new StringBuilder();
+                  int c = 0;
+                  for (int i = s.length() - 1; i >= 0; i--) {
+                      out.append(s.charAt(i));
+                      c++;
+                      if (c % 3 == 0 && i > 0) {
+                          out.append('.');
+                      }
+                  }
+                  return out.reverse().toString();
+              }
+
+              private int questionSize(int len) {
+                  return len <= 9 ? 46 : len <= 13 ? 38 : len <= 16 ? 30 : len <= 19 ? 24 : len <= 23 ? 20 : 17;
+              }
+
+              private int optionSize(int len) {
+                  return len <= 6 ? 28 : len <= 8 ? 24 : 20;
+              }
+
               private void buildQuestions() {
                   for (int i = 0; i < TOTAL; i++) {
-                      int n = i + 1;
-                      int max = DIFF_BASE[diff] + (n - 1) * DIFF_STEP[diff];
-                      int op = (mode == 3) ? rnd.nextInt(3) : mode;
-                      int a;
-                      int b;
-                      int ans;
-                      String sym;
-                      if (op == 0) {
-                          a = 1 + rnd.nextInt(max);
-                          b = 1 + rnd.nextInt(max);
-                          ans = a + b;
-                          sym = "+";
-                      } else if (op == 1) {
-                          a = 1 + rnd.nextInt(max);
-                          b = 1 + rnd.nextInt(a);
-                          ans = a - b;
-                          sym = "-";
-                      } else {
-                          int aMax = (diff == 1) ? Math.min(10, 2 + n) : DIFF_MUL_A[diff];
-                          a = 1 + rnd.nextInt(aMax);
-                          b = 1 + rnd.nextInt(DIFF_MUL_B[diff]);
-                          ans = a * b;
-                          sym = "\u00D7";
-                      }
-
                       Q q = new Q();
-                      q.text = a + " " + sym + " " + b + " = ?";
-                      q.answer = ans;
-                      int spread = Math.max(10, ans / 4);
-                      int pos = rnd.nextInt(4);
-                      Arrays.fill(q.opts, -1);
-                      q.opts[pos] = ans;
-                      q.correctIdx = pos;
-                      for (int k = 0; k < 4; k++) {
-                          if (k == pos) {
-                              continue;
-                          }
-                          int v;
-                          boolean bad;
-                          do {
-                              v = ans + rnd.nextInt(2 * spread + 1) - spread;
-                              bad = (v < 0 || v == ans);
-                              for (int j = 0; j < 4 && !bad; j++) {
-                                  if (q.opts[j] == v) {
-                                      bad = true;
-                                  }
-                              }
-                          } while (bad);
-                          q.opts[k] = v;
+                      if (mode == 4) {
+                          buildThree(q, i + 1);
+                      } else {
+                          buildTwo(q, i + 1);
                       }
+                      fillOptions(q);
                       qs[i] = q;
                   }
               }
 
+              private void buildTwo(Q q, int n) {
+                  int op = (mode == 3) ? rnd.nextInt(3) : mode;
+                  int a;
+                  int b;
+                  int ans;
+                  String sym;
+                  if (op == 2) {
+                      a = range(MUL_A_LO[kelas], grow(MUL_A_S[kelas], MUL_A_E[kelas], n));
+                      b = range(MUL_B_LO[kelas], grow(MUL_B_S[kelas], MUL_B_E[kelas], n));
+                      ans = a * b;
+                      sym = "\u00D7";
+                  } else {
+                      int max = grow(ADD_LO[kelas], ADD_HI[kelas], n);
+                      int low = Math.max(1, max / 10);
+                      if (op == 0) {
+                          a = range(low, max - low);
+                          b = range(low, max - a);
+                          ans = a + b;
+                          sym = "+";
+                      } else {
+                          a = range(2 * low, max);
+                          b = range(low, a - low);
+                          ans = a - b;
+                          sym = "-";
+                      }
+                  }
+                  q.text = fmt(a) + " " + sym + " " + fmt(b) + " = ?";
+                  q.answer = ans;
+              }
+
+              // Tiga bilangan. Kelas 1-3: tambah dan kurang. Kelas 4-6: ada perkalian (urutan operasi).
+              private void buildThree(Q q, int n) {
+                  String expr;
+                  int ans;
+                  if (kelas <= 2) {
+                      int max = grow(ADD_LO[kelas], ADD_HI[kelas], n);
+                      int low = Math.max(1, max / 10);
+                      int form = rnd.nextInt(4);
+                      int a;
+                      int b;
+                      int c;
+                      if (form == 0) {
+                          int top = Math.max(low, max / 3);
+                          a = range(low, top);
+                          b = range(low, top);
+                          c = range(low, top);
+                          ans = a + b + c;
+                      } else if (form == 1) {
+                          int top = Math.max(low, max / 2);
+                          a = range(low, top);
+                          b = range(low, top);
+                          c = range(low, a + b - low);
+                          ans = a + b - c;
+                      } else if (form == 2) {
+                          a = range(2 * low, max);
+                          b = range(low, a - low);
+                          c = range(low, max - (a - b));
+                          ans = a - b + c;
+                      } else {
+                          a = range(3 * low, max);
+                          b = range(low, (a - low) / 2);
+                          c = range(low, a - b - low);
+                          ans = a - b - c;
+                      }
+                      String s1 = (form < 2) ? "+" : "-";
+                      String s2 = (form % 2 == 0) ? "+" : "-";
+                      expr = fmt(a) + " " + s1 + " " + fmt(b) + " " + s2 + " " + fmt(c);
+                  } else {
+                      int x = range(2, grow(X_S[kelas], X_E[kelas], n));
+                      int y = range(2, grow(Y_S[kelas], Y_E[kelas], n));
+                      int zmax = grow(Z_S[kelas], Z_E[kelas], n);
+                      int p = x * y;
+                      int z;
+                      int form = rnd.nextInt(kelas == 3 ? 4 : 6);
+                      if (form == 0) {
+                          z = range(2, zmax);
+                          ans = z + p;
+                          expr = fmt(z) + " + " + x + " \u00D7 " + y;
+                          q.trap = (z + x) * y;
+                      } else if (form == 1) {
+                          z = range(2, zmax);
+                          ans = p + z;
+                          expr = x + " \u00D7 " + y + " + " + fmt(z);
+                          q.trap = x * (y + z);
+                      } else if (form == 2) {
+                          z = range(2, Math.min(zmax, p - 1));
+                          ans = p - z;
+                          expr = x + " \u00D7 " + y + " - " + fmt(z);
+                          q.trap = x * (y - z);
+                      } else if (form == 3) {
+                          z = range(p + 1, p + zmax);
+                          ans = z - p;
+                          expr = fmt(z) + " - " + x + " \u00D7 " + y;
+                          q.trap = (z - x) * y;
+                      } else if (form == 4) {
+                          z = range(2, zmax);
+                          ans = (z + x) * y;
+                          expr = "(" + fmt(z) + " + " + x + ") \u00D7 " + y;
+                          q.trap = z + x * y;
+                      } else {
+                          z = range(x + 1, x + zmax);
+                          ans = (z - x) * y;
+                          expr = "(" + fmt(z) + " - " + x + ") \u00D7 " + y;
+                          q.trap = z - x * y;
+                      }
+                  }
+                  q.text = expr + "\n= ?";
+                  q.answer = ans;
+              }
+
+              // Empat pilihan jawaban. Untuk soal ber-urutan-operasi, salah satu pilihan
+              // adalah jawaban kalau dihitung dari kiri ke kanan (jebakan).
+              private void fillOptions(Q q) {
+                  int ans = q.answer;
+                  int spread = Math.max(5, ans / 10);
+                  int pos = rnd.nextInt(4);
+                  Arrays.fill(q.opts, -1);
+                  q.opts[pos] = ans;
+                  q.correctIdx = pos;
+                  boolean needTrap = q.trap >= 1 && q.trap != ans;
+                  for (int k = 0; k < 4; k++) {
+                      if (k == pos) {
+                          continue;
+                      }
+                      if (needTrap) {
+                          q.opts[k] = q.trap;
+                          needTrap = false;
+                          continue;
+                      }
+                      int v;
+                      boolean bad;
+                      do {
+                          v = ans + rnd.nextInt(2 * spread + 1) - spread;
+                          bad = (v < 1 || v == ans);
+                          for (int j = 0; j < 4 && !bad; j++) {
+                              if (q.opts[j] == v) {
+                                  bad = true;
+                              }
+                          }
+                      } while (bad);
+                      q.opts[k] = v;
+                  }
+              }
               // ---------- Layar giliran (multi pemain) ----------
 
               private void showPass() {
@@ -665,7 +893,7 @@ jobs:
                           lp(WRAP, 18));
                   c.addView(text(names[cur], 34, PLAYER_COLORS[cur], true), lp(WRAP, 4));
                   c.addView(text("Pemain " + (cur + 1) + " dari " + np, 14, DARK, false), lp(WRAP, 4));
-                  c.addView(pill(DIFF_NAMES[diff] + " \u2022 " + modeLabel(), DIFF_COLOR[diff]), lpw(14));
+                  c.addView(pill(KELAS_NAMES[kelas] + " \u2022 " + modeLabel(), KELAS_COLOR[kelas]), lpw(14));
 
                   if (cur > 0) {
                       LinearLayout board = card();
@@ -696,7 +924,7 @@ jobs:
                   qi = 0;
                   score = 0;
                   correct = 0;
-                  lives = DIFF_LIVES[diff];
+                  lives = KELAS_LIVES[kelas];
                   showGame();
                   showQuestion();
               }
@@ -799,10 +1027,14 @@ jobs:
                   locked = false;
 
                   tvQuestion.setText(q.text);
+                  int nl = q.text.indexOf('\n');
+                  tvQuestion.setTextSize(questionSize(nl >= 0 ? nl : q.text.length()));
                   tvFeedback.setText(" ");
                   for (int i = 0; i < 4; i++) {
                       final int idx = i;
-                      opts[i].setText(String.valueOf(q.opts[i]));
+                      String ot = fmt(q.opts[i]);
+                      opts[i].setText(ot);
+                      opts[i].setTextSize(optionSize(ot.length()));
                       opts[i].setBackground(box(OPT_COLORS[i], 16));
                       opts[i].setAlpha(1f);
                       opts[i].setOnClickListener(v -> choose(idx));
@@ -864,7 +1096,7 @@ jobs:
                       opts[idx].setBackground(box(RED, 16));
                       correctBtn.setBackground(box(GREEN, 16));
                       dots[qi - 1].setBackground(box(RED, 4));
-                      tvFeedback.setText("Oops! Jawabannya " + q.answer);
+                      tvFeedback.setText("Oops! Jawabannya " + fmt(q.answer));
                       tvFeedback.setTextColor(RED);
                   }
                   updateHud();
@@ -882,7 +1114,7 @@ jobs:
                   dimOthers(q.correctIdx, q.correctIdx);
                   correctBtn.setBackground(box(GREEN, 16));
                   dots[qi - 1].setBackground(box(RED, 4));
-                  tvFeedback.setText("Jawabannya " + q.answer);
+                  tvFeedback.setText("Jawabannya " + fmt(q.answer));
                   tvFeedback.setTextColor(RED);
                   updateHud();
                   handler.postDelayed(this::showQuestion, 1000);
@@ -926,7 +1158,7 @@ jobs:
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
                   c.addView(text(lives <= 0 ? "Nyawa habis!" : "Selesai!", 32, ORANGE_DARK, true), lp(WRAP, 0));
-                  c.addView(pill(DIFF_NAMES[diff] + " \u2022 " + modeLabel(), DIFF_COLOR[diff]), lpw(10));
+                  c.addView(pill(KELAS_NAMES[kelas] + " \u2022 " + modeLabel(), KELAS_COLOR[kelas]), lpw(10));
 
                   LinearLayout card = card();
                   card.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -972,7 +1204,7 @@ jobs:
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
                   c.addView(text("Hasil Akhir", 32, ORANGE_DARK, true), lp(WRAP, 0));
-                  c.addView(pill(DIFF_NAMES[diff] + " \u2022 " + modeLabel(), DIFF_COLOR[diff]), lpw(10));
+                  c.addView(pill(KELAS_NAMES[kelas] + " \u2022 " + modeLabel(), KELAS_COLOR[kelas]), lpw(10));
 
                   TextView banner = text(winners > 1 ? "Seri! Skor sama \uD83E\uDD1D"
                           : "\uD83C\uDFC6 " + names[order[0]] + " menang!", 22, Color.WHITE, true);
