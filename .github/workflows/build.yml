@@ -68,8 +68,8 @@ jobs:
                   applicationId "com.petualangan.berhitung"
                   minSdk 21
                   targetSdk 34
-                  versionCode 6
-                  versionName "3.2"
+                  versionCode 7
+                  versionName "3.3"
               }
 
               signingConfigs {
@@ -189,32 +189,32 @@ jobs:
                       "Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"
               };
               private static final String[] KELAS_DESC = {
-                      "Sampai 20 \u2022 perkalian kecil (1\u20135)",
-                      "Sampai 100 \u2022 perkalian tabel 2\u20135",
-                      "Sampai 1.000 \u2022 perkalian tabel 2\u201310",
-                      "Sampai 10.000 \u2022 perkalian 2 angka \u00D7 1 angka",
-                      "Sampai 100.000 \u2022 perkalian 2 angka \u00D7 2 angka",
-                      "Sampai 1.000.000 \u2022 perkalian 3 angka \u00D7 2 angka"
+                  "Sampai 10\u201320 \u2022 kali-bagi: pengayaan",
+                  "Sampai 15\u201320 \u2022 kali-bagi: pengayaan",
+                  "Sampai 100\u2013500 \u2022 kali-bagi sampai 70",
+                  "Sampai 500\u20131.000 \u2022 kali-bagi sampai 100",
+                  "Sampai 1.000\u201310.000 \u2022 kali-bagi 2 angka",
+                  "Sampai 10.000\u2013100.000 \u2022 kali-bagi 3 angka"
               };
               private static final int[] KELAS_COLOR = {GREEN, TEAL, BLUE, PURPLE, ORANGE, RED};
               private static final int[] KELAS_LIVES = {5, 5, 4, 4, 3, 3};
               // Penjumlahan dan pengurangan: batas bilangan di soal 1 dan di soal 10
-              private static final int[] ADD_LO = {10, 20, 100, 1000, 10000, 100000};
-              private static final int[] ADD_HI = {20, 100, 1000, 10000, 100000, 1000000};
-              // Perkalian: faktor pertama (a) dan kedua (b); batas atas naik dari soal 1 ke soal 10
-              private static final int[] MUL_A_LO = {1, 2, 2, 11, 12, 101};
-              private static final int[] MUL_A_S = {2, 3, 6, 30, 30, 200};
-              private static final int[] MUL_A_E = {5, 5, 10, 99, 99, 500};
-              private static final int[] MUL_B_LO = {1, 1, 2, 2, 11, 11};
-              private static final int[] MUL_B_S = {3, 5, 6, 5, 15, 20};
-              private static final int[] MUL_B_E = {5, 10, 10, 9, 30, 50};
-              // Soal 3 bilangan Kelas 4-6: faktor kecil x, y dan bilangan z (naik dari soal 1 ke soal 10)
-              private static final int[] X_S = {0, 0, 0, 4, 6, 10};
-              private static final int[] X_E = {0, 0, 0, 9, 12, 25};
-              private static final int[] Y_S = {0, 0, 0, 3, 4, 5};
-              private static final int[] Y_E = {0, 0, 0, 9, 12, 15};
-              private static final int[] Z_S = {0, 0, 0, 20, 100, 500};
-              private static final int[] Z_E = {0, 0, 0, 200, 2000, 10000};
+              private static final int[] ADD_LO = {10, 15, 100, 500, 1000, 10000};
+              private static final int[] ADD_HI = {20, 20, 500, 1000, 10000, 100000};
+              // Perkalian dan pembagian: faktor a dan b; batas atas naik dari soal 1 ke soal 10
+              private static final int[] MUL_A_LO = {1, 2, 2, 2, 11, 101};
+              private static final int[] MUL_A_S = {2, 3, 4, 6, 20, 200};
+              private static final int[] MUL_A_E = {5, 5, 7, 10, 99, 500};
+              private static final int[] MUL_B_LO = {1, 1, 2, 2, 2, 11};
+              private static final int[] MUL_B_S = {3, 5, 6, 8, 5, 20};
+              private static final int[] MUL_B_E = {5, 10, 10, 10, 30, 50};
+              // Soal 3 bilangan Kelas 5-6: faktor kecil x, y dan bilangan z (naik dari soal 1 ke soal 10)
+              private static final int[] X_S = {0, 0, 0, 0, 4, 10};
+              private static final int[] X_E = {0, 0, 0, 0, 12, 25};
+              private static final int[] Y_S = {0, 0, 0, 0, 3, 5};
+              private static final int[] Y_E = {0, 0, 0, 0, 9, 15};
+              private static final int[] Z_S = {0, 0, 0, 0, 50, 500};
+              private static final int[] Z_E = {0, 0, 0, 0, 1000, 6000};
               private static final int[] PLAYER_COLORS = {BLUE, PINK, GREEN, PURPLE};
               private static final String[] PLAYER_ICON = {
                       "\uD83D\uDC31", "\uD83D\uDC36", "\uD83D\uDC30", "\uD83D\uDC3C"
@@ -534,15 +534,19 @@ jobs:
                   c.addView(text("Pilih permainan", 16, DARK, true), lp(WRAP, 20));
                   LinearLayout r1 = new LinearLayout(this);
                   r1.setOrientation(LinearLayout.HORIZONTAL);
-                  c.addView(r1, lp(dp(104), 10));
+                  c.addView(r1, lp(dp(96), 10));
                   r1.addView(tile("+", "Tambah", ORANGE, 0), weight(0, 6));
                   r1.addView(tile("\u2212", "Kurang", BLUE, 1), weight(6, 0));
                   LinearLayout r2 = new LinearLayout(this);
                   r2.setOrientation(LinearLayout.HORIZONTAL);
-                  c.addView(r2, lp(dp(104), 12));
+                  c.addView(r2, lp(dp(96), 12));
                   r2.addView(tile("\u00D7", "Kali", GREEN, 2), weight(0, 6));
-                  r2.addView(tile("\uD83C\uDFB2", "Campur", PURPLE, 3), weight(6, 0));
-                  c.addView(wideTile("+ \u2212 \u00D7", "Campur 3 Bilangan", PINK, 4), lp(dp(72), 12));
+                  r2.addView(tile("\u00F7", "Bagi", TEAL, 3), weight(6, 0));
+                  LinearLayout r3 = new LinearLayout(this);
+                  r3.setOrientation(LinearLayout.HORIZONTAL);
+                  c.addView(r3, lp(dp(96), 12));
+                  r3.addView(tile("\uD83C\uDFB2", "Campur", PURPLE, 4), weight(0, 6));
+                  r3.addView(tile("+\u2212\u00D7", "3 Bilangan", PINK, 5), weight(6, 0));
 
                   // Pengaturan (pemain dan waktu)
                   String who = (np == 1) ? "Main sendiri" : np + " pemain";
@@ -565,21 +569,6 @@ jobs:
                   t.setElevation(dp(5));
                   t.addView(text(sym, 36, Color.WHITE, true), new LinearLayout.LayoutParams(WRAP, WRAP));
                   t.addView(text(label, 17, Color.WHITE, true), new LinearLayout.LayoutParams(WRAP, WRAP));
-                  t.setClickable(true);
-                  t.setOnClickListener(v -> startGame(m));
-                  return t;
-              }
-
-              private LinearLayout wideTile(String sym, String label, int color, final int m) {
-                  LinearLayout t = new LinearLayout(this);
-                  t.setOrientation(LinearLayout.HORIZONTAL);
-                  t.setGravity(Gravity.CENTER);
-                  t.setBackground(box(color, 22));
-                  t.setElevation(dp(5));
-                  t.addView(text(sym, 22, Color.WHITE, true), new LinearLayout.LayoutParams(WRAP, WRAP));
-                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(WRAP, WRAP);
-                  p.leftMargin = dp(14);
-                  t.addView(text(label, 19, Color.WHITE, true), p);
                   t.setClickable(true);
                   t.setOnClickListener(v -> startGame(m));
                   return t;
@@ -723,7 +712,7 @@ jobs:
               private void buildQuestions() {
                   for (int i = 0; i < TOTAL; i++) {
                       Q q = new Q();
-                      if (mode == 4) {
+                      if (mode == 5) {
                           buildThree(q, i + 1);
                       } else {
                           buildTwo(q, i + 1);
@@ -734,16 +723,28 @@ jobs:
               }
 
               private void buildTwo(Q q, int n) {
-                  int op = (mode == 3) ? rnd.nextInt(3) : mode;
+                  int op = (mode == 4) ? rnd.nextInt(4) : mode;
                   int a;
                   int b;
                   int ans;
                   String sym;
-                  if (op == 2) {
-                      a = range(MUL_A_LO[kelas], grow(MUL_A_S[kelas], MUL_A_E[kelas], n));
-                      b = range(MUL_B_LO[kelas], grow(MUL_B_S[kelas], MUL_B_E[kelas], n));
-                      ans = a * b;
-                      sym = "\u00D7";
+                  if (op >= 2) {
+                      boolean div = (op == 3);
+                      int fa = range(div ? Math.max(2, MUL_A_LO[kelas]) : MUL_A_LO[kelas],
+                              grow(MUL_A_S[kelas], MUL_A_E[kelas], n));
+                      int fb = range(div ? Math.max(2, MUL_B_LO[kelas]) : MUL_B_LO[kelas],
+                              grow(MUL_B_S[kelas], MUL_B_E[kelas], n));
+                      if (div) {
+                          a = fa * fb;
+                          b = Math.min(fa, fb);
+                          ans = Math.max(fa, fb);
+                          sym = "\u00F7";
+                      } else {
+                          a = fa;
+                          b = fb;
+                          ans = fa * fb;
+                          sym = "\u00D7";
+                      }
                   } else {
                       int max = grow(ADD_LO[kelas], ADD_HI[kelas], n);
                       int low = Math.max(1, max / 10);
@@ -763,11 +764,11 @@ jobs:
                   q.answer = ans;
               }
 
-              // Tiga bilangan. Kelas 1-3: tambah dan kurang. Kelas 4-6: ada perkalian (urutan operasi).
+              // Tiga bilangan. Kelas 1-4: tambah dan kurang. Kelas 5-6: ada perkalian (urutan operasi).
               private void buildThree(Q q, int n) {
                   String expr;
                   int ans;
-                  if (kelas <= 2) {
+                  if (kelas <= 3) {
                       int max = grow(ADD_LO[kelas], ADD_HI[kelas], n);
                       int low = Math.max(1, max / 10);
                       int form = rnd.nextInt(4);
@@ -806,7 +807,7 @@ jobs:
                       int zmax = grow(Z_S[kelas], Z_E[kelas], n);
                       int p = x * y;
                       int z;
-                      int form = rnd.nextInt(kelas == 3 ? 4 : 6);
+                      int form = rnd.nextInt(kelas == 4 ? 4 : 6);
                       if (form == 0) {
                           z = range(2, zmax);
                           ans = z + p;
