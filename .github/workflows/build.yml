@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "4.9"
+                  versionName "5.1"
               }
 
               signingConfigs {
@@ -143,6 +143,7 @@ jobs:
 
                   <activity
                       android:name=".MainActivity"
+                      android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode"
                       android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
@@ -594,11 +595,22 @@ jobs:
               private static final int[] Z_S = {0, 0, 0, 0, 50, 500};
               private static final int[] Z_E = {0, 0, 0, 0, 1000, 6000};
               private static final int[] PLAYER_COLORS = {BLUE, PINK, GREEN, PURPLE};
+              private static final String[] AVATARS = {
+                      "\uD83E\uDD81", "\uD83D\uDC2F", "\uD83D\uDC3C", "\uD83D\uDC28", "\uD83D\uDC38", "\uD83E\uDD8A",
+                      "\uD83D\uDC30", "\uD83D\uDC36", "\uD83D\uDC31", "\uD83E\uDD84", "\uD83D\uDC27", "\uD83E\uDD89"
+              };
+              private final int[] avatar = new int[MAX_PLAYERS];
+
+              private String av(int i) {
+                  return AVATARS[Math.max(0, Math.min(AVATARS.length - 1, avatar[i]))];
+              }
+
               private static final String[] PLAYER_ICON = {
                       "\uD83D\uDC31", "\uD83D\uDC36", "\uD83D\uDC30", "\uD83D\uDC3C"
               };
               private static final int[] OPT_COLORS = {BLUE, PURPLE, TEAL, PINK};
               // Huruf bulat yang ramah anak (Android 9 ke atas); di HP lama otomatis memakai huruf biasa
+              private float ui = 1f;
               private static final Typeface ROUND_BOLD = Typeface.create("sans-serif-rounded", Typeface.BOLD);
               // Mata pelajaran: 0 Matematika, 1 Bahasa Indonesia, 2 Bahasa Inggris
               private static final String[] SUBJ_NAMES = {"Matematika", "Bahasa Indonesia", "Bahasa Inggris"};
@@ -834,6 +846,9 @@ jobs:
                   super.onCreate(savedInstanceState);
                   // HP tetap tegak; layar besar (TV, panel interaktif, tablet) mengikuti arah layarnya
                   boolean besar = getResources().getConfiguration().smallestScreenWidthDp >= 600;
+                  // Layar besar: huruf dan tombol diperbesar sesuai tinggi layar agar terbaca dari belakang kelas
+                  int tinggiDp = getResources().getConfiguration().screenHeightDp;
+                  ui = besar ? Math.max(1f, Math.min(1.5f, tinggiDp / 700f)) : 1f;
                   setRequestedOrientation(besar ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                           : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
                   prefs = getSharedPreferences("berhitung", MODE_PRIVATE);
@@ -1082,7 +1097,7 @@ jobs:
               // ---------- Helper tampilan ----------
 
               private int dp(int v) {
-                  return Math.round(v * getResources().getDisplayMetrics().density);
+                  return Math.round(v * getResources().getDisplayMetrics().density * ui);
               }
 
               private GradientDrawable box(int color, int radiusDp) {
@@ -1217,7 +1232,7 @@ jobs:
               private TextView text(String s, int sp, int color, boolean bold) {
                   TextView t = new TextView(this);
                   t.setText(s);
-                  t.setTextSize(sp);
+                  t.setTextSize(sp * ui);
                   t.setTextColor(color);
                   t.setGravity(Gravity.CENTER);
                   if (bold) {
@@ -1243,7 +1258,7 @@ jobs:
                   Button b = new Button(this);
                   b.setText(s);
                   b.setAllCaps(false);
-                  b.setTextSize(sp);
+                  b.setTextSize(sp * ui);
                   b.setTextColor(Color.WHITE);
                   b.setTypeface(ROUND_BOLD);
                   b.setBackground(box(color, 22));
@@ -1398,6 +1413,7 @@ jobs:
                   sfxOn = prefs.getBoolean("sfx", true);
                   for (int i = 0; i < MAX_PLAYERS; i++) {
                       names[i] = prefs.getString("name" + i, "Pemain " + (i + 1));
+                      avatar[i] = Math.max(0, Math.min(AVATARS.length - 1, prefs.getInt("avatar" + i, i)));
                   }
               }
 
@@ -2146,7 +2162,7 @@ jobs:
                           e.setHint("Nama pemain " + (i + 1));
                           e.setSingleLine(true);
                           e.setFilters(new InputFilter[]{new InputFilter.LengthFilter(10)});
-                          e.setTextSize(16);
+                          e.setTextSize(16 * ui);
                           e.setTextColor(DARK);
                           e.setPadding(dp(14), 0, dp(14), 0);
                           e.setBackground(outline(PLAYER_COLORS[i], 12));
@@ -2157,6 +2173,41 @@ jobs:
                       nameFields = null;
                   }
                   c.addView(cp, lp(WRAP, 18));
+
+                  // Avatar
+                  LinearLayout ca = card();
+                  ca.addView(heading("Pilih avatar"), lp(WRAP, 0));
+                  for (int i = 0; i < np; i++) {
+                      final int pl = i;
+                      String who = np == 1 ? "Avatar kamu" : "Avatar " + names[i];
+                      ca.addView(text(who, 13, DARK, true), lp(WRAP, i == 0 ? 8 : 14));
+                      for (int r = 0; r < 2; r++) {
+                          LinearLayout row = new LinearLayout(this);
+                          row.setOrientation(LinearLayout.HORIZONTAL);
+                          for (int q = 0; q < 6; q++) {
+                              final int k = r * 6 + q;
+                              boolean on = avatar[i] == k;
+                              TextView b = text(AVATARS[k], 24, Color.WHITE, false);
+                              b.setGravity(Gravity.CENTER);
+                              b.setBackground(on ? box(PLAYER_COLORS[i], 14) : box(GRAY, 14));
+                              b.setOnClickListener(v -> {
+                                  saveNames();
+                                  for (int j = 0; j < np; j++) {
+                                      if (j != pl && avatar[j] == k) {
+                                          avatar[j] = avatar[pl];
+                                          prefs.edit().putInt("avatar" + j, avatar[j]).apply();
+                                      }
+                                  }
+                                  avatar[pl] = k;
+                                  prefs.edit().putInt("avatar" + pl, k).apply();
+                                  showSettings();
+                              });
+                              row.addView(b, weight(q == 0 ? 0 : 3, q == 5 ? 0 : 3));
+                          }
+                          ca.addView(row, lp(dp(48), 8));
+                      }
+                  }
+                  c.addView(ca, lp(WRAP, 14));
 
                   // Mode waktu
                   LinearLayout cm = card();
@@ -2491,7 +2542,7 @@ jobs:
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
 
-                  TextView av = text(PLAYER_ICON[cur], 60, Color.WHITE, false);
+                  TextView av = text(av(cur), 60, Color.WHITE, false);
                   av.setBackground(box(PLAYER_COLORS[cur], 60));
                   av.setElevation(dp(6));
                   c.addView(av, new LinearLayout.LayoutParams(dp(120), dp(120)));
@@ -2506,7 +2557,7 @@ jobs:
                       LinearLayout board = card();
                       board.addView(heading("Skor sementara"), lp(WRAP, 0));
                       for (int i = 0; i < cur; i++) {
-                          board.addView(text(PLAYER_ICON[i] + " " + names[i] + ":  " + pScore[i] + " poin",
+                          board.addView(text(av(i) + " " + names[i] + ":  " + pScore[i] + " poin",
                                   15, DARK, false), lp(WRAP, 6));
                       }
                       c.addView(board, lp(WRAP, 18));
@@ -2591,7 +2642,7 @@ jobs:
                   top.setOrientation(LinearLayout.HORIZONTAL);
                   top.setGravity(Gravity.CENTER_VERTICAL);
                   c.addView(top, lp(WRAP, 0));
-                  String who = (np > 1) ? PLAYER_ICON[cur] + " " + names[cur] : "\u2B50 Petualang";
+                  String who = (np > 1) ? av(cur) + " " + names[cur] : av(0) + " Petualang";
                   top.addView(pill(who, np > 1 ? PLAYER_COLORS[cur] : ORANGE),
                           new LinearLayout.LayoutParams(WRAP, WRAP));
                   top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
@@ -2683,14 +2734,14 @@ jobs:
                   tvQuestion.setText(q.text);
                   int nl = q.text.indexOf('\n');
                   int qsz = questionSize(nl >= 0 ? nl : q.text.length());
-                  tvQuestion.setTextSize(q.sopts != null ? Math.min(qsz, 24) : qsz);
+                  tvQuestion.setTextSize((q.sopts != null ? Math.min(qsz, 24) : qsz) * ui);
                   tvFeedback.setText(mode == 6 ? "Isi titik-titiknya!" : " ");
                   tvFeedback.setTextColor(DARK);
                   for (int i = 0; i < 4; i++) {
                       final int idx = i;
                       String ot = optText(q, i);
                       opts[i].setText(ot);
-                      opts[i].setTextSize(q.sopts != null ? bankOptionSize(ot.length()) : optionSize(ot.length()));
+                      opts[i].setTextSize((q.sopts != null ? bankOptionSize(ot.length()) : optionSize(ot.length())) * ui);
                       opts[i].setBackground(box(OPT_COLORS[i], 16));
                       opts[i].setAlpha(1f);
                       opts[i].setOnClickListener(v -> choose(idx));
@@ -2859,8 +2910,9 @@ jobs:
 
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
+                  c.addView(text(av(0), 48, Color.WHITE, false), lp(WRAP, 0));
                   TextView title = text(lives <= 0 ? "Nyawa habis!" : "Selesai!", 32, ORANGE_DARK, true);
-                  c.addView(title, lp(WRAP, 0));
+                  c.addView(title, lp(WRAP, 4));
                   c.addView(pill(KELAS_NAMES[kelas] + " \u2022 " + modeLabel(), KELAS_COLOR[kelas]), lpw(10));
 
                   LinearLayout card = card();
@@ -2951,7 +3003,7 @@ jobs:
                       rank.setBackground(box(rankColor[r], 18));
                       row.addView(rank, new LinearLayout.LayoutParams(dp(36), dp(36)));
 
-                      TextView nm = text(PLAYER_ICON[p] + " " + names[p], 18, DARK, true);
+                      TextView nm = text(av(p) + " " + names[p], 18, DARK, true);
                       nm.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
                       LinearLayout.LayoutParams nmp = new LinearLayout.LayoutParams(0, WRAP, 1f);
                       nmp.leftMargin = dp(12);
