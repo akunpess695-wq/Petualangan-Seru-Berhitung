@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "5.1"
+                  versionName "5.2"
               }
 
               signingConfigs {
@@ -806,6 +806,7 @@ jobs:
               private boolean resumeNext;
               private boolean dialogOpen;
               private AlertDialog exitDialog;
+              private AlertDialog menuDialog;
 
               // Tampilan permainan
               private TextView tvStep;
@@ -888,6 +889,10 @@ jobs:
                           }
                           sfxTracks[i] = null;
                       }
+                  }
+                  if (menuDialog != null && menuDialog.isShowing()) {
+                      menuDialog.setOnDismissListener(null);
+                      menuDialog.dismiss();
                   }
                   if (exitDialog != null && exitDialog.isShowing()) {
                       exitDialog.dismiss();
@@ -1425,6 +1430,27 @@ jobs:
 
                   LinearLayout c = column();
 
+                  // Baris ikon: suara di kiri, avatar di kanan
+                  LinearLayout bar = new LinearLayout(this);
+                  bar.setOrientation(LinearLayout.HORIZONTAL);
+                  bar.setGravity(Gravity.CENTER_VERTICAL);
+                  TextView snd = text(sfxOn ? "\uD83D\uDD0A" : "\uD83D\uDD07", 22, DARK, false);
+                  snd.setBackground(box(Color.WHITE, 26));
+                  snd.setElevation(dp(3));
+                  snd.setOnClickListener(v -> {
+                      prefs.edit().putBoolean("sfx", !sfxOn).apply();
+                      showMenu();
+                      sfx(SFX_CORRECT);
+                  });
+                  bar.addView(snd, new LinearLayout.LayoutParams(dp(52), dp(52)));
+                  bar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+                  TextView avb = text(av(0), 26, DARK, false);
+                  avb.setBackground(box(Color.WHITE, 26));
+                  avb.setElevation(dp(3));
+                  avb.setOnClickListener(v -> dialogAvatar());
+                  bar.addView(avb, new LinearLayout.LayoutParams(dp(52), dp(52)));
+                  c.addView(bar, lp(WRAP, 0));
+
                   // Spanduk judul
                   LinearLayout hero = new LinearLayout(this);
                   hero.setOrientation(LinearLayout.VERTICAL);
@@ -1446,16 +1472,29 @@ jobs:
                   hero.addView(text("SD Alam Muhammadiyah Kandangan", 14, Color.WHITE, true), lp(WRAP, 4));
                   hero.addView(text("Ayo belajar sambil bermain!", 14,
                           Color.parseColor("#FFF3E0"), false), lp(WRAP, 4));
-                  c.addView(hero, lp(WRAP, 0));
+                  c.addView(hero, lp(WRAP, 10));
 
-                  // Pilih kelas
-                  LinearLayout ck = card();
-                  ck.addView(heading("Kelas berapa?"), lp(WRAP, 0));
-                  ck.addView(chips(KELAS_LABEL, kelas, KELAS_COLOR, k -> {
-                      prefs.edit().putInt("kelas", k).apply();
-                      showMenu();
-                  }), lp(dp(46), 10));
-                  c.addView(ck, lp(WRAP, 18));
+                  // Tiga tombol pengaturan: kelas, pemain, waktu
+                  LinearLayout opt = new LinearLayout(this);
+                  opt.setOrientation(LinearLayout.HORIZONTAL);
+                  Button bk = button("\uD83C\uDF93 " + KELAS_NAMES[kelas], KELAS_COLOR[kelas], 13);
+                  flat(bk);
+                  bk.setElevation(dp(3));
+                  bk.setOnClickListener(v -> dialogKelas());
+                  opt.addView(bk, weight(0, 4));
+                  Button bp = button("\uD83D\uDC65 " + (np == 1 ? "Sendiri" : np + " pemain"), Color.WHITE, 13);
+                  bp.setTextColor(DARK);
+                  flat(bp);
+                  bp.setElevation(dp(3));
+                  bp.setOnClickListener(v -> dialogPemain());
+                  opt.addView(bp, weight(4, 4));
+                  Button bw = button("\u23F1\uFE0F " + (timed ? secs + " detik" : "Bebas"), Color.WHITE, 13);
+                  bw.setTextColor(DARK);
+                  flat(bw);
+                  bw.setElevation(dp(3));
+                  bw.setOnClickListener(v -> dialogWaktu());
+                  opt.addView(bw, weight(4, 0));
+                  c.addView(opt, lp(dp(54), 16));
 
                   // Pilih pelajaran
                   c.addView(text("Pilih pelajaran", 16, DARK, true), lp(WRAP, 20));
@@ -1473,29 +1512,24 @@ jobs:
                       c.addView(t, lp(dp(96), 14));
                   }
 
-                  // Pengaturan (pemain dan waktu)
-                  String who = (np == 1) ? "Main sendiri" : np + " pemain";
-                  Button st = button("\u2699  " + who + " \u2022 " + timeLabel() + "  \u203A", Color.WHITE, 14);
-                  st.setTextColor(DARK);
-                  st.setElevation(dp(3));
-                  c.addView(st, lp(dp(52), 22));
-                  st.setOnClickListener(v -> showSettings());
-
-                  // Soal dari guru
-                  Button gr = button("\uD83D\uDCDA  Soal dari Guru  \u203A", Color.WHITE, 14);
+                  // Soal dari guru dan rekor skor, sebaris
+                  LinearLayout foot = new LinearLayout(this);
+                  foot.setOrientation(LinearLayout.HORIZONTAL);
+                  Button gr = button("\uD83D\uDCDA Soal Guru", Color.WHITE, 14);
                   gr.setTextColor(DARK);
+                  flat(gr);
                   gr.setElevation(dp(3));
-                  c.addView(gr, lp(dp(52), 12));
                   gr.setOnClickListener(v -> {
                       importMsg = "";
                       showGuru();
                   });
-
-                  // Rekor skor tertinggi
-                  Button rk = button("🏆  Rekor Skor  ›", Color.WHITE, 14);
+                  foot.addView(gr, weight(0, 4));
+                  Button rk = button("\uD83C\uDFC6 Rekor Skor", Color.WHITE, 14);
                   rk.setTextColor(DARK);
+                  flat(rk);
                   rk.setElevation(dp(3));
-                  c.addView(rk, lp(dp(52), 12));
+                  foot.addView(rk, weight(4, 0));
+                  c.addView(foot, lp(dp(54), 22));
                   rk.setOnClickListener(v -> showRekor());
 
                   c.setFocusableInTouchMode(true);
@@ -2137,22 +2171,81 @@ jobs:
 
               // ---------- Pengaturan ----------
 
-              private void showSettings() {
-                  handler.removeCallbacksAndMessages(null);
-                  screen = 4;
-                  loadPrefs();
+              // ---------- Kotak pengaturan (dibuka dari ikon di menu) ----------
 
-                  LinearLayout c = column();
-                  c.addView(text("\u2699 Pengaturan", 26, ORANGE_DARK, true), lp(WRAP, 0));
+              private LinearLayout dialogBody() {
+                  LinearLayout b = new LinearLayout(this);
+                  b.setOrientation(LinearLayout.VERTICAL);
+                  return b;
+              }
 
-                  // Jumlah pemain
-                  LinearLayout cp = card();
-                  cp.addView(heading("Jumlah pemain"), lp(WRAP, 0));
-                  cp.addView(chips(new String[]{"1", "2", "3", "4"}, np - 1, PLAYER_COLORS, k1 -> {
-                      prefs.edit().putInt("np", k1 + 1).apply();
-                      showSettings();
-                  }), lp(dp(46), 10));
-                  cp.addView(text(np == 1 ? "Main sendiri" : np + " pemain, main bergantian di HP ini",
+              private void showDialogView(String title, LinearLayout body) {
+                  if (menuDialog != null && menuDialog.isShowing()) {
+                      menuDialog.setOnDismissListener(null);
+                      menuDialog.dismiss();
+                  }
+                  LinearLayout c = new LinearLayout(this);
+                  c.setOrientation(LinearLayout.VERTICAL);
+                  c.setPadding(dp(18), dp(16), dp(18), dp(16));
+                  c.addView(text(title, 22, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(body, lp(WRAP, 12));
+                  Button ok = button("Selesai", GREEN, 18);
+                  flat(ok);
+                  c.addView(ok, lp(dp(52), 16));
+                  ScrollView sv = new ScrollView(this);
+                  sv.addView(c);
+                  final AlertDialog d = new AlertDialog.Builder(this).setView(sv).create();
+                  menuDialog = d;
+                  d.setOnDismissListener(dl -> {
+                      saveNames();
+                      nameFields = null;
+                      showMenu();
+                  });
+                  ok.setOnClickListener(v -> d.dismiss());
+                  if (d.getWindow() != null) {
+                      d.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                              | android.view.WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+                      d.getWindow().setSoftInputMode(
+                              android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+                  }
+                  d.show();
+                  if (d.getWindow() != null) {
+                      d.getWindow().setBackgroundDrawable(box(Color.WHITE, 24));
+                      int maxW = getResources().getDisplayMetrics().widthPixels - dp(24);
+                      d.getWindow().setLayout(Math.min(dp(380), maxW), ViewGroup.LayoutParams.WRAP_CONTENT);
+                  }
+              }
+
+              private void dialogKelas() {
+                  LinearLayout b = dialogBody();
+                  for (int r = 0; r < 2; r++) {
+                      LinearLayout row = new LinearLayout(this);
+                      row.setOrientation(LinearLayout.HORIZONTAL);
+                      for (int q = 0; q < 3; q++) {
+                          final int k = r * 3 + q;
+                          boolean on = (k == kelas);
+                          Button t = button(KELAS_LABEL[k], on ? KELAS_COLOR[k] : GRAY, 26);
+                          t.setTextColor(on ? Color.WHITE : DARK);
+                          flat(t);
+                          t.setOnClickListener(v -> {
+                              prefs.edit().putInt("kelas", k).apply();
+                              menuDialog.dismiss();
+                          });
+                          row.addView(t, weight(q == 0 ? 0 : 4, q == 2 ? 0 : 4));
+                      }
+                      b.addView(row, lp(dp(72), r == 0 ? 0 : 8));
+                  }
+                  showDialogView("Kelas berapa?", b);
+              }
+
+              private void dialogPemain() {
+                  LinearLayout b = dialogBody();
+                  b.addView(chips(new String[]{"1", "2", "3", "4"}, np - 1, PLAYER_COLORS, k1 -> {
+                      np = k1 + 1;
+                      prefs.edit().putInt("np", np).apply();
+                      dialogPemain();
+                  }), lp(dp(50), 0));
+                  b.addView(text(np == 1 ? "Main sendiri" : np + " pemain, main bergantian di HP ini",
                           13, DARK, false), lp(WRAP, 8));
                   if (np > 1) {
                       nameFields = new EditText[np];
@@ -2166,32 +2259,66 @@ jobs:
                           e.setTextColor(DARK);
                           e.setPadding(dp(14), 0, dp(14), 0);
                           e.setBackground(outline(PLAYER_COLORS[i], 12));
-                          cp.addView(e, lp(dp(46), 8));
+                          b.addView(e, lp(dp(46), 8));
                           nameFields[i] = e;
                       }
                   } else {
                       nameFields = null;
                   }
-                  c.addView(cp, lp(WRAP, 18));
+                  showDialogView("Siapa yang main?", b);
+              }
 
-                  // Avatar
-                  LinearLayout ca = card();
-                  ca.addView(heading("Pilih avatar"), lp(WRAP, 0));
+              private void dialogWaktu() {
+                  LinearLayout b = dialogBody();
+                  b.addView(chips(new String[]{"Tanpa waktu", "Berwaktu"}, timed ? 1 : 0,
+                          new int[]{PURPLE, PURPLE}, k3 -> {
+                              timed = (k3 == 1);
+                              prefs.edit().putBoolean("timed", timed).apply();
+                              dialogWaktu();
+                          }), lp(dp(50), 0));
+                  if (timed) {
+                      LinearLayout srow = new LinearLayout(this);
+                      srow.setOrientation(LinearLayout.HORIZONTAL);
+                      b.addView(srow, lp(dp(52), 12));
+                      srow.addView(stepButton("\u22125", -5), fixed(52));
+                      srow.addView(stepButton("\u22121", -1), fixed(52));
+                      srow.addView(text(secs + " detik", 18, PURPLE, true),
+                              new LinearLayout.LayoutParams(0, MATCH, 1f));
+                      srow.addView(stepButton("+1", 1), fixed(52));
+                      srow.addView(stepButton("+5", 5), fixed(52));
+                      b.addView(text("Waktu untuk tiap soal", 12, DARK, false), lp(WRAP, 6));
+                  } else {
+                      b.addView(text("Menjawab tanpa batas waktu", 13, DARK, false), lp(WRAP, 8));
+                  }
+                  showDialogView("Waktu menjawab", b);
+              }
+
+              private Button stepButton(String label, final int delta) {
+                  Button b = button(label, ORANGE, 14);
+                  flat(b);
+                  b.setOnClickListener(v -> {
+                      secs = Math.max(SECS_MIN, Math.min(SECS_MAX, secs + delta));
+                      prefs.edit().putInt("secs", secs).apply();
+                      dialogWaktu();
+                  });
+                  return b;
+              }
+
+              private void dialogAvatar() {
+                  LinearLayout b = dialogBody();
                   for (int i = 0; i < np; i++) {
                       final int pl = i;
                       String who = np == 1 ? "Avatar kamu" : "Avatar " + names[i];
-                      ca.addView(text(who, 13, DARK, true), lp(WRAP, i == 0 ? 8 : 14));
+                      b.addView(text(who, 13, DARK, true), lp(WRAP, i == 0 ? 0 : 14));
                       for (int r = 0; r < 2; r++) {
                           LinearLayout row = new LinearLayout(this);
                           row.setOrientation(LinearLayout.HORIZONTAL);
                           for (int q = 0; q < 6; q++) {
                               final int k = r * 6 + q;
                               boolean on = avatar[i] == k;
-                              TextView b = text(AVATARS[k], 24, Color.WHITE, false);
-                              b.setGravity(Gravity.CENTER);
-                              b.setBackground(on ? box(PLAYER_COLORS[i], 14) : box(GRAY, 14));
-                              b.setOnClickListener(v -> {
-                                  saveNames();
+                              TextView t = text(AVATARS[k], 24, Color.WHITE, false);
+                              t.setBackground(on ? box(PLAYER_COLORS[i], 14) : box(GRAY, 14));
+                              t.setOnClickListener(v -> {
                                   for (int j = 0; j < np; j++) {
                                       if (j != pl && avatar[j] == k) {
                                           avatar[j] = avatar[pl];
@@ -2200,75 +2327,15 @@ jobs:
                                   }
                                   avatar[pl] = k;
                                   prefs.edit().putInt("avatar" + pl, k).apply();
-                                  showSettings();
+                                  dialogAvatar();
                               });
-                              row.addView(b, weight(q == 0 ? 0 : 3, q == 5 ? 0 : 3));
+                              row.addView(t, weight(q == 0 ? 0 : 3, q == 5 ? 0 : 3));
                           }
-                          ca.addView(row, lp(dp(48), 8));
+                          b.addView(row, lp(dp(48), 8));
                       }
                   }
-                  c.addView(ca, lp(WRAP, 14));
-
-                  // Mode waktu
-                  LinearLayout cm = card();
-                  cm.addView(heading("Mode waktu"), lp(WRAP, 0));
-                  cm.addView(chips(new String[]{"Tanpa waktu", "Berwaktu"}, timed ? 1 : 0,
-                          new int[]{PURPLE, PURPLE}, k3 -> {
-                              prefs.edit().putBoolean("timed", k3 == 1).apply();
-                              showSettings();
-                          }), lp(dp(46), 10));
-                  if (timed) {
-                      LinearLayout srow = new LinearLayout(this);
-                      srow.setOrientation(LinearLayout.HORIZONTAL);
-                      cm.addView(srow, lp(dp(48), 10));
-                      srow.addView(stepButton("\u22125", -5), fixed(52));
-                      srow.addView(stepButton("\u22121", -1), fixed(52));
-                      srow.addView(text(secs + " detik", 18, PURPLE, true),
-                              new LinearLayout.LayoutParams(0, MATCH, 1f));
-                      srow.addView(stepButton("+1", 1), fixed(52));
-                      srow.addView(stepButton("+5", 5), fixed(52));
-                      cm.addView(text("Waktu per soal, atur dengan tombol di atas", 12, DARK, false),
-                              lp(WRAP, 6));
-                  }
-                  c.addView(cm, lp(WRAP, 14));
-
-                  // Suara dan getar
-                  LinearLayout cs = card();
-                  cs.addView(heading("Suara & getar"), lp(WRAP, 0));
-                  cs.addView(chips(new String[]{"Nyala", "Mati"}, sfxOn ? 0 : 1, new int[]{TEAL, SILVER}, k4 -> {
-                      prefs.edit().putBoolean("sfx", k4 == 0).apply();
-                      showSettings();
-                      sfx(SFX_CORRECT);
-                  }), lp(dp(46), 10));
-                  cs.addView(text("Efek suara dan getaran saat menjawab dan di layar hasil", 13, DARK, false),
-                          lp(WRAP, 8));
-                  c.addView(cs, lp(WRAP, 14));
-
-                  Button done = button("Selesai", GREEN, 20);
-                  done.setElevation(dp(4));
-                  c.addView(done, lp(dp(58), 24));
-                  done.setOnClickListener(v -> {
-                      saveNames();
-                      showMenu();
-                  });
-
-                  c.setFocusableInTouchMode(true);
-                  c.requestFocus();
-                  wrap(c);
+                  showDialogView("Pilih avatar", b);
               }
-
-              private Button stepButton(String label, final int delta) {
-                  Button b = button(label, ORANGE, 14);
-                  flat(b);
-                  b.setOnClickListener(v -> {
-                      saveNames();
-                      int n = Math.max(SECS_MIN, Math.min(SECS_MAX, secs + delta));
-                      prefs.edit().putInt("secs", n).apply();
-                      showSettings();
-                  });
-                  return b;
-              }
-              // ---------- Persiapan permainan ----------
 
               private void startGame(int m) {
                   saveNames();
