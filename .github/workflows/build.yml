@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "5.3"
+                  versionName "5.4"
               }
 
               signingConfigs {
@@ -568,7 +568,7 @@ jobs:
                       "Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"
               };
               private static final String[] KELAS_DESC = {
-                  "Sampai 10\u201320 \u2022 kali-bagi: pengayaan",
+                  "Sampai 10\u201320 \u2022 kali-bagi: pengayaan ringan",
                   "Sampai 15\u201320 \u2022 kali-bagi: pengayaan",
                   "Sampai 100\u2013500 \u2022 kali-bagi sampai 70",
                   "Sampai 500\u20131.000 \u2022 kali-bagi sampai 100",
@@ -580,13 +580,16 @@ jobs:
               // Penjumlahan dan pengurangan: batas bilangan di soal 1 dan di soal 10
               private static final int[] ADD_LO = {10, 15, 100, 500, 1000, 10000};
               private static final int[] ADD_HI = {20, 20, 500, 1000, 10000, 100000};
+              // Isi Titik dan 3 Bilangan: batas bilangan di soal 1 dan soal 10 (Kelas 1-2 lebih ringan)
+              private static final int[] EASY_LO = {6, 10, 100, 500, 1000, 10000};
+              private static final int[] EASY_HI = {10, 20, 500, 1000, 10000, 100000};
               // Perkalian dan pembagian: faktor a dan b; batas atas naik dari soal 1 ke soal 10
               private static final int[] MUL_A_LO = {1, 2, 2, 2, 11, 101};
               private static final int[] MUL_A_S = {2, 3, 4, 6, 20, 200};
-              private static final int[] MUL_A_E = {5, 5, 7, 10, 99, 500};
+              private static final int[] MUL_A_E = {3, 5, 7, 10, 99, 500};
               private static final int[] MUL_B_LO = {1, 1, 2, 2, 2, 11};
-              private static final int[] MUL_B_S = {3, 5, 6, 8, 5, 20};
-              private static final int[] MUL_B_E = {5, 10, 10, 10, 30, 50};
+              private static final int[] MUL_B_S = {2, 5, 6, 8, 5, 20};
+              private static final int[] MUL_B_E = {6, 10, 10, 10, 30, 50};
               // Soal 3 bilangan Kelas 5-6: faktor kecil x, y dan bilangan z (naik dari soal 1 ke soal 10)
               private static final int[] X_S = {0, 0, 0, 0, 4, 10};
               private static final int[] X_E = {0, 0, 0, 0, 12, 25};
@@ -2860,7 +2863,8 @@ jobs:
                           sym = "\u00D7";
                       }
                   } else {
-                      int max = grow(ADD_LO[kelas], ADD_HI[kelas], n);
+                      int max = (mode == 6) ? grow(EASY_LO[kelas], EASY_HI[kelas], n)
+                              : grow(ADD_LO[kelas], ADD_HI[kelas], n);
                       int low = Math.max(1, max / 10);
                       if (op == 0) {
                           a = range(low, max - low);
@@ -2895,7 +2899,7 @@ jobs:
                   String expr;
                   int ans;
                   if (kelas <= 3) {
-                      int max = grow(ADD_LO[kelas], ADD_HI[kelas], n);
+                      int max = grow(EASY_LO[kelas], EASY_HI[kelas], n);
                       int low = Math.max(1, max / 10);
                       int form = rnd.nextInt(4);
                       int a;
