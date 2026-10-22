@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "4.5"
+                  versionName "4.6"
               }
 
               signingConfigs {
@@ -594,6 +594,8 @@ jobs:
                       "\uD83D\uDC31", "\uD83D\uDC36", "\uD83D\uDC30", "\uD83D\uDC3C"
               };
               private static final int[] OPT_COLORS = {BLUE, PURPLE, TEAL, PINK};
+              // Huruf bulat yang ramah anak (Android 9 ke atas); di HP lama otomatis memakai huruf biasa
+              private static final Typeface ROUND_BOLD = Typeface.create("sans-serif-rounded", Typeface.BOLD);
               // Mata pelajaran: 0 Matematika, 1 Bahasa Indonesia, 2 Bahasa Inggris
               private static final String[] SUBJ_NAMES = {"Matematika", "Bahasa Indonesia", "Bahasa Inggris"};
               private static final String[] SUBJ_ICON = {"\uD83D\uDD22", "\uD83D\uDCD6", "\uD83C\uDF0D"};
@@ -1111,8 +1113,8 @@ jobs:
                           return;
                       }
                       p.setStyle(Paint.Style.FILL);
-                      p.setShader(new LinearGradient(0, 0, 0, h, Color.parseColor("#FFF8E1"),
-                              Color.parseColor("#FFE0B2"), Shader.TileMode.CLAMP));
+                      p.setShader(new LinearGradient(0, 0, 0, h, Color.parseColor("#F1F6FF"),
+                              Color.parseColor("#FFEFD6"), Shader.TileMode.CLAMP));
                       cv.drawRect(r, p);
                       p.setShader(null);
 
@@ -1211,7 +1213,7 @@ jobs:
                   t.setTextColor(color);
                   t.setGravity(Gravity.CENTER);
                   if (bold) {
-                      t.setTypeface(Typeface.DEFAULT_BOLD);
+                      t.setTypeface(ROUND_BOLD);
                   }
                   return t;
               }
@@ -1235,8 +1237,8 @@ jobs:
                   b.setAllCaps(false);
                   b.setTextSize(sp);
                   b.setTextColor(Color.WHITE);
-                  b.setTypeface(Typeface.DEFAULT_BOLD);
-                  b.setBackground(box(color, 16));
+                  b.setTypeface(ROUND_BOLD);
+                  b.setBackground(box(color, 22));
                   b.setOnTouchListener((v, e) -> {
                       int act = e.getActionMasked();
                       if (act == MotionEvent.ACTION_DOWN) {
@@ -1274,8 +1276,8 @@ jobs:
                   LinearLayout l = new LinearLayout(this);
                   l.setOrientation(LinearLayout.VERTICAL);
                   l.setPadding(dp(16), dp(14), dp(16), dp(16));
-                  l.setBackground(box(Color.WHITE, 20));
-                  l.setElevation(dp(4));
+                  l.setBackground(box(Color.WHITE, 26));
+                  l.setElevation(dp(5));
                   return l;
               }
 
@@ -1398,8 +1400,8 @@ jobs:
                   hero.setGravity(Gravity.CENTER_HORIZONTAL);
                   hero.setPadding(dp(16), dp(20), dp(16), dp(20));
                   GradientDrawable hg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                          new int[]{Color.parseColor("#FFA726"), Color.parseColor("#F4511E")});
-                  hg.setCornerRadius(dp(28));
+                          new int[]{Color.parseColor("#7E57C2"), Color.parseColor("#FF7043")});
+                  hg.setCornerRadius(dp(32));
                   hero.setBackground(hg);
                   hero.setElevation(dp(6));
                   ImageView logo = new ImageView(this);
@@ -1437,7 +1439,7 @@ jobs:
                       }
                       LinearLayout t = subjectTile(SUBJ_ICON[s], SUBJ_NAMES[s], sub, SUBJ_COLOR[s]);
                       t.setOnClickListener(v -> openSubject(sj));
-                      c.addView(t, lp(dp(84), 12));
+                      c.addView(t, lp(dp(96), 14));
                   }
 
                   // Pengaturan (pemain dan waktu)
@@ -1458,8 +1460,83 @@ jobs:
                       showGuru();
                   });
 
+                  // Rekor skor tertinggi
+                  Button rk = button("🏆  Rekor Skor  ›", Color.WHITE, 14);
+                  rk.setTextColor(DARK);
+                  rk.setElevation(dp(3));
+                  c.addView(rk, lp(dp(52), 12));
+                  rk.setOnClickListener(v -> showRekor());
+
                   c.setFocusableInTouchMode(true);
                   c.requestFocus();
+                  wrap(c);
+              }
+
+              // ---------- Rekor skor tertinggi (disimpan di HP ini) ----------
+
+              private String recordLine(String label, int k, String subjPart) {
+                  int free = prefs.getInt("best_k" + k + subjPart, 0);
+                  int timedBest = prefs.getInt("best_k" + k + subjPart + "_t", 0);
+                  if (free <= 0 && timedBest <= 0) {
+                      return "";
+                  }
+                  String s = label + ": ";
+                  if (free > 0) {
+                      s += "tanpa waktu " + free;
+                  }
+                  if (timedBest > 0) {
+                      s += (free > 0 ? " • " : "") + "berwaktu " + timedBest;
+                  }
+                  return s;
+              }
+
+              private void showRekor() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 8;
+                  nameFields = null;
+
+                  LinearLayout c = column();
+                  c.addView(text("🏆 Rekor Skor", 28, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(text("Skor tertinggi main sendiri di HP ini", 14, DARK, false), lp(WRAP, 6));
+
+                  for (int k = 0; k < 6; k++) {
+                      ArrayList<String> lines = new ArrayList<>();
+                      String[] parts = {
+                              recordLine("Matematika", k, ""),
+                              recordLine("Matematika (soal guru)", k, "_b0"),
+                              recordLine("Bahasa Indonesia", k, "_b1"),
+                              recordLine("Bahasa Inggris", k, "_b2")
+                      };
+                      for (String p : parts) {
+                          if (!p.isEmpty()) {
+                              lines.add(p);
+                          }
+                      }
+                      LinearLayout cd = card();
+                      LinearLayout head = new LinearLayout(this);
+                      head.setOrientation(LinearLayout.HORIZONTAL);
+                      head.setGravity(Gravity.CENTER_VERTICAL);
+                      head.addView(pill(KELAS_NAMES[k], KELAS_COLOR[k]), new LinearLayout.LayoutParams(WRAP, WRAP));
+                      cd.addView(head, lp(WRAP, 0));
+                      if (lines.isEmpty()) {
+                          TextView none = text("Belum ada rekor", 14, DARK, false);
+                          none.setGravity(Gravity.START);
+                          cd.addView(none, lp(WRAP, 8));
+                      } else {
+                          for (String ln : lines) {
+                              TextView tv = text(ln, 15, DARK, true);
+                              tv.setGravity(Gravity.START);
+                              cd.addView(tv, lp(WRAP, 8));
+                          }
+                      }
+                      c.addView(cd, lp(WRAP, 14));
+                  }
+
+                  Button back = button("Kembali", GRAY, 14);
+                  back.setTextColor(DARK);
+                  c.addView(back, lp(dp(46), 18));
+                  back.setOnClickListener(v -> showMenu());
+
                   wrap(c);
               }
 
@@ -1470,10 +1547,14 @@ jobs:
                   t.setPadding(dp(18), 0, dp(18), 0);
                   t.setBackground(new TileDrawable(color));
                   t.setElevation(dp(5));
-                  t.addView(text(icon, 34, Color.WHITE, false), new LinearLayout.LayoutParams(dp(52), WRAP));
+                  TextView ic = text(icon, 30, Color.WHITE, false);
+                  ic.setBackground(box(Color.argb(70, 255, 255, 255), 28));
+                  LinearLayout.LayoutParams icp = new LinearLayout.LayoutParams(dp(56), dp(56));
+                  icp.rightMargin = dp(14);
+                  t.addView(ic, icp);
                   LinearLayout col = new LinearLayout(this);
                   col.setOrientation(LinearLayout.VERTICAL);
-                  TextView n = text(label, 20, Color.WHITE, true);
+                  TextView n = text(label, 22, Color.WHITE, true);
                   n.setGravity(Gravity.START);
                   TextView s = text(sub, 13, Color.parseColor("#FFF3E0"), false);
                   s.setGravity(Gravity.START);
