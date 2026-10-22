@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "5.5"
+                  versionName "5.6"
               }
 
               signingConfigs {
@@ -1665,14 +1665,11 @@ jobs:
                   // Soal dari guru dan rekor skor, sebaris
                   LinearLayout foot = new LinearLayout(this);
                   foot.setOrientation(LinearLayout.HORIZONTAL);
-                  Button gr = button("\uD83D\uDCDA Soal Guru", Color.WHITE, 14);
+                  Button gr = button((hasPin() ? "\uD83D\uDD12" : "\uD83D\uDCDA") + " Soal Guru", Color.WHITE, 14);
                   gr.setTextColor(DARK);
                   flat(gr);
                   gr.setElevation(dp(3));
-                  gr.setOnClickListener(v -> {
-                      importMsg = "";
-                      showGuru();
-                  });
+                  gr.setOnClickListener(v -> openGuru());
                   foot.addView(gr, weight(0, 4));
                   Button rk = button("\uD83C\uDFC5 Rekor & Lencana", Color.WHITE, 13);
                   rk.setTextColor(DARK);
@@ -1703,6 +1700,311 @@ jobs:
                       s += (free > 0 ? " • " : "") + "berwaktu " + timedBest;
                   }
                   return s;
+              }
+
+              // ---------- PIN guru ----------
+              // PIN 4 angka menjaga halaman Soal Guru. Yang disimpan hanya sidik (hash), bukan PIN-nya.
+              // Kode cadangan (8 huruf/angka) dibuat saat PIN disimpan dan dipakai kalau PIN lupa.
+              // Ini kunci kelas, bukan pengaman bank: PIN bisa direset juga lewat hapus data aplikasi.
+
+              private static final String CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+              private static final int PIN_MAX_FAIL = 5;
+              private static final long PIN_LOCK_MS = 60000L;
+
+              private String sha(String x) {
+                  try {
+                      java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+                      byte[] d = md.digest(x.getBytes(StandardCharsets.UTF_8));
+                      StringBuilder sb = new StringBuilder();
+                      for (byte bt : d) {
+                          sb.append(String.format(Locale.ROOT, "%02x", bt & 0xff));
+                      }
+                      return sb.toString();
+                  } catch (Exception e) {
+                      return "";
+                  }
+              }
+
+              private String pinSalt() {
+                  String sl = prefs.getString("pin_salt", "");
+                  if (sl.isEmpty()) {
+                      sl = sha(System.nanoTime() + ":" + rnd.nextLong()).substring(0, 16);
+                      prefs.edit().putString("pin_salt", sl).apply();
+                  }
+                  return sl;
+              }
+
+              private boolean hasPin() {
+                  return !prefs.getString("pin_hash", "").isEmpty();
+              }
+
+              private boolean pinOk(String pin) {
+                  return sha(pinSalt() + ":pin:" + pin).equals(prefs.getString("pin_hash", ""));
+              }
+
+              private String normCode(String x) {
+                  StringBuilder sb = new StringBuilder();
+                  for (int i = 0; i < x.length(); i++) {
+                      char ch = Character.toUpperCase(x.charAt(i));
+                      if (Character.isLetterOrDigit(ch)) {
+                          sb.append(ch);
+                      }
+                  }
+                  return sb.toString();
+              }
+
+              private String newCode() {
+                  java.security.SecureRandom sr = new java.security.SecureRandom();
+                  StringBuilder sb = new StringBuilder();
+                  for (int i = 0; i < 8; i++) {
+                      if (i == 4) {
+                          sb.append('-');
+                      }
+                      sb.append(CODE_CHARS.charAt(sr.nextInt(CODE_CHARS.length())));
+                  }
+                  return sb.toString();
+              }
+
+              // Simpan PIN baru dan kode cadangan baru; mengembalikan kode untuk dicatat guru
+              private String savePin(String pin) {
+                  String code = newCode();
+                  String salt = pinSalt();
+                  prefs.edit()
+                          .putString("pin_hash", sha(salt + ":pin:" + pin))
+                          .putString("rec_hash", sha(salt + ":rec:" + normCode(code)))
+                          .putInt("pin_fail", 0)
+                          .putLong("pin_lock", 0L)
+                          .apply();
+                  return code;
+              }
+
+              private void clearPin() {
+                  prefs.edit().remove("pin_hash").remove("rec_hash").putInt("pin_fail", 0)
+                          .putLong("pin_lock", 0L).apply();
+              }
+
+              // Pintu masuk Soal Guru
+              private void openGuru() {
+                  importMsg = "";
+                  if (!hasPin()) {
+                      dialogBuatPin(true);
+                      return;
+                  }
+                  long left = prefs.getLong("pin_lock", 0L) - System.currentTimeMillis();
+                  if (left > 0) {
+                      Toast.makeText(this, "Terlalu banyak salah. Coba lagi " + (left / 1000 + 1) + " detik lagi.",
+                              Toast.LENGTH_LONG).show();
+                      return;
+                  }
+                  dialogMasukPin();
+              }
+
+              private EditText pinField(String hint) {
+                  EditText e = new EditText(this);
+                  e.setHint(hint);
+                  e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                          | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+                  e.setFilters(new InputFilter[]{new InputFilter.LengthFilter(4)});
+                  e.setSingleLine(true);
+                  e.setGravity(Gravity.CENTER);
+                  e.setTextSize(24 * ui);
+                  e.setTextColor(DARK);
+                  e.setBackground(outline(PURPLE, 12));
+                  return e;
+              }
+
+              private LinearLayout cardBody(String title) {
+                  LinearLayout c = new LinearLayout(this);
+                  c.setOrientation(LinearLayout.VERTICAL);
+                  c.setPadding(dp(18), dp(16), dp(18), dp(16));
+                  c.addView(text(title, 22, ORANGE_DARK, true), lp(WRAP, 0));
+                  return c;
+              }
+
+              // Kotak kecil di tengah layar dengan keyboard yang bisa muncul
+              private AlertDialog showCard(LinearLayout c, int widthDp, boolean cancelable) {
+                  if (pickDialog != null && pickDialog.isShowing()) {
+                      pickDialog.dismiss();
+                  }
+                  ScrollView sv = new ScrollView(this);
+                  sv.addView(c);
+                  AlertDialog d = new AlertDialog.Builder(this).setView(sv).create();
+                  d.setCancelable(cancelable);
+                  d.setCanceledOnTouchOutside(cancelable);
+                  if (d.getWindow() != null) {
+                      d.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                              | android.view.WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+                      d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                              | android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+                  }
+                  d.show();
+                  if (d.getWindow() != null) {
+                      d.getWindow().setBackgroundDrawable(box(Color.WHITE, 24));
+                      int maxW = getResources().getDisplayMetrics().widthPixels - dp(24);
+                      d.getWindow().setLayout(Math.min(dp(widthDp), maxW), ViewGroup.LayoutParams.WRAP_CONTENT);
+                  }
+                  pickDialog = d;
+                  return d;
+              }
+
+              private void dialogMasukPin() {
+                  LinearLayout c = cardBody("PIN guru");
+                  TextView info = text("Masukkan PIN untuk membuka Soal Guru.", 13, DARK, false);
+                  info.setGravity(Gravity.START);
+                  c.addView(info, lp(WRAP, 8));
+                  final EditText p = pinField("PIN 4 angka");
+                  c.addView(p, lp(dp(54), 12));
+                  final TextView err = text(" ", 13, RED, true);
+                  c.addView(err, lp(WRAP, 8));
+                  Button masuk = button("Masuk", GREEN, 18);
+                  flat(masuk);
+                  c.addView(masuk, lp(dp(52), 10));
+                  Button lupa = button("Lupa PIN?", GRAY, 14);
+                  lupa.setTextColor(DARK);
+                  flat(lupa);
+                  c.addView(lupa, lp(dp(44), 8));
+                  Button batal = button("Batal", GRAY, 14);
+                  batal.setTextColor(DARK);
+                  flat(batal);
+                  c.addView(batal, lp(dp(44), 8));
+                  final AlertDialog d = showCard(c, 340, true);
+                  masuk.setOnClickListener(v -> {
+                      if (pinOk(p.getText().toString())) {
+                          prefs.edit().putInt("pin_fail", 0).apply();
+                          d.dismiss();
+                          importMsg = "";
+                          showGuru();
+                          return;
+                      }
+                      int f = prefs.getInt("pin_fail", 0) + 1;
+                      if (f >= PIN_MAX_FAIL) {
+                          prefs.edit().putInt("pin_fail", 0)
+                                  .putLong("pin_lock", System.currentTimeMillis() + PIN_LOCK_MS).apply();
+                          d.dismiss();
+                          Toast.makeText(this, "PIN salah " + PIN_MAX_FAIL + " kali. Coba lagi 1 menit lagi.",
+                                  Toast.LENGTH_LONG).show();
+                      } else {
+                          prefs.edit().putInt("pin_fail", f).apply();
+                          err.setText("PIN salah. Sisa percobaan: " + (PIN_MAX_FAIL - f));
+                          p.setText("");
+                      }
+                  });
+                  lupa.setOnClickListener(v -> {
+                      d.dismiss();
+                      dialogLupaPin();
+                  });
+                  batal.setOnClickListener(v -> d.dismiss());
+              }
+
+              private void dialogLupaPin() {
+                  LinearLayout c = cardBody("Lupa PIN?");
+                  TextView info = text("Masukkan kode cadangan yang dicatat saat PIN dibuat. "
+                          + "Kalau kode hilang, hapus data aplikasi lewat Pengaturan HP "
+                          + "(soal guru ikut terhapus).", 13, DARK, false);
+                  info.setGravity(Gravity.START);
+                  c.addView(info, lp(WRAP, 8));
+                  final EditText e = new EditText(this);
+                  e.setHint("Kode cadangan");
+                  e.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                          | android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+                          | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+                  e.setFilters(new InputFilter[]{new InputFilter.LengthFilter(12)});
+                  e.setSingleLine(true);
+                  e.setGravity(Gravity.CENTER);
+                  e.setTextSize(20 * ui);
+                  e.setTextColor(DARK);
+                  e.setBackground(outline(PURPLE, 12));
+                  c.addView(e, lp(dp(54), 12));
+                  final TextView err = text(" ", 13, RED, true);
+                  c.addView(err, lp(WRAP, 8));
+                  Button lanjut = button("Lanjut", GREEN, 18);
+                  flat(lanjut);
+                  c.addView(lanjut, lp(dp(52), 10));
+                  Button batal = button("Batal", GRAY, 14);
+                  batal.setTextColor(DARK);
+                  flat(batal);
+                  c.addView(batal, lp(dp(44), 8));
+                  final AlertDialog d = showCard(c, 340, true);
+                  lanjut.setOnClickListener(v -> {
+                      String h = sha(pinSalt() + ":rec:" + normCode(e.getText().toString()));
+                      if (!prefs.getString("rec_hash", "").isEmpty() && h.equals(prefs.getString("rec_hash", ""))) {
+                          d.dismiss();
+                          dialogBuatPin(false);
+                      } else {
+                          err.setText("Kode cadangan tidak cocok.");
+                      }
+                  });
+                  batal.setOnClickListener(v -> d.dismiss());
+              }
+
+              // Buat PIN pertama (firstTime) atau ganti PIN
+              private void dialogBuatPin(final boolean firstTime) {
+                  LinearLayout c = cardBody(hasPin() ? "PIN baru" : "Buat PIN guru");
+                  TextView info = text("PIN 4 angka supaya murid tidak bisa membuka Soal Guru. Hanya guru yang perlu tahu.",
+                          13, DARK, false);
+                  info.setGravity(Gravity.START);
+                  c.addView(info, lp(WRAP, 8));
+                  final EditText p1 = pinField("PIN baru");
+                  final EditText p2 = pinField("Ulangi PIN");
+                  c.addView(p1, lp(dp(54), 12));
+                  c.addView(p2, lp(dp(54), 8));
+                  final TextView err = text(" ", 13, RED, true);
+                  c.addView(err, lp(WRAP, 8));
+                  Button ok = button("Simpan PIN", GREEN, 18);
+                  flat(ok);
+                  c.addView(ok, lp(dp(52), 10));
+                  Button skip = button(firstTime ? "Lewati (tanpa PIN)" : "Batal", GRAY, 14);
+                  skip.setTextColor(DARK);
+                  flat(skip);
+                  c.addView(skip, lp(dp(44), 8));
+                  final AlertDialog d = showCard(c, 340, true);
+                  ok.setOnClickListener(v -> {
+                      String a1 = p1.getText().toString();
+                      String a2 = p2.getText().toString();
+                      if (a1.length() != 4) {
+                          err.setText("PIN harus 4 angka.");
+                          return;
+                      }
+                      if (!a1.equals(a2)) {
+                          err.setText("Kedua PIN tidak sama.");
+                          return;
+                      }
+                      String code = savePin(a1);
+                      d.dismiss();
+                      dialogKodeCadangan(code);
+                  });
+                  skip.setOnClickListener(v -> {
+                      d.dismiss();
+                      if (firstTime) {
+                          importMsg = "";
+                          showGuru();
+                      }
+                  });
+              }
+
+              // Kode cadangan hanya tampil sekali, setelah PIN disimpan
+              private void dialogKodeCadangan(String code) {
+                  LinearLayout c = cardBody("Catat kode cadangan");
+                  TextView cd = text(code, 32, PURPLE, true);
+                  cd.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+                  cd.setBackground(box(GRAY, 16));
+                  cd.setPadding(dp(8), dp(14), dp(8), dp(14));
+                  c.addView(cd, lp(WRAP, 14));
+                  TextView info = text("Tulis kode ini di kertas dan simpan di tempat aman, jauh dari murid. "
+                          + "Kode dipakai kalau PIN lupa, dan hanya tampil sekarang. "
+                          + "Kalau kode tidak sempat dicatat, buat PIN baru lewat tombol Ganti PIN.",
+                          13, DARK, false);
+                  info.setGravity(Gravity.START);
+                  c.addView(info, lp(WRAP, 12));
+                  Button ok = button("Sudah saya catat", GREEN, 18);
+                  flat(ok);
+                  c.addView(ok, lp(dp(52), 14));
+                  final AlertDialog d = showCard(c, 340, false);
+                  ok.setOnClickListener(v -> {
+                      d.dismiss();
+                      importMsg = "Berhasil: PIN guru disimpan.";
+                      showGuru();
+                  });
               }
 
               // ---------- Pilihan nyawa (kotak dari tombol di menu) ----------
@@ -2436,6 +2738,33 @@ jobs:
                   how.setGravity(Gravity.START);
                   ch.addView(how, lp(WRAP, 8));
                   c.addView(ch, lp(WRAP, 14));
+
+                  LinearLayout cpin = card();
+                  cpin.addView(heading("PIN guru"), lp(WRAP, 0));
+                  TextView pinInfo = text(hasPin()
+                          ? "PIN aktif. Murid tidak bisa membuka halaman ini tanpa PIN."
+                          : "Belum ada PIN. Siapa pun yang menekan Soal Guru bisa membuka halaman ini.",
+                          13, DARK, false);
+                  pinInfo.setGravity(Gravity.START);
+                  cpin.addView(pinInfo, lp(WRAP, 8));
+                  Button gpin = button(hasPin() ? "Ganti PIN" : "Buat PIN", BLUE, 16);
+                  cpin.addView(gpin, lp(dp(46), 10));
+                  gpin.setOnClickListener(v -> dialogBuatPin(false));
+                  if (hasPin()) {
+                      Button hpin = button("Hapus PIN", RED, 14);
+                      cpin.addView(hpin, lp(dp(42), 8));
+                      hpin.setOnClickListener(v -> new AlertDialog.Builder(this)
+                              .setTitle("Hapus PIN guru?")
+                              .setMessage("Setelah itu murid bisa membuka Soal Guru tanpa PIN.")
+                              .setPositiveButton("Hapus", (dl, w) -> {
+                                  clearPin();
+                                  importMsg = "Berhasil: PIN guru dihapus.";
+                                  showGuru();
+                              })
+                              .setNegativeButton("Batal", null)
+                              .show());
+                  }
+                  c.addView(cpin, lp(WRAP, 14));
 
                   if (!bank.isEmpty()) {
                       Button del = button("Hapus semua soal guru", RED, 14);
