@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "4.4"
+                  versionName "4.5"
               }
 
               signingConfigs {
@@ -128,6 +128,8 @@ jobs:
           cat > app/src/main/AndroidManifest.xml <<'PB_EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.VIBRATE" />
 
               <application
                   android:allowBackup="true"
@@ -469,7 +471,17 @@ jobs:
           package com.petualangan.berhitung;
 
           import android.app.Activity;
+          import android.animation.ObjectAnimator;
+          import android.animation.ValueAnimator;
           import android.app.AlertDialog;
+          import android.content.Context;
+          import android.media.AudioFormat;
+          import android.media.AudioManager;
+          import android.media.AudioTrack;
+          import android.os.Vibrator;
+          import android.view.MotionEvent;
+          import android.view.animation.AccelerateInterpolator;
+          import android.view.animation.DecelerateInterpolator;
           import android.content.Intent;
           import android.content.SharedPreferences;
           import android.graphics.Canvas;
@@ -591,6 +603,30 @@ jobs:
               private static final int SECS_MIN = 3;
               private static final int SECS_MAX = 120;
 
+              // Efek suara dibuat dari nada sederhana: {frekuensi Hz, lama ms}; 0 Hz = diam
+              private static final int SFX_RATE = 22050;
+              private static final int SFX_TAP = 0;
+              private static final int SFX_CORRECT = 1;
+              private static final int SFX_WRONG = 2;
+              private static final int SFX_TIMEOUT = 3;
+              private static final int SFX_TICK = 4;
+              private static final int SFX_WIN = 5;
+              private static final int SFX_RECORD = 6;
+              private static final int SFX_LOSE = 7;
+              private static final int SFX_OK = 8;
+              private static final int[][][] SFX_NOTES = {
+                  {{880, 22}},
+                  {{784, 80}, {1047, 170}},
+                  {{233, 140}, {175, 240}},
+                  {{262, 110}, {0, 30}, {196, 280}},
+                  {{1300, 28}},
+                  {{523, 100}, {659, 100}, {784, 100}, {1047, 340}},
+                  {{523, 80}, {659, 80}, {784, 80}, {1047, 80}, {784, 60}, {1047, 80}, {1319, 420}},
+                  {{392, 170}, {330, 170}, {262, 400}},
+                  {{523, 110}, {659, 110}, {784, 280}}
+              };
+              private static final int[] CONFETTI_COLORS = {ORANGE, GREEN, BLUE, PURPLE, PINK, GOLD, RED, TEAL};
+
               private static class Q {
                   String text;
                   String full;
@@ -617,9 +653,103 @@ jobs:
                   void on(int i);
               }
 
+              // Hujan confetti di layar hasil
+              private static class Confetti extends View {
+                  private final int n;
+                  private final float[] x;
+                  private final float[] y;
+                  private final float[] vx;
+                  private final float[] vy;
+                  private final float[] size;
+                  private final float[] rot;
+                  private final float[] vrot;
+                  private final int[] color;
+                  private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final Random r = new Random();
+                  private final float density;
+                  private boolean ready;
+                  private long start;
+                  private long last;
+
+                  Confetti(Context ctx, int count) {
+                      super(ctx);
+                      n = count;
+                      x = new float[n];
+                      y = new float[n];
+                      vx = new float[n];
+                      vy = new float[n];
+                      size = new float[n];
+                      rot = new float[n];
+                      vrot = new float[n];
+                      color = new int[n];
+                      density = ctx.getResources().getDisplayMetrics().density;
+                  }
+
+                  @Override
+                  protected void onDraw(Canvas c) {
+                      int w = getWidth();
+                      int h = getHeight();
+                      if (w == 0 || h == 0) {
+                          postInvalidateOnAnimation();
+                          return;
+                      }
+                      long now = System.nanoTime();
+                      if (!ready) {
+                          ready = true;
+                          start = now;
+                          last = now;
+                          for (int i = 0; i < n; i++) {
+                              x[i] = r.nextFloat() * w;
+                              y[i] = -r.nextFloat() * h * 0.5f;
+                              vx[i] = (r.nextFloat() - 0.5f) * w * 0.3f;
+                              vy[i] = h * (0.22f + r.nextFloat() * 0.3f);
+                              size[i] = density * (5f + r.nextFloat() * 6f);
+                              rot[i] = r.nextFloat() * 360f;
+                              vrot[i] = (r.nextFloat() - 0.5f) * 720f;
+                              color[i] = CONFETTI_COLORS[r.nextInt(CONFETTI_COLORS.length)];
+                          }
+                      }
+                      float dt = (now - last) / 1e9f;
+                      if (dt > 0.05f) {
+                          dt = 0.05f;
+                      }
+                      last = now;
+                      boolean alive = false;
+                      for (int i = 0; i < n; i++) {
+                          x[i] += vx[i] * dt;
+                          y[i] += vy[i] * dt;
+                          vx[i] *= (1f - 0.4f * dt);
+                          rot[i] += vrot[i] * dt;
+                          if (y[i] < h + size[i]) {
+                              alive = true;
+                          }
+                          if (y[i] < -size[i] || y[i] > h + size[i]) {
+                              continue;
+                          }
+                          paint.setColor(color[i]);
+                          c.save();
+                          c.rotate(rot[i], x[i], y[i]);
+                          c.drawRect(x[i] - size[i] / 2f, y[i] - size[i] / 3f,
+                                  x[i] + size[i] / 2f, y[i] + size[i] / 3f, paint);
+                          c.restore();
+                      }
+                      if (alive && now - start < 7000000000L) {
+                          postInvalidateOnAnimation();
+                      } else {
+                          final ViewGroup p = (ViewGroup) getParent();
+                          if (p != null) {
+                              post(() -> p.removeView(this));
+                          }
+                      }
+                  }
+              }
+
               private final Random rnd = new Random();
               private final Handler handler = new Handler(Looper.getMainLooper());
               private SharedPreferences prefs;
+              private boolean sfxOn = true;
+              private Vibrator vib;
+              private final AudioTrack[] sfxTracks = new AudioTrack[SFX_NOTES.length];
 
               // Pengaturan
               private int screen;
@@ -684,6 +814,10 @@ jobs:
                           timeout();
                       } else {
                           showTime();
+                          if (timeLeft <= 3) {
+                              sfx(SFX_TICK);
+                              pop(tvTimer, 1.25f);
+                          }
                           handler.postDelayed(this, 1000);
                       }
                   }
@@ -693,12 +827,20 @@ jobs:
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   prefs = getSharedPreferences("berhitung", MODE_PRIVATE);
+                  vib = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                  setVolumeControlStream(AudioManager.STREAM_MUSIC);
+                  for (int i = 0; i < SFX_NOTES.length; i++) {
+                      sfxTrack(i);
+                  }
                   loadBank();
                   showMenu();
               }
 
               @Override
               protected void onPause() {
+                  if (screen == 2) {
+                      handler.removeCallbacksAndMessages(null);
+                  }
                   pauseGame();
                   super.onPause();
               }
@@ -712,6 +854,16 @@ jobs:
               @Override
               protected void onDestroy() {
                   handler.removeCallbacksAndMessages(null);
+                  for (int i = 0; i < sfxTracks.length; i++) {
+                      if (sfxTracks[i] != null) {
+                          try {
+                              sfxTracks[i].release();
+                          } catch (Exception e) {
+                              // abaikan
+                          }
+                          sfxTracks[i] = null;
+                      }
+                  }
                   if (exitDialog != null && exitDialog.isShowing()) {
                       exitDialog.dismiss();
                   }
@@ -733,6 +885,187 @@ jobs:
                   } else {
                       saveNames();
                       showMenu();
+                  }
+              }
+
+              // ---------- Efek suara, getar, dan gerak ----------
+
+              private static short[] synth(int[][] notes, boolean buzz) {
+                  int total = 0;
+                  for (int[] nt : notes) {
+                      total += SFX_RATE * nt[1] / 1000;
+                  }
+                  short[] out = new short[total];
+                  int pos = 0;
+                  for (int[] nt : notes) {
+                      int len = SFX_RATE * nt[1] / 1000;
+                      double f = nt[0];
+                      for (int k = 0; k < len; k++) {
+                          if (f > 0) {
+                              double ph = 2 * Math.PI * f * k / SFX_RATE;
+                              double v = buzz ? Math.sin(ph) + 0.5 * Math.sin(3 * ph) + 0.3 * Math.sin(5 * ph)
+                                      : Math.sin(ph) + 0.3 * Math.sin(2 * ph);
+                              double env = Math.min(1.0, k / (SFX_RATE * 0.004))
+                                      * Math.min(1.0, (len - k) / (SFX_RATE * 0.01))
+                                      * Math.exp(-2.2 * k / len);
+                              out[pos + k] = (short) (v * env * 9000);
+                          }
+                      }
+                      pos += len;
+                  }
+                  return out;
+              }
+
+              private AudioTrack sfxTrack(int id) {
+                  if (sfxTracks[id] == null) {
+                      try {
+                          short[] pcm = synth(SFX_NOTES[id], id == SFX_WRONG);
+                          AudioTrack t = new AudioTrack(AudioManager.STREAM_MUSIC, SFX_RATE,
+                                  AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                                  pcm.length * 2, AudioTrack.MODE_STATIC);
+                          t.write(pcm, 0, pcm.length);
+                          sfxTracks[id] = t;
+                      } catch (Exception e) {
+                          return null;
+                      }
+                  }
+                  return sfxTracks[id];
+              }
+
+              private void sfx(int id) {
+                  if (!sfxOn) {
+                      return;
+                  }
+                  AudioTrack t = sfxTrack(id);
+                  if (t == null) {
+                      return;
+                  }
+                  try {
+                      t.stop();
+                      t.reloadStaticData();
+                      t.play();
+                  } catch (Exception e) {
+                      // Suara gagal diputar: abaikan saja
+                  }
+              }
+
+              private void buzz(long ms) {
+                  if (!sfxOn || vib == null) {
+                      return;
+                  }
+                  try {
+                      vib.vibrate(ms);
+                  } catch (Exception e) {
+                      // Getar tidak tersedia: abaikan saja
+                  }
+              }
+
+              // Membesar sebentar lalu memantul kembali
+              private void pop(final View v, float peak) {
+                  if (v == null) {
+                      return;
+                  }
+                  v.animate().cancel();
+                  v.animate().setStartDelay(0).scaleX(peak).scaleY(peak).setDuration(110)
+                          .setInterpolator(new DecelerateInterpolator())
+                          .withEndAction(() -> v.animate().scaleX(1f).scaleY(1f).setDuration(240)
+                                  .setInterpolator(new OvershootInterpolator(3f)).start())
+                          .start();
+              }
+
+              // Bergetar ke kiri-kanan
+              private void shake(View v) {
+                  if (v == null) {
+                      return;
+                  }
+                  v.animate().cancel();
+                  float a = dp(10);
+                  float b = dp(8);
+                  float c = dp(4);
+                  ObjectAnimator.ofFloat(v, View.TRANSLATION_X, 0f, -a, a, -b, b, -c, c, 0f)
+                          .setDuration(420).start();
+              }
+
+              // Kartu soal meluncur keluar ke kiri sebelum soal berikutnya muncul
+              private void exitCard() {
+                  handler.postDelayed(() -> {
+                      if (cardQ != null) {
+                          cardQ.animate().setStartDelay(0).translationX(-dp(70)).alpha(0f).setDuration(220)
+                                  .setInterpolator(new AccelerateInterpolator()).start();
+                      }
+                  }, 760);
+              }
+
+              private void launchConfetti(int n) {
+                  ViewGroup root = findViewById(android.R.id.content);
+                  if (root != null) {
+                      root.addView(new Confetti(this, n), new FrameLayout.LayoutParams(MATCH, MATCH));
+                  }
+              }
+
+              // Efek layar hasil (solo): judul turun, skor menghitung naik, bintang muncul satu per satu
+              private void playResultFx(TextView title, TextView[] st, final int stars, final TextView sc,
+                                        TextView ben, TextView rekorPill, final boolean rekor) {
+                  title.setTranslationY(-dp(50));
+                  title.setAlpha(0f);
+                  title.animate().translationY(0f).alpha(1f).setDuration(450)
+                          .setInterpolator(new OvershootInterpolator(1.8f)).start();
+
+                  ben.setAlpha(0f);
+                  ben.animate().alpha(1f).setStartDelay(300).setDuration(400).start();
+
+                  sc.setText("Skor: 0");
+                  ValueAnimator va = ValueAnimator.ofInt(0, pScore[0]);
+                  va.setDuration(Math.min(1400L, 400L + pScore[0] * 8L));
+                  va.setStartDelay(250);
+                  va.addUpdateListener(a -> sc.setText("Skor: " + a.getAnimatedValue()));
+                  va.start();
+
+                  for (int i = 0; i < 3; i++) {
+                      long delay = 350 + 380L * i;
+                      boolean filled = i < stars;
+                      st[i].setScaleX(0f);
+                      st[i].setScaleY(0f);
+                      st[i].setAlpha(0f);
+                      android.view.animation.Interpolator ip;
+                      if (filled) {
+                          ip = new OvershootInterpolator(3.5f);
+                      } else {
+                          ip = new DecelerateInterpolator();
+                      }
+                      st[i].animate().scaleX(1f).scaleY(1f).alpha(1f).setStartDelay(delay)
+                              .setDuration(filled ? 480 : 250).setInterpolator(ip).start();
+                      if (filled) {
+                          handler.postDelayed(() -> {
+                              sfx(SFX_CORRECT);
+                              buzz(30);
+                          }, delay);
+                      }
+                  }
+
+                  long end = 350 + 380L * stars + 200;
+                  handler.postDelayed(() -> {
+                      if (rekor) {
+                          sfx(SFX_RECORD);
+                          buzz(90);
+                      } else if (stars >= 3) {
+                          sfx(SFX_WIN);
+                          buzz(60);
+                      } else if (stars >= 1) {
+                          sfx(SFX_OK);
+                      } else {
+                          sfx(SFX_LOSE);
+                      }
+                      if (stars >= 2 || rekor) {
+                          launchConfetti(stars >= 3 || rekor ? 130 : 80);
+                      }
+                  }, end);
+
+                  if (rekorPill != null) {
+                      rekorPill.setScaleX(0f);
+                      rekorPill.setScaleY(0f);
+                      rekorPill.animate().scaleX(1f).scaleY(1f).setStartDelay(end).setDuration(500)
+                              .setInterpolator(new OvershootInterpolator(3f)).start();
                   }
               }
 
@@ -904,6 +1237,20 @@ jobs:
                   b.setTextColor(Color.WHITE);
                   b.setTypeface(Typeface.DEFAULT_BOLD);
                   b.setBackground(box(color, 16));
+                  b.setOnTouchListener((v, e) -> {
+                      int act = e.getActionMasked();
+                      if (act == MotionEvent.ACTION_DOWN) {
+                          if (v.getTag() == null) {
+                              sfx(SFX_TAP);
+                          }
+                          v.animate().setStartDelay(0).scaleX(0.95f).scaleY(0.95f).setDuration(80)
+                                  .setInterpolator(new DecelerateInterpolator()).start();
+                      } else if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) {
+                          v.animate().setStartDelay(0).scaleX(1f).scaleY(1f).setDuration(180)
+                                  .setInterpolator(new OvershootInterpolator(2f)).start();
+                      }
+                      return false;
+                  });
                   return b;
               }
 
@@ -938,6 +1285,10 @@ jobs:
                   sv.setBackground(background());
                   sv.addView(c);
                   setContentView(sv);
+                  sv.setAlpha(0f);
+                  sv.setTranslationY(dp(12));
+                  sv.animate().alpha(1f).translationY(0f).setDuration(200)
+                          .setInterpolator(new DecelerateInterpolator()).start();
               }
 
               private LinearLayout.LayoutParams lp(int height, int topDp) {
@@ -1027,6 +1378,7 @@ jobs:
                   timed = prefs.getBoolean("timed", false);
                   secs = Math.max(SECS_MIN, Math.min(SECS_MAX, prefs.getInt("secs", 10)));
                   np = Math.max(1, Math.min(MAX_PLAYERS, prefs.getInt("np", 1)));
+                  sfxOn = prefs.getBoolean("sfx", true);
                   for (int i = 0; i < MAX_PLAYERS; i++) {
                       names[i] = prefs.getString("name" + i, "Pemain " + (i + 1));
                   }
@@ -1732,6 +2084,18 @@ jobs:
                   }
                   c.addView(cm, lp(WRAP, 14));
 
+                  // Suara dan getar
+                  LinearLayout cs = card();
+                  cs.addView(heading("Suara & getar"), lp(WRAP, 0));
+                  cs.addView(chips(new String[]{"Nyala", "Mati"}, sfxOn ? 0 : 1, new int[]{TEAL, SILVER}, k4 -> {
+                      prefs.edit().putBoolean("sfx", k4 == 0).apply();
+                      showSettings();
+                      sfx(SFX_CORRECT);
+                  }), lp(dp(46), 10));
+                  cs.addView(text("Efek suara dan getaran saat menjawab dan di layar hasil", 13, DARK, false),
+                          lp(WRAP, 8));
+                  c.addView(cs, lp(WRAP, 14));
+
                   Button done = button("Selesai", GREEN, 20);
                   done.setElevation(dp(4));
                   c.addView(done, lp(dp(58), 24));
@@ -2195,6 +2559,7 @@ jobs:
                       c.addView(row, lp(dp(84), 12));
                       for (int k = 0; k < 2; k++) {
                           Button b = button("", OPT_COLORS[r * 2 + k], 28);
+                          b.setTag("opt");
                           b.setElevation(dp(4));
                           row.addView(b, weight(k == 0 ? 0 : 6, k == 0 ? 6 : 0));
                           opts[r * 2 + k] = b;
@@ -2236,11 +2601,22 @@ jobs:
                   correctBtn = opts[q.correctIdx];
                   dots[qi - 1].setBackground(box(ORANGE, 4));
 
-                  cardQ.setScaleX(0.88f);
-                  cardQ.setScaleY(0.88f);
-                  cardQ.setAlpha(0.4f);
-                  cardQ.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(280)
-                          .setInterpolator(new OvershootInterpolator()).start();
+                  cardQ.animate().cancel();
+                  cardQ.setTranslationX(dp(70));
+                  cardQ.setScaleX(0.92f);
+                  cardQ.setScaleY(0.92f);
+                  cardQ.setRotation(3f);
+                  cardQ.setAlpha(0f);
+                  cardQ.animate().setStartDelay(0).translationX(0f).scaleX(1f).scaleY(1f).rotation(0f).alpha(1f)
+                          .setDuration(340).setInterpolator(new OvershootInterpolator(0.9f)).start();
+                  for (int i = 0; i < 4; i++) {
+                      opts[i].animate().cancel();
+                      opts[i].setScaleX(0.6f);
+                      opts[i].setScaleY(0.6f);
+                      opts[i].setAlpha(0f);
+                      opts[i].animate().scaleX(1f).scaleY(1f).alpha(1f).setStartDelay(120 + 60L * i)
+                              .setDuration(260).setInterpolator(new OvershootInterpolator(1.6f)).start();
+                  }
 
                   handler.removeCallbacks(tick);
                   if (timed) {
@@ -2263,6 +2639,9 @@ jobs:
 
               private void dimOthers(int keep1, int keep2) {
                   for (int i = 0; i < 4; i++) {
+                      opts[i].animate().cancel();
+                      opts[i].setScaleX(1f);
+                      opts[i].setScaleY(1f);
                       opts[i].setAlpha(i == keep1 || i == keep2 ? 1f : 0.45f);
                   }
               }
@@ -2287,6 +2666,11 @@ jobs:
                       dots[qi - 1].setBackground(box(GREEN, 4));
                       tvFeedback.setText("Benar! \uD83C\uDF89");
                       tvFeedback.setTextColor(GREEN);
+                      sfx(SFX_CORRECT);
+                      buzz(25);
+                      pop(opts[idx], 1.12f);
+                      pop(tvFeedback, 1.25f);
+                      pop(tvScore, 1.45f);
                   } else {
                       lives--;
                       opts[idx].setBackground(box(RED, 16));
@@ -2294,8 +2678,15 @@ jobs:
                       dots[qi - 1].setBackground(box(RED, 4));
                       tvFeedback.setText("Oops! Jawabannya " + optText(q, q.correctIdx));
                       tvFeedback.setTextColor(RED);
+                      sfx(SFX_WRONG);
+                      buzz(120);
+                      shake(opts[idx]);
+                      shake(cardQ);
+                      shake(tvHearts);
+                      pop(correctBtn, 1.1f);
                   }
                   updateHud();
+                  exitCard();
                   handler.postDelayed(this::showQuestion, 1000);
               }
 
@@ -2313,7 +2704,13 @@ jobs:
                   dots[qi - 1].setBackground(box(RED, 4));
                   tvFeedback.setText("Jawabannya " + optText(q, q.correctIdx));
                   tvFeedback.setTextColor(RED);
+                  sfx(SFX_TIMEOUT);
+                  buzz(150);
+                  shake(cardQ);
+                  shake(tvHearts);
+                  pop(correctBtn, 1.1f);
                   updateHud();
+                  exitCard();
                   handler.postDelayed(this::showQuestion, 1000);
               }
 
@@ -2336,7 +2733,7 @@ jobs:
                   } else if (np == 1) {
                       showSoloResult();
                   } else {
-                      showRanking();
+                      showRanking(true);
                   }
               }
 
@@ -2350,10 +2747,14 @@ jobs:
                   if (rekorNow) {
                       prefs.edit().putInt(key, pScore[0]).apply();
                   }
-                  renderSoloResult();
+                  renderSoloResult(true);
               }
 
               private void renderSoloResult() {
+                  renderSoloResult(false);
+              }
+
+              private void renderSoloResult(boolean fx) {
                   screen = 2;
                   boolean rekor = rekorNow;
                   int pct = total > 0 ? pCorrect[0] * 10 / total : 0;
@@ -2361,28 +2762,44 @@ jobs:
 
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
-                  c.addView(text(lives <= 0 ? "Nyawa habis!" : "Selesai!", 32, ORANGE_DARK, true), lp(WRAP, 0));
+                  TextView title = text(lives <= 0 ? "Nyawa habis!" : "Selesai!", 32, ORANGE_DARK, true);
+                  c.addView(title, lp(WRAP, 0));
                   c.addView(pill(KELAS_NAMES[kelas] + " \u2022 " + modeLabel(), KELAS_COLOR[kelas]), lpw(10));
 
                   LinearLayout card = card();
                   card.setGravity(Gravity.CENTER_HORIZONTAL);
-                  StringBuilder s = new StringBuilder();
+                  LinearLayout starRow = new LinearLayout(this);
+                  starRow.setOrientation(LinearLayout.HORIZONTAL);
+                  starRow.setGravity(Gravity.CENTER);
+                  TextView[] st = new TextView[3];
                   for (int i = 0; i < 3; i++) {
-                      s.append(i < stars ? "\u2B50" : "\u2606");
+                      st[i] = text(i < stars ? "\u2B50" : "\u2606", 44, ORANGE, false);
+                      starRow.addView(st[i], new LinearLayout.LayoutParams(WRAP, WRAP));
                   }
-                  card.addView(text(s.toString(), 44, ORANGE, false), lp(WRAP, 0));
-                  card.addView(text("Skor: " + pScore[0], 30, DARK, true), lp(WRAP, 10));
-                  card.addView(text("Benar " + pCorrect[0] + " dari " + total, 16, DARK, false), lp(WRAP, 6));
+                  card.addView(starRow, lp(WRAP, 0));
+                  TextView sc = text("Skor: " + pScore[0], 30, DARK, true);
+                  card.addView(sc, lp(WRAP, 10));
+                  TextView ben = text("Benar " + pCorrect[0] + " dari " + total, 16, DARK, false);
+                  card.addView(ben, lp(WRAP, 6));
+                  TextView rekorPill = null;
                   if (rekor) {
-                      card.addView(pill("Rekor baru! \uD83C\uDFC6", PURPLE), lpw(12));
+                      rekorPill = pill("Rekor baru! \uD83C\uDFC6", PURPLE);
+                      card.addView(rekorPill, lpw(12));
                   }
                   c.addView(card, lp(WRAP, 18));
 
                   addResultButtons(c);
                   wrap(c);
+                  if (fx) {
+                      playResultFx(title, st, stars, sc, ben, rekorPill, rekor);
+                  }
               }
 
               private void showRanking() {
+                  showRanking(false);
+              }
+
+              private void showRanking(boolean fx) {
                   screen = 2;
                   Integer[] order = new Integer[np];
                   for (int i = 0; i < np; i++) {
@@ -2416,6 +2833,12 @@ jobs:
                   banner.setPadding(dp(16), dp(14), dp(16), dp(14));
                   banner.setElevation(dp(4));
                   c.addView(banner, lp(WRAP, 18));
+                  if (fx) {
+                      banner.setScaleX(0f);
+                      banner.setScaleY(0f);
+                      banner.animate().scaleX(1f).scaleY(1f).setStartDelay(150).setDuration(550)
+                              .setInterpolator(new OvershootInterpolator(2.5f)).start();
+                  }
 
                   int[] rankColor = {GOLD, SILVER, BRONZE, GRAY_D};
                   for (int r = 0; r < np; r++) {
@@ -2442,11 +2865,24 @@ jobs:
                       sc.setGravity(Gravity.END);
                       row.addView(sc, new LinearLayout.LayoutParams(WRAP, WRAP));
 
+                      if (fx) {
+                          row.setAlpha(0f);
+                          row.setTranslationX(dp(90));
+                          row.animate().alpha(1f).translationX(0f).setStartDelay(500 + 180L * r).setDuration(380)
+                                  .setInterpolator(new DecelerateInterpolator(1.6f)).start();
+                      }
                       c.addView(row, lp(WRAP, 10));
                   }
 
                   addResultButtons(c);
                   wrap(c);
+                  if (fx) {
+                      handler.postDelayed(() -> {
+                          sfx(SFX_WIN);
+                          buzz(60);
+                          launchConfetti(130);
+                      }, 400);
+                  }
               }
 
               private boolean hasMistakes() {
