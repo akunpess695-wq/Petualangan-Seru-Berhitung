@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "4.2"
+                  versionName "4.3"
               }
 
               signingConfigs {
@@ -652,6 +652,10 @@ jobs:
               private int lives;
               private int timeLeft;
               private boolean locked;
+              private boolean gamePaused;
+              private boolean resumeNext;
+              private boolean dialogOpen;
+              private AlertDialog exitDialog;
 
               // Tampilan permainan
               private TextView tvStep;
@@ -692,8 +696,23 @@ jobs:
               }
 
               @Override
+              protected void onPause() {
+                  pauseGame();
+                  super.onPause();
+              }
+
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  resumeGame();
+              }
+
+              @Override
               protected void onDestroy() {
                   handler.removeCallbacksAndMessages(null);
+                  if (exitDialog != null && exitDialog.isShowing()) {
+                      exitDialog.dismiss();
+                  }
                   super.onDestroy();
               }
 
@@ -701,6 +720,8 @@ jobs:
               public void onBackPressed() {
                   if (screen == 0) {
                       super.onBackPressed();
+                  } else if (screen == 1) {
+                      confirmExit();
                   } else if (screen == 5) {
                       if (np == 1) {
                           renderSoloResult();
@@ -2024,6 +2045,50 @@ jobs:
 
               // ---------- Permainan ----------
 
+              // Jeda saat app ke background atau dialog tampil, lanjut saat kembali
+              private void pauseGame() {
+                  if (screen != 1 || gamePaused) {
+                      return;
+                  }
+                  gamePaused = true;
+                  resumeNext = locked;
+                  handler.removeCallbacksAndMessages(null);
+                  if (timed && timerFill != null) {
+                      timerFill.animate().cancel();
+                  }
+              }
+
+              private void resumeGame() {
+                  if (screen != 1 || !gamePaused || dialogOpen) {
+                      return;
+                  }
+                  gamePaused = false;
+                  if (resumeNext) {
+                      resumeNext = false;
+                      handler.postDelayed(this::showQuestion, 600);
+                  } else if (timed && timeLeft > 0) {
+                      timerFill.setScaleX(timeLeft / (float) secs);
+                      timerFill.animate().scaleX(0f).setDuration(timeLeft * 1000L)
+                              .setInterpolator(new LinearInterpolator()).start();
+                      handler.postDelayed(tick, 1000);
+                  }
+              }
+
+              private void confirmExit() {
+                  pauseGame();
+                  dialogOpen = true;
+                  exitDialog = new AlertDialog.Builder(this)
+                          .setTitle("Keluar dari permainan?")
+                          .setMessage("Skor permainan ini tidak akan tersimpan.")
+                          .setPositiveButton("Keluar", (dl, w) -> showMenu())
+                          .setNegativeButton("Lanjut main", null)
+                          .setOnDismissListener(dl -> {
+                              dialogOpen = false;
+                              resumeGame();
+                          })
+                          .show();
+              }
+
               private void startTurn() {
                   qi = 0;
                   score = 0;
@@ -2035,6 +2100,8 @@ jobs:
 
               private void showGame() {
                   screen = 1;
+                  gamePaused = false;
+                  resumeNext = false;
                   LinearLayout c = column();
 
                   // Baris atas: nama pemain dan nyawa
@@ -2116,7 +2183,7 @@ jobs:
                   Button back = button("Kembali ke menu", GRAY, 14);
                   back.setTextColor(DARK);
                   c.addView(back, lp(dp(46), 22));
-                  back.setOnClickListener(v -> showMenu());
+                  back.setOnClickListener(v -> confirmExit());
 
                   wrap(c);
               }
