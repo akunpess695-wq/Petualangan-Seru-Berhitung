@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.0.1"
+                  versionName "6.0.2"
               }
 
               signingConfigs {
@@ -552,7 +552,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.0.1";
+              private static final String APP_VERSION = "6.0.2";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -998,17 +998,158 @@ jobs:
                   }
               };
 
+              // =====================================================================
+              // Tampilan menurut perangkat (versi 6.0.2): HP, tablet/panel, TV
+              // =====================================================================
+
+              // 1 = HP, 2 = tablet/panel, 3 = TV (hasil gabungan pilihan guru dan deteksi perangkat)
+              private int tampilProfile = 1;
+              private static final String[] TAMPIL_NAMES = {"Otomatis", "HP", "Tablet / Panel", "TV"};
+
+              // Profil otomatis. Layar 960x540dp (panel atau TV Full HD) juga dianggap besar,
+              // padahal lebar terkecilnya hanya 540dp; HP paling tinggi sekitar 430dp pada sisi pendeknya.
+              static int autoProfile(boolean tv, int smallestDp, int widthDp, int heightDp) {
+                  if (tv) {
+                      return 3;
+                  }
+                  int mx = Math.max(widthDp, heightDp);
+                  int mn = Math.min(widthDp, heightDp);
+                  if (smallestDp >= 600 || (mx >= 900 && mn >= 500)) {
+                      return 2;
+                  }
+                  return 1;
+              }
+
+              static float clampF(float v, float lo, float hi) {
+                  return Math.max(lo, Math.min(hi, v));
+              }
+
+              // Faktor pembesaran huruf dan tombol supaya terbaca dari jauh
+              static float profileUi(int profile, int widthDp, int heightDp) {
+                  if (profile == 1) {
+                      return 1f;
+                  }
+                  if (profile == 2) {
+                      boolean landscape = widthDp * 10 >= heightDp * 13;
+                      return landscape ? clampF(heightDp / 600f, 1f, 1.6f) : clampF(heightDp / 700f, 1f, 1.5f);
+                  }
+                  return clampF(heightDp / 560f, 1.2f, 1.8f);
+              }
+
+              // Layar lebar dan mendatar: menu dan layar soal dibuat dua kolom
+              static boolean wideLayout(int widthPx, int heightPx, int minWidthPx) {
+                  return widthPx >= minWidthPx && widthPx * 10 >= heightPx * 13;
+              }
+
+              // Profil HP selalu satu kolom; tablet/panel dan TV memakai dua kolom bila layarnya lebar
+              static boolean wideFor(int profile, int widthPx, int heightPx, int minWidthPx) {
+                  return profile != 1 && wideLayout(widthPx, heightPx, minWidthPx);
+              }
+
+              private boolean isTvDevice() {
+                  try {
+                      android.app.UiModeManager um = (android.app.UiModeManager) getSystemService(Context.UI_MODE_SERVICE);
+                      if (um != null && um.getCurrentModeType() == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) {
+                          return true;
+                      }
+                  } catch (Exception e) {
+                      // lanjut ke pemeriksaan berikutnya
+                  }
+                  try {
+                      return getPackageManager().hasSystemFeature("android.software.leanback");
+                  } catch (Exception e) {
+                      return false;
+                  }
+              }
+
+              private void applyDisplayProfile() {
+                  android.content.res.Configuration cf = getResources().getConfiguration();
+                  int p = prefs.getInt("tampil", 0);
+                  if (p < 1 || p > 3) {
+                      p = autoProfile(isTvDevice(), cf.smallestScreenWidthDp, cf.screenWidthDp, cf.screenHeightDp);
+                  }
+                  tampilProfile = p;
+                  ui = profileUi(p, cf.screenWidthDp, cf.screenHeightDp);
+                  setRequestedOrientation(p == 1 ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                          : (p == 2 ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                          : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE));
+              }
+
+              @Override
+              public void onConfigurationChanged(android.content.res.Configuration nc) {
+                  super.onConfigurationChanged(nc);
+                  if (prefs == null) {
+                      return;
+                  }
+                  applyDisplayProfile();
+                  boolean dialogUp = (menuDialog != null && menuDialog.isShowing())
+                          || (pickDialog != null && pickDialog.isShowing());
+                  if (screen == 0 && !dialogUp) {
+                      showMenu();
+                  }
+              }
+
+              private boolean isWide() {
+                  android.util.DisplayMetrics m = getResources().getDisplayMetrics();
+                  return wideFor(tampilProfile, m.widthPixels, m.heightPixels, dp(720));
+              }
+
+              // Dua kolom berdampingan di tengah layar (dipakai menu dan layar soal pada layar lebar)
+              private void wrapTwo(LinearLayout left, LinearLayout right) {
+                  ScrollView sv = new ScrollView(this);
+                  sv.setFillViewport(true);
+                  sv.setBackground(background());
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.HORIZONTAL);
+                  root.setGravity(Gravity.CENTER_VERTICAL);
+                  root.addView(left, new LinearLayout.LayoutParams(0, WRAP, 1f));
+                  root.addView(right, new LinearLayout.LayoutParams(0, WRAP, 1f));
+                  FrameLayout fl = new FrameLayout(this);
+                  int maxW = Math.min(getResources().getDisplayMetrics().widthPixels, dp(1240));
+                  fl.addView(root, new FrameLayout.LayoutParams(maxW, WRAP, Gravity.CENTER));
+                  sv.addView(fl);
+                  setContentView(sv);
+                  sv.setAlpha(0f);
+                  sv.setTranslationY(dp(12));
+                  sv.animate().alpha(1f).translationY(0f).setDuration(200)
+                          .setInterpolator(new DecelerateInterpolator()).start();
+              }
+
+              private void dialogTampilan() {
+                  LinearLayout b = dialogBody();
+                  int cur = prefs.getInt("tampil", 0);
+                  for (int i = 0; i < TAMPIL_NAMES.length; i++) {
+                      final int idx = i;
+                      boolean on = (i == cur) || (i == 0 && (cur < 1 || cur > 3));
+                      Button t = button(TAMPIL_NAMES[i], on ? PURPLE : GRAY, 16);
+                      t.setTextColor(on ? Color.WHITE : DARK);
+                      flat(t);
+                      t.setOnClickListener(v -> {
+                          prefs.edit().putInt("tampil", idx).apply();
+                          if (menuDialog != null) {
+                              menuDialog.setOnDismissListener(null);
+                              menuDialog.dismiss();
+                          }
+                          recreate();
+                      });
+                      b.addView(t, lp(dp(50), i == 0 ? 0 : 8));
+                  }
+                  boolean auto = cur < 1 || cur > 3;
+                  TextView info = text("Sekarang: " + TAMPIL_NAMES[tampilProfile] + (auto ? " (otomatis)" : " (pilihan manual)")
+                          + "\nOtomatis mengikuti perangkat. Pilih manual kalau tampilannya kurang pas. "
+                          + "Aplikasi akan dimulai ulang.", 13, DARK, false);
+                  info.setGravity(Gravity.START);
+                  b.addView(info, lp(WRAP, 10));
+                  showDialogView("Tampilan layar", b);
+              }
+
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  // HP tetap tegak; layar besar (TV, panel interaktif, tablet) mengikuti arah layarnya
-                  boolean besar = getResources().getConfiguration().smallestScreenWidthDp >= 600;
-                  // Layar besar: huruf dan tombol diperbesar sesuai tinggi layar agar terbaca dari belakang kelas
-                  int tinggiDp = getResources().getConfiguration().screenHeightDp;
-                  ui = besar ? Math.max(1f, Math.min(1.5f, tinggiDp / 700f)) : 1f;
-                  setRequestedOrientation(besar ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                          : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
                   prefs = getSharedPreferences("berhitung", MODE_PRIVATE);
+                  // HP tetap tegak; tablet/panel mengikuti arah layar; TV mendatar. Huruf dan tombol
+                  // diperbesar sesuai tinggi layar agar terbaca dari belakang kelas (lihat applyDisplayProfile)
+                  applyDisplayProfile();
                   vib = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
                   setVolumeControlStream(AudioManager.STREAM_MUSIC);
                   for (int i = 0; i < SFX_NOTES.length; i++) {
@@ -1610,8 +1751,11 @@ jobs:
                   loadPrefs();
 
                   LinearLayout c = column();
+                  final boolean wide = isWide();
+                  LinearLayout cr = wide ? column() : null;
+                  LinearLayout rt = wide ? cr : c;
 
-                  // Baris ikon: suara di kiri, avatar di kanan
+                  // Baris ikon: suara dan tampilan di kiri, avatar di kanan
                   LinearLayout bar = new LinearLayout(this);
                   bar.setOrientation(LinearLayout.HORIZONTAL);
                   bar.setGravity(Gravity.CENTER_VERTICAL);
@@ -1624,6 +1768,13 @@ jobs:
                       sfx(SFX_CORRECT);
                   });
                   bar.addView(snd, new LinearLayout.LayoutParams(dp(52), dp(52)));
+                  TextView dsp = text("\uD83D\uDCFA", 22, DARK, false);
+                  dsp.setBackground(box(Color.WHITE, 26));
+                  dsp.setElevation(dp(3));
+                  dsp.setOnClickListener(v -> dialogTampilan());
+                  LinearLayout.LayoutParams dspLp = new LinearLayout.LayoutParams(dp(52), dp(52));
+                  dspLp.leftMargin = dp(10);
+                  bar.addView(dsp, dspLp);
                   bar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
                   TextView avb = text(av(0), 26, DARK, false);
                   avb.setBackground(box(Color.WHITE, 26));
@@ -1689,10 +1840,10 @@ jobs:
                   // Peta Petualangan
                   LinearLayout mp = subjectTile("\uD83D\uDDFA\uFE0F", "Peta Petualangan", advSummary(), GREEN);
                   mp.setOnClickListener(v -> showPeta());
-                  c.addView(mp, lp(dp(96), 18));
+                  rt.addView(mp, lp(dp(96), wide ? 0 : 18));
 
                   // Pilih pelajaran
-                  c.addView(text("Pilih pelajaran", 16, DARK, true), lp(WRAP, 20));
+                  rt.addView(text("Pilih pelajaran", 16, DARK, true), lp(WRAP, wide ? 16 : 20));
                   for (int s = 0; s < 3; s++) {
                       final int sj = s;
                       int n = countBank(s, kelas);
@@ -1706,7 +1857,7 @@ jobs:
                       }
                       LinearLayout t = subjectTile(SUBJ_ICON[s], SUBJ_NAMES[s], sub, SUBJ_COLOR[s]);
                       t.setOnClickListener(v -> openSubject(sj));
-                      c.addView(t, lp(dp(96), 14));
+                      rt.addView(t, lp(dp(96), 14));
                   }
 
                   // Soal dari guru dan rekor skor, sebaris
@@ -1728,7 +1879,11 @@ jobs:
 
                   c.setFocusableInTouchMode(true);
                   c.requestFocus();
-                  wrap(c);
+                  if (wide) {
+                      wrapTwo(c, cr);
+                  } else {
+                      wrap(c);
+                  }
               }
 
               // ---------- Rekor skor tertinggi (disimpan di HP ini) ----------
@@ -4536,6 +4691,9 @@ jobs:
                   gamePaused = false;
                   resumeNext = false;
                   LinearLayout c = column();
+                  final boolean wide = isWide();
+                  LinearLayout cr = wide ? column() : null;
+                  LinearLayout rt = wide ? cr : c;
 
                   // Baris atas: nama pemain dan nyawa
                   LinearLayout top = new LinearLayout(this);
@@ -4605,7 +4763,7 @@ jobs:
                   for (int r = 0; r < 2; r++) {
                       LinearLayout row = new LinearLayout(this);
                       row.setOrientation(LinearLayout.HORIZONTAL);
-                      c.addView(row, lp(dp(84), 12));
+                      rt.addView(row, lp(dp(wide ? 96 : 84), 12));
                       for (int k = 0; k < 2; k++) {
                           Button b = button("", OPT_COLORS[r * 2 + k], 28);
                           b.setTag("opt");
@@ -4617,10 +4775,14 @@ jobs:
 
                   Button back = button(advLevel >= 0 ? "Kembali ke peta" : "Kembali ke menu", GRAY, 14);
                   back.setTextColor(DARK);
-                  c.addView(back, lp(dp(46), 22));
+                  rt.addView(back, lp(dp(46), 22));
                   back.setOnClickListener(v -> confirmExit());
 
-                  wrap(c);
+                  if (wide) {
+                      wrapTwo(c, cr);
+                  } else {
+                      wrap(c);
+                  }
               }
 
               private void showQuestion() {
