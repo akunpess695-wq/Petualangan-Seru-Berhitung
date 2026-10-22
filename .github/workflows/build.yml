@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "5.4"
+                  versionName "5.5"
               }
 
               signingConfigs {
@@ -692,6 +692,27 @@ jobs:
                       "\uD83D\uDC31", "\uD83D\uDC36", "\uD83D\uDC30", "\uD83D\uDC3C"
               };
               private static final int[] OPT_COLORS = {BLUE, PURPLE, TEAL, PINK};
+              // Lencana (penghargaan): ikon, nama, syarat, warna
+              private static final String[] BADGE_ICON = {
+                      "\uD83C\uDF31", "\u2B50", "\uD83D\uDCAF", "\u26A1", "\uD83D\uDD25",
+                      "\uD83C\uDF1F", "\uD83C\uDFC6", "\uD83E\uDDE9", "\uD83D\uDC65"
+              };
+              private static final String[] BADGE_NAME = {
+                      "Pemula", "Bintang Tiga", "Sempurna", "Kilat", "Rajin",
+                      "Kolektor Bintang", "Pemecah Rekor", "Pasangan Hebat", "Teman Main"
+              };
+              private static final String[] BADGE_DESC = {
+                      "Selesaikan 1 permainan",
+                      "Dapat 3 bintang dalam satu permainan",
+                      "Jawab semua soal dengan benar",
+                      "Jawab semua benar saat berwaktu",
+                      "Selesaikan 10 permainan",
+                      "Kumpulkan 30 bintang",
+                      "Pecahkan rekor skormu sendiri",
+                      "Cocokkan semua pasangan tanpa salah",
+                      "Main bersama teman"
+              };
+              private static final int[] BADGE_COLOR = {GREEN, GOLD, PINK, ORANGE, RED, INDIGO, PURPLE, TEAL, BLUE};
               // Huruf bulat yang ramah anak (Android 9 ke atas); di HP lama otomatis memakai huruf biasa
               private float ui = 1f;
               private static final Typeface ROUND_BOLD = Typeface.create("sans-serif-rounded", Typeface.BOLD);
@@ -849,6 +870,10 @@ jobs:
               private final Handler handler = new Handler(Looper.getMainLooper());
               private SharedPreferences prefs;
               private boolean sfxOn = true;
+              // Belajar santai: nyawa tidak berkurang dan skor tidak masuk rekor
+              private boolean relaxed = false;
+              // Lencana yang baru didapat di permainan yang baru selesai
+              private ArrayList<Integer> freshBadges = new ArrayList<>();
               private Vibrator vib;
               private final AudioTrack[] sfxTracks = new AudioTrack[SFX_NOTES.length];
 
@@ -1483,7 +1508,18 @@ jobs:
               }
 
               private String modeLabel() {
-                  return mode == 7 ? SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
+                  String base = mode == 7 ? SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
+                  return (relaxed && mode != 7) ? base + " \u2022 Santai" : base;
+              }
+
+              // Permainan tanpa nyawa: soal guru selalu begitu, soal hitung kalau mode santai menyala
+              private boolean noLives() {
+                  return mode == 7 || relaxed;
+              }
+
+              // Skor hanya masuk rekor kalau tidak dalam mode santai (soal guru selalu dihitung)
+              private boolean countsForRecord() {
+                  return mode == 7 || !relaxed;
               }
 
               private String optText(Q q, int i) {
@@ -1518,6 +1554,7 @@ jobs:
                   secs = Math.max(SECS_MIN, Math.min(SECS_MAX, prefs.getInt("secs", 10)));
                   np = Math.max(1, Math.min(MAX_PLAYERS, prefs.getInt("np", 1)));
                   sfxOn = prefs.getBoolean("sfx", true);
+                  relaxed = prefs.getBoolean("relaxed", false);
                   for (int i = 0; i < MAX_PLAYERS; i++) {
                       names[i] = prefs.getString("name" + i, "Pemain " + (i + 1));
                       avatar[i] = Math.max(0, Math.min(AVATARS.length - 1, prefs.getInt("avatar" + i, i)));
@@ -1598,6 +1635,15 @@ jobs:
                   opt.addView(bw, weight(4, 0));
                   c.addView(opt, lp(dp(54), 16));
 
+                  // Pilihan nyawa: ada nyawa atau belajar santai
+                  Button bn = button(relaxed ? "\uD83D\uDC9A Belajar santai \u2022 tanpa nyawa"
+                          : "\u2764\uFE0F Ada nyawa", Color.WHITE, 14);
+                  bn.setTextColor(DARK);
+                  flat(bn);
+                  bn.setElevation(dp(3));
+                  bn.setOnClickListener(v -> dialogNyawa());
+                  c.addView(bn, lp(dp(46), 10));
+
                   // Pilih pelajaran
                   c.addView(text("Pilih pelajaran", 16, DARK, true), lp(WRAP, 20));
                   for (int s = 0; s < 3; s++) {
@@ -1628,7 +1674,7 @@ jobs:
                       showGuru();
                   });
                   foot.addView(gr, weight(0, 4));
-                  Button rk = button("\uD83C\uDFC6 Rekor Skor", Color.WHITE, 14);
+                  Button rk = button("\uD83C\uDFC5 Rekor & Lencana", Color.WHITE, 13);
                   rk.setTextColor(DARK);
                   flat(rk);
                   rk.setElevation(dp(3));
@@ -1659,14 +1705,160 @@ jobs:
                   return s;
               }
 
+              // ---------- Pilihan nyawa (kotak dari tombol di menu) ----------
+
+              private void dialogNyawa() {
+                  LinearLayout b = dialogBody();
+                  b.addView(chips(new String[]{"Ada nyawa", "Santai"}, relaxed ? 1 : 0,
+                          new int[]{RED, GREEN}, kn -> {
+                              relaxed = (kn == 1);
+                              prefs.edit().putBoolean("relaxed", relaxed).apply();
+                              dialogNyawa();
+                          }), lp(dp(50), 0));
+                  b.addView(text(relaxed
+                          ? "Belajar santai: nyawa tidak berkurang, soal jalan terus sampai selesai. "
+                          + "Skor tidak masuk rekor."
+                          : "Nyawa berkurang setiap salah. Kalau nyawa habis, permainan berhenti.",
+                          13, DARK, false), lp(WRAP, 8));
+                  showDialogView("Nyawa", b);
+              }
+
+              // ---------- Lencana dan bintang terkumpul (disimpan di HP ini) ----------
+
+              private boolean hasBadge(int i) {
+                  return prefs.getBoolean("badge" + i, false);
+              }
+
+              private void giveBadge(int i, ArrayList<Integer> fresh) {
+                  if (hasBadge(i)) {
+                      return;
+                  }
+                  prefs.edit().putBoolean("badge" + i, true).apply();
+                  fresh.add(i);
+              }
+
+              private int totalStars() {
+                  return prefs.getInt("stars_total", 0);
+              }
+
+              // Dipanggil sekali setiap satu permainan selesai.
+              // kind: 0 kuis main sendiri, 1 kuis bergantian, 2 Cocokkan Pasangan
+              private ArrayList<Integer> awardBadges(int kind, int stars, boolean perfect, boolean rekorBroken) {
+                  ArrayList<Integer> fresh = new ArrayList<>();
+                  int games = prefs.getInt("games_total", 0) + 1;
+                  int sum = prefs.getInt("stars_total", 0) + stars;
+                  prefs.edit().putInt("games_total", games).putInt("stars_total", sum).apply();
+                  giveBadge(0, fresh);
+                  if (stars >= 3) {
+                      giveBadge(1, fresh);
+                  }
+                  if (kind == 0 && perfect) {
+                      giveBadge(2, fresh);
+                      if (timed) {
+                          giveBadge(3, fresh);
+                      }
+                  }
+                  if (games >= 10) {
+                      giveBadge(4, fresh);
+                  }
+                  if (sum >= 30) {
+                      giveBadge(5, fresh);
+                  }
+                  if (rekorBroken) {
+                      giveBadge(6, fresh);
+                  }
+                  if (kind == 2 && perfect) {
+                      giveBadge(7, fresh);
+                  }
+                  if (kind == 1) {
+                      giveBadge(8, fresh);
+                  }
+                  return fresh;
+              }
+
+              // Kartu "Lencana baru!" di layar hasil
+              private void addFreshBadges(LinearLayout c) {
+                  if (freshBadges == null || freshBadges.isEmpty()) {
+                      return;
+                  }
+                  LinearLayout cd = card();
+                  cd.addView(text("\uD83C\uDF89 Lencana baru!", 18, PURPLE, true), lp(WRAP, 0));
+                  for (int n = 0; n < freshBadges.size(); n++) {
+                      int b = freshBadges.get(n);
+                      LinearLayout row = new LinearLayout(this);
+                      row.setOrientation(LinearLayout.HORIZONTAL);
+                      row.setGravity(Gravity.CENTER_VERTICAL);
+                      TextView ic = text(BADGE_ICON[b], 26, Color.WHITE, false);
+                      ic.setBackground(box(BADGE_COLOR[b], 24));
+                      row.addView(ic, new LinearLayout.LayoutParams(dp(48), dp(48)));
+                      LinearLayout col = new LinearLayout(this);
+                      col.setOrientation(LinearLayout.VERTICAL);
+                      TextView nm = text(BADGE_NAME[b], 16, DARK, true);
+                      nm.setGravity(Gravity.START);
+                      TextView ds = text(BADGE_DESC[b], 12, DARK, false);
+                      ds.setGravity(Gravity.START);
+                      col.addView(nm, new LinearLayout.LayoutParams(WRAP, WRAP));
+                      col.addView(ds, new LinearLayout.LayoutParams(WRAP, WRAP));
+                      LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, WRAP, 1f);
+                      cp.leftMargin = dp(12);
+                      row.addView(col, cp);
+                      cd.addView(row, lp(WRAP, 10));
+                      ic.setScaleX(0f);
+                      ic.setScaleY(0f);
+                      ic.animate().scaleX(1f).scaleY(1f).setStartDelay(700 + 250L * n).setDuration(450)
+                              .setInterpolator(new OvershootInterpolator(3f)).start();
+                  }
+                  c.addView(cd, lp(WRAP, 14));
+              }
+
+              // Papan semua lencana (3 x 3) di layar Rekor; yang belum didapat berupa gembok
+              private void addBadgeBoard(LinearLayout c) {
+                  int earned = 0;
+                  for (int i = 0; i < BADGE_NAME.length; i++) {
+                      if (hasBadge(i)) {
+                          earned++;
+                      }
+                  }
+                  LinearLayout bd = card();
+                  bd.addView(heading("\uD83C\uDFC5 Lencana (" + earned + " dari " + BADGE_NAME.length + ")"),
+                          lp(WRAP, 0));
+                  TextView tot = text("\uD83C\uDF1F Total bintang: " + totalStars(), 14, DARK, false);
+                  tot.setGravity(Gravity.START);
+                  bd.addView(tot, lp(WRAP, 6));
+                  for (int r = 0; r < 3; r++) {
+                      LinearLayout row = new LinearLayout(this);
+                      row.setOrientation(LinearLayout.HORIZONTAL);
+                      for (int q = 0; q < 3; q++) {
+                          final int b = r * 3 + q;
+                          boolean on = hasBadge(b);
+                          LinearLayout cell = new LinearLayout(this);
+                          cell.setOrientation(LinearLayout.VERTICAL);
+                          cell.setGravity(Gravity.CENTER);
+                          cell.setPadding(dp(4), dp(4), dp(4), dp(4));
+                          cell.setBackground(box(on ? BADGE_COLOR[b] : GRAY, 16));
+                          cell.addView(text(on ? BADGE_ICON[b] : "\uD83D\uDD12", 26, Color.WHITE, false),
+                                  new LinearLayout.LayoutParams(WRAP, WRAP));
+                          TextView nm = text(BADGE_NAME[b], 11, on ? Color.WHITE : DARK, true);
+                          nm.setMaxLines(2);
+                          cell.addView(nm, new LinearLayout.LayoutParams(WRAP, WRAP));
+                          cell.setOnClickListener(v -> Toast.makeText(this,
+                                  BADGE_NAME[b] + ": " + BADGE_DESC[b], Toast.LENGTH_SHORT).show());
+                          row.addView(cell, weight(q == 0 ? 0 : 4, q == 2 ? 0 : 4));
+                      }
+                      bd.addView(row, lp(dp(88), r == 0 ? 10 : 8));
+                  }
+                  c.addView(bd, lp(WRAP, 14));
+              }
+
               private void showRekor() {
                   handler.removeCallbacksAndMessages(null);
                   screen = 8;
                   nameFields = null;
 
                   LinearLayout c = column();
-                  c.addView(text("🏆 Rekor Skor", 28, ORANGE_DARK, true), lp(WRAP, 0));
-                  c.addView(text("Skor tertinggi main sendiri di HP ini", 14, DARK, false), lp(WRAP, 6));
+                  c.addView(text("\uD83C\uDFC6 Rekor & Lencana", 28, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(text("Skor tertinggi main sendiri dan lencana di HP ini", 14, DARK, false), lp(WRAP, 6));
+                  addBadgeBoard(c);
 
                   for (int k = 0; k < 6; k++) {
                       ArrayList<String> lines = new ArrayList<>();
@@ -1773,7 +1965,8 @@ jobs:
                   LinearLayout c = column();
                   c.addView(text("\uD83D\uDD22 Matematika", 26, ORANGE_DARK, true), lp(WRAP, 0));
                   c.addView(pill(KELAS_NAMES[kelas], KELAS_COLOR[kelas]), lpw(10));
-                  c.addView(text(KELAS_DESC[kelas] + " \u2022 " + KELAS_LIVES[kelas] + " nyawa",
+                  c.addView(text(KELAS_DESC[kelas] + " \u2022 "
+                          + (relaxed ? "tanpa nyawa" : KELAS_LIVES[kelas] + " nyawa"),
                           13, DARK, false), lp(WRAP, 10));
 
                   c.addView(text("Pilih permainan", 16, DARK, true), lp(WRAP, 16));
@@ -2707,6 +2900,7 @@ jobs:
                   handler.removeCallbacksAndMessages(null);
                   screen = 9;
                   int stars = matchWrong == 0 ? 3 : matchWrong <= 2 ? 2 : 1;
+                  freshBadges = awardBadges(2, stars, matchWrong == 0, false);
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
                   c.addView(text(av(0), 48, Color.WHITE, false), lp(WRAP, 0));
@@ -2726,7 +2920,9 @@ jobs:
                   card.addView(starRow, lp(WRAP, 0));
                   card.addView(text(matchWrong == 0 ? "Semua benar, tanpa salah!"
                           : "Salah memilih " + matchWrong + " kali", 16, DARK, false), lp(WRAP, 10));
+                  card.addView(text("\uD83C\uDF1F Total bintang: " + totalStars(), 14, DARK, false), lp(WRAP, 8));
                   c.addView(card, lp(WRAP, 18));
+                  addFreshBadges(c);
 
                   Button again = button("Main Lagi", GREEN, 22);
                   again.setElevation(dp(4));
@@ -3101,7 +3297,7 @@ jobs:
                   qi = 0;
                   score = 0;
                   correct = 0;
-                  lives = (mode == 7) ? 99 : KELAS_LIVES[kelas];
+                  lives = noLives() ? 99 : KELAS_LIVES[kelas];
                   showGame();
                   showQuestion();
               }
@@ -3339,8 +3535,11 @@ jobs:
 
               private void updateHud() {
                   StringBuilder h = new StringBuilder();
-                  for (int i = 0; mode != 7 && i < lives; i++) {
+                  for (int i = 0; !noLives() && i < lives; i++) {
                       h.append("\u2764\uFE0F");
+                  }
+                  if (relaxed && mode != 7) {
+                      h.append("\uD83D\uDC9A Santai");
                   }
                   tvHearts.setText(h.toString());
                   tvStep.setText("Soal " + qi + " dari " + total);
@@ -3356,6 +3555,7 @@ jobs:
                   } else if (np == 1) {
                       showSoloResult();
                   } else {
+                      freshBadges = awardBadges(1, 0, false, false);
                       showRanking(true);
                   }
               }
@@ -3366,11 +3566,19 @@ jobs:
                   screen = 2;
                   String key = bestKey();
                   int best = prefs.getInt(key, 0);
-                  rekorNow = pScore[0] > best;
+                  rekorNow = countsForRecord() && pScore[0] > best;
                   if (rekorNow) {
                       prefs.edit().putInt(key, pScore[0]).apply();
                   }
+                  boolean perfect = total >= 5 && pCorrect[0] == total;
+                  freshBadges = awardBadges(0, soloStars(), perfect, rekorNow && best > 0);
                   renderSoloResult(true);
+              }
+
+              // Bintang permainan solo: 3 bintang kalau benar 90% ke atas
+              private int soloStars() {
+                  int pct = total > 0 ? pCorrect[0] * 10 / total : 0;
+                  return pct >= 9 ? 3 : pct >= 6 ? 2 : pct >= 3 ? 1 : 0;
               }
 
               private void renderSoloResult() {
@@ -3380,8 +3588,7 @@ jobs:
               private void renderSoloResult(boolean fx) {
                   screen = 2;
                   boolean rekor = rekorNow;
-                  int pct = total > 0 ? pCorrect[0] * 10 / total : 0;
-                  int stars = pct >= 9 ? 3 : pct >= 6 ? 2 : pct >= 3 ? 1 : 0;
+                  int stars = soloStars();
 
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
@@ -3405,6 +3612,10 @@ jobs:
                   card.addView(sc, lp(WRAP, 10));
                   TextView ben = text("Benar " + pCorrect[0] + " dari " + total, 16, DARK, false);
                   card.addView(ben, lp(WRAP, 6));
+                  card.addView(text("\uD83C\uDF1F Total bintang: " + totalStars(), 14, DARK, false), lp(WRAP, 6));
+                  if (!countsForRecord()) {
+                      card.addView(text("Mode santai: skor tidak masuk rekor", 12, DARK, false), lp(WRAP, 4));
+                  }
                   TextView rekorPill = null;
                   if (rekor) {
                       rekorPill = pill("Rekor baru! \uD83C\uDFC6", PURPLE);
@@ -3618,6 +3829,7 @@ jobs:
               }
 
               private void addResultButtons(LinearLayout c) {
+                  addFreshBadges(c);
                   boolean mistakes = hasMistakes();
                   if (mistakes) {
                       Button rev = button("Lihat Pembahasan", BLUE, 20);
