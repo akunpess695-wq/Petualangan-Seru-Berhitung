@@ -81,11 +81,11 @@ jobs:
               compileSdk 34
 
               defaultConfig {
-                  applicationId "com.petualangan.berhitung"
+                  applicationId "com.petualangan.belajarbersama"
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "4.8"
+                  versionName "4.9"
               }
 
               signingConfigs {
