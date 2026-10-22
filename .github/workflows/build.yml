@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "4.3"
+                  versionName "4.4"
               }
 
               signingConfigs {
@@ -599,6 +599,7 @@ jobs:
                   int answer;
                   int correctIdx;
                   int trap = -1;
+                  String key = "";
                   final int[] opts = new int[4];
               }
 
@@ -642,6 +643,7 @@ jobs:
               private final ArrayList<B> bank = new ArrayList<>();
               private String importMsg = "";
               private int total = TOTAL;
+              private final ArrayList<String> lastKeys = new ArrayList<>();
               private int subj = 0;
               private int cur;
 
@@ -1816,16 +1818,31 @@ jobs:
                       return;
                   }
                   total = TOTAL;
+                  ArrayList<String> seen = new ArrayList<>();
                   for (int i = 0; i < TOTAL; i++) {
-                      Q q = new Q();
-                      if (mode == 5) {
-                          buildThree(q, i + 1);
-                      } else {
-                          buildTwo(q, i + 1);
+                      Q q = null;
+                      // Ulangi sampai dapat soal yang belum muncul di permainan ini.
+                      // Percobaan 0-29 juga menghindari soal dari permainan sebelumnya.
+                      // Percobaan 60 ke atas menaikkan tingkat soal sedikit supaya pilihan angkanya lebih luas.
+                      for (int t = 0; t < 120; t++) {
+                          q = new Q();
+                          int lvl = (t < 60) ? i + 1 : Math.min(TOTAL, i + 2 + (t - 60) / 10);
+                          if (mode == 5) {
+                              buildThree(q, lvl);
+                          } else {
+                              buildTwo(q, lvl);
+                          }
+                          boolean dup = seen.contains(q.key) || (t < 30 && lastKeys.contains(q.key));
+                          if (!dup) {
+                              break;
+                          }
                       }
+                      seen.add(q.key);
                       fillOptions(q);
                       qs[i] = q;
                   }
+                  lastKeys.clear();
+                  lastKeys.addAll(seen);
               }
 
               private void buildTwo(Q q, int n) {
@@ -1874,6 +1891,9 @@ jobs:
                           sym = "-";
                       }
                   }
+                  int lo = Math.min(a, b);
+                  int hi = Math.max(a, b);
+                  q.key = (op == 0 || op == 2) ? (lo + sym + hi) : (a + sym + b);
                   q.full = fmt(a) + " " + sym + " " + fmt(b) + " = " + fmt(ans);
                   if (mode == 6) {
                       boolean hideA = rnd.nextBoolean();
@@ -1963,6 +1983,7 @@ jobs:
                           q.trap = z - x * y;
                       }
                   }
+                  q.key = expr;
                   q.text = expr + "\n= ?";
                   q.full = expr + " = " + fmt(ans);
                   q.answer = ans;
