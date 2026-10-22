@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "5.6"
+                  versionName "6.0.1"
               }
 
               signingConfigs {
@@ -490,6 +490,7 @@ jobs:
           import android.content.Intent;
           import android.content.SharedPreferences;
           import android.graphics.Canvas;
+          import android.graphics.DashPathEffect;
           import android.graphics.Color;
           import android.graphics.ColorFilter;
           import android.graphics.LinearGradient;
@@ -508,6 +509,8 @@ jobs:
           import android.os.Handler;
           import android.os.Looper;
           import android.text.InputFilter;
+          import android.text.TextPaint;
+          import android.text.TextUtils;
           import android.view.Gravity;
           import android.view.View;
           import android.view.ViewGroup;
@@ -530,10 +533,16 @@ jobs:
           import java.io.InputStream;
           import java.io.OutputStream;
           import java.nio.charset.StandardCharsets;
+          import java.text.SimpleDateFormat;
           import java.util.ArrayList;
           import java.util.Arrays;
           import java.util.Collections;
+          import java.util.Comparator;
+          import java.util.Date;
+          import java.util.HashMap;
+          import java.util.Iterator;
           import java.util.Locale;
+          import java.util.Map;
           import java.util.Random;
 
           public class MainActivity extends Activity {
@@ -541,6 +550,12 @@ jobs:
               private static final String APP_NAME = "Belajar Bersama";
               private static final String BANK_FILE = "bank.json";
               private static final int REQ_IMPORT = 41;
+              private static final int REQ_BACKUP_SAVE = 42;
+              private static final int REQ_BACKUP_OPEN = 43;
+              private static final String APP_VERSION = "6.0.1";
+              private static final String STATS_KEY = "laporan_v1";
+              private static final int STATS_MAX_ITEMS = 500;
+              private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
               private static final int TOTAL = 10;
               private static final int MAX_PLAYERS = 4;
               private static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -695,11 +710,13 @@ jobs:
               // Lencana (penghargaan): ikon, nama, syarat, warna
               private static final String[] BADGE_ICON = {
                       "\uD83C\uDF31", "\u2B50", "\uD83D\uDCAF", "\u26A1", "\uD83D\uDD25",
-                      "\uD83C\uDF1F", "\uD83C\uDFC6", "\uD83E\uDDE9", "\uD83D\uDC65"
+                      "\uD83C\uDF1F", "\uD83C\uDFC6", "\uD83E\uDDE9", "\uD83D\uDC65",
+                      "\uD83D\uDDFA\uFE0F", "\uD83C\uDFF0", "\uD83D\uDC8E"
               };
               private static final String[] BADGE_NAME = {
                       "Pemula", "Bintang Tiga", "Sempurna", "Kilat", "Rajin",
-                      "Kolektor Bintang", "Pemecah Rekor", "Pasangan Hebat", "Teman Main"
+                      "Kolektor Bintang", "Pemecah Rekor", "Pasangan Hebat", "Teman Main",
+                      "Penjelajah", "Penakluk Dunia", "Bintang Penuh"
               };
               private static final String[] BADGE_DESC = {
                       "Selesaikan 1 permainan",
@@ -710,9 +727,13 @@ jobs:
                       "Kumpulkan 30 bintang",
                       "Pecahkan rekor skormu sendiri",
                       "Cocokkan semua pasangan tanpa salah",
-                      "Main bersama teman"
+                      "Main bersama teman",
+                      "Selesaikan 5 level di Peta Petualangan",
+                      "Selesaikan semua level di satu dunia",
+                      "Raih 3 bintang di semua level satu dunia"
               };
-              private static final int[] BADGE_COLOR = {GREEN, GOLD, PINK, ORANGE, RED, INDIGO, PURPLE, TEAL, BLUE};
+              private static final int[] BADGE_COLOR = {GREEN, GOLD, PINK, ORANGE, RED, INDIGO, PURPLE, TEAL, BLUE,
+                      ORANGE_DARK, TEAL, INDIGO};
               // Huruf bulat yang ramah anak (Android 9 ke atas); di HP lama otomatis memakai huruf biasa
               private float ui = 1f;
               private static final Typeface ROUND_BOLD = Typeface.create("sans-serif-rounded", Typeface.BOLD);
@@ -898,6 +919,17 @@ jobs:
               private int reviewPlayer;
               private final ArrayList<B> bank = new ArrayList<>();
               private String importMsg = "";
+              // Laporan guru: hitungan benar/salah per topik dan per soal (disimpan di prefs laporan_v1)
+              private final HashMap<String, int[]> stTopic = new HashMap<>();
+              private final HashMap<String, int[]> stItem = new HashMap<>();
+              private final HashMap<String, String> stText = new HashMap<>();
+              private long stSince = 0L;
+              private int stTotal = 0;
+              private boolean stDirty = false;
+              private int rpSubj = -1;
+              private int rpKelas = -1;
+              private String pendingBackup = "";
+              private String pendingRestore = "";
               private int total = TOTAL;
               private final ArrayList<String> lastKeys = new ArrayList<>();
               private int subj = 0;
@@ -983,11 +1015,13 @@ jobs:
                       sfxTrack(i);
                   }
                   loadBank();
+                  loadStats();
                   showMenu();
               }
 
               @Override
               protected void onPause() {
+                  saveStats();
                   if (screen == 2) {
                       handler.removeCallbacksAndMessages(null);
                   }
@@ -1039,6 +1073,10 @@ jobs:
                       } else {
                           showRanking();
                       }
+                  } else if ((screen == 2 || screen == 9) && advLevel >= 0) {
+                      showPeta();
+                  } else if (screen == 11) {
+                      showGuru();
                   } else {
                       saveNames();
                       showMenu();
@@ -1508,18 +1546,21 @@ jobs:
               }
 
               private String modeLabel() {
+                  if (advLevel >= 0) {
+                      return "Petualangan \u2022 " + timeLabel();
+                  }
                   String base = mode == 7 ? SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
                   return (relaxed && mode != 7) ? base + " \u2022 Santai" : base;
               }
 
               // Permainan tanpa nyawa: soal guru selalu begitu, soal hitung kalau mode santai menyala
               private boolean noLives() {
-                  return mode == 7 || relaxed;
+                  return mode == 7 || relaxed || advLevel >= 0;
               }
 
               // Skor hanya masuk rekor kalau tidak dalam mode santai (soal guru selalu dihitung)
               private boolean countsForRecord() {
-                  return mode == 7 || !relaxed;
+                  return advLevel < 0 && (mode == 7 || !relaxed);
               }
 
               private String optText(Q q, int i) {
@@ -1564,6 +1605,7 @@ jobs:
               private void showMenu() {
                   handler.removeCallbacksAndMessages(null);
                   screen = 0;
+                  advLevel = -1;
                   nameFields = null;
                   loadPrefs();
 
@@ -1644,6 +1686,11 @@ jobs:
                   bn.setOnClickListener(v -> dialogNyawa());
                   c.addView(bn, lp(dp(46), 10));
 
+                  // Peta Petualangan
+                  LinearLayout mp = subjectTile("\uD83D\uDDFA\uFE0F", "Peta Petualangan", advSummary(), GREEN);
+                  mp.setOnClickListener(v -> showPeta());
+                  c.addView(mp, lp(dp(96), 18));
+
                   // Pilih pelajaran
                   c.addView(text("Pilih pelajaran", 16, DARK, true), lp(WRAP, 20));
                   for (int s = 0; s < 3; s++) {
@@ -1697,7 +1744,7 @@ jobs:
                       s += "tanpa waktu " + free;
                   }
                   if (timedBest > 0) {
-                      s += (free > 0 ? " • " : "") + "berwaktu " + timedBest;
+                      s += (free > 0 ? " \u2022 " : "") + "berwaktu " + timedBest;
                   }
                   return s;
               }
@@ -2127,7 +2174,7 @@ jobs:
                   TextView tot = text("\uD83C\uDF1F Total bintang: " + totalStars(), 14, DARK, false);
                   tot.setGravity(Gravity.START);
                   bd.addView(tot, lp(WRAP, 6));
-                  for (int r = 0; r < 3; r++) {
+                  for (int r = 0; r < 4; r++) {
                       LinearLayout row = new LinearLayout(this);
                       row.setOrientation(LinearLayout.HORIZONTAL);
                       for (int q = 0; q < 3; q++) {
@@ -2262,6 +2309,7 @@ jobs:
               private void showMath() {
                   handler.removeCallbacksAndMessages(null);
                   screen = 6;
+                  advLevel = -1;
                   nameFields = null;
 
                   LinearLayout c = column();
@@ -2405,6 +2453,22 @@ jobs:
               @Override
               protected void onActivityResult(int req, int res, Intent data) {
                   super.onActivityResult(req, res, data);
+                  if (req == REQ_BACKUP_SAVE) {
+                      String payload = pendingBackup;
+                      pendingBackup = "";
+                      if (res != RESULT_OK || data == null || data.getData() == null || payload.isEmpty()) {
+                          return;
+                      }
+                      writeBackup(data.getData(), payload);
+                      return;
+                  }
+                  if (req == REQ_BACKUP_OPEN) {
+                      if (res != RESULT_OK || data == null || data.getData() == null) {
+                          return;
+                      }
+                      readBackup(data.getData());
+                      return;
+                  }
                   if (req != REQ_IMPORT || res != RESULT_OK || data == null || data.getData() == null) {
                       return;
                   }
@@ -2661,6 +2725,10 @@ jobs:
               }
 
               private void buildBank() {
+                  if (advLevel >= 0) {
+                      buildBuiltin();
+                      return;
+                  }
                   ArrayList<B> pool = new ArrayList<>();
                   for (B b : bank) {
                       if (b.subj == subj && b.kelas == kelas + 1) {
@@ -2739,6 +2807,34 @@ jobs:
                   ch.addView(how, lp(WRAP, 8));
                   c.addView(ch, lp(WRAP, 14));
 
+                  LinearLayout clap = card();
+                  clap.addView(heading("Laporan guru"), lp(WRAP, 0));
+                  TextView lapInfo = text(stTotal > 0
+                          ? "Sudah ada " + stTotal + " jawaban murid tercatat. Lihat topik yang perlu diulang dan soal yang paling sering salah."
+                          : "Belum ada data. Laporan terisi otomatis setelah murid bermain.",
+                          13, DARK, false);
+                  lapInfo.setGravity(Gravity.START);
+                  clap.addView(lapInfo, lp(WRAP, 8));
+                  Button lap = button("Buka laporan", PURPLE, 18);
+                  clap.addView(lap, lp(dp(50), 10));
+                  lap.setOnClickListener(v -> showLaporan());
+                  c.addView(clap, lp(WRAP, 14));
+
+                  LinearLayout ccad = card();
+                  ccad.addView(heading("Cadangan data"), lp(WRAP, 0));
+                  TextView cadInfo = text("Simpan soal guru, rekor, bintang, lencana, pengaturan, dan laporan ke satu file. "
+                          + "Berguna kalau ganti HP atau data aplikasi terhapus. PIN guru tidak ikut disimpan.",
+                          13, DARK, false);
+                  cadInfo.setGravity(Gravity.START);
+                  ccad.addView(cadInfo, lp(WRAP, 8));
+                  Button cadSave = button("Simpan cadangan ke file", BLUE, 16);
+                  ccad.addView(cadSave, lp(dp(48), 10));
+                  cadSave.setOnClickListener(v -> startBackupSave());
+                  Button cadOpen = button("Pulihkan dari file cadangan", ORANGE, 16);
+                  ccad.addView(cadOpen, lp(dp(48), 8));
+                  cadOpen.setOnClickListener(v -> startBackupOpen());
+                  c.addView(ccad, lp(WRAP, 14));
+
                   LinearLayout cpin = card();
                   cpin.addView(heading("PIN guru"), lp(WRAP, 0));
                   TextView pinInfo = text(hasPin()
@@ -2788,6 +2884,782 @@ jobs:
                   back.setOnClickListener(v -> showMenu());
 
                   wrap(c);
+              }
+
+              // =====================================================================
+              // Laporan guru dan cadangan data (versi 6.0.1)
+              // =====================================================================
+
+              private String cutText(String s, int n) {
+                  if (s == null) {
+                      return "";
+                  }
+                  String t = s.replace('\n', ' ').trim();
+                  return t.length() <= n ? t : t.substring(0, n - 1) + "\u2026";
+              }
+
+              private String fmtDate(long ms) {
+                  return new SimpleDateFormat("d MMM yyyy", new Locale("id", "ID")).format(new Date(ms));
+              }
+
+              private void loadStats() {
+                  stTopic.clear();
+                  stItem.clear();
+                  stText.clear();
+                  stSince = 0L;
+                  stTotal = 0;
+                  stDirty = false;
+                  String raw = prefs.getString(STATS_KEY, "");
+                  if (raw.isEmpty()) {
+                      return;
+                  }
+                  try {
+                      JSONObject o = new JSONObject(raw);
+                      stSince = o.optLong("since", 0L);
+                      stTotal = o.optInt("n", 0);
+                      JSONObject t = o.optJSONObject("t");
+                      if (t != null) {
+                          Iterator<String> it = t.keys();
+                          while (it.hasNext()) {
+                              String k = it.next();
+                              JSONArray a = t.getJSONArray(k);
+                              stTopic.put(k, new int[]{a.getInt(0), a.getInt(1)});
+                          }
+                      }
+                      JSONObject m = o.optJSONObject("i");
+                      if (m != null) {
+                          Iterator<String> it2 = m.keys();
+                          while (it2.hasNext()) {
+                              String k = it2.next();
+                              JSONArray a = m.getJSONArray(k);
+                              stItem.put(k, new int[]{a.getInt(0), a.getInt(1)});
+                              stText.put(k, a.optString(2, ""));
+                          }
+                      }
+                  } catch (Exception e) {
+                      // Data laporan rusak: mulai dari kosong
+                      stTopic.clear();
+                      stItem.clear();
+                      stText.clear();
+                      stSince = 0L;
+                      stTotal = 0;
+                  }
+              }
+
+              private void pruneStats() {
+                  while (stItem.size() > STATS_MAX_ITEMS) {
+                      String worst = null;
+                      int worstVal = Integer.MAX_VALUE;
+                      for (Map.Entry<String, int[]> e : stItem.entrySet()) {
+                          int[] v = e.getValue();
+                          int val = v[1] * 100 + v[0] + v[1];
+                          if (val < worstVal) {
+                              worstVal = val;
+                              worst = e.getKey();
+                          }
+                      }
+                      if (worst == null) {
+                          return;
+                      }
+                      stItem.remove(worst);
+                      stText.remove(worst);
+                  }
+              }
+
+              private void saveStats() {
+                  if (!stDirty) {
+                      return;
+                  }
+                  try {
+                      pruneStats();
+                      JSONObject o = new JSONObject();
+                      o.put("v", 1);
+                      o.put("since", stSince);
+                      o.put("n", stTotal);
+                      JSONObject t = new JSONObject();
+                      for (Map.Entry<String, int[]> e : stTopic.entrySet()) {
+                          t.put(e.getKey(), new JSONArray().put(e.getValue()[0]).put(e.getValue()[1]));
+                      }
+                      o.put("t", t);
+                      JSONObject m = new JSONObject();
+                      for (Map.Entry<String, int[]> e : stItem.entrySet()) {
+                          String tx = stText.get(e.getKey());
+                          m.put(e.getKey(), new JSONArray().put(e.getValue()[0]).put(e.getValue()[1])
+                                  .put(tx == null ? "" : tx));
+                      }
+                      o.put("i", m);
+                      prefs.edit().putString(STATS_KEY, o.toString()).apply();
+                      stDirty = false;
+                  } catch (Exception e) {
+                      // Gagal menyimpan laporan: abaikan, permainan tidak terganggu
+                  }
+              }
+
+              private void clearStats() {
+                  stTopic.clear();
+                  stItem.clear();
+                  stText.clear();
+                  stSince = 0L;
+                  stTotal = 0;
+                  stDirty = false;
+                  prefs.edit().remove(STATS_KEY).apply();
+              }
+
+              private void bumpStat(HashMap<String, int[]> m, String k, boolean ok) {
+                  int[] v = m.get(k);
+                  if (v == null) {
+                      v = new int[2];
+                      m.put(k, v);
+                  }
+                  v[ok ? 0 : 1]++;
+              }
+
+              private void touchStats() {
+                  if (stSince == 0L) {
+                      stSince = System.currentTimeMillis();
+                  }
+                  stTotal++;
+                  stDirty = true;
+              }
+
+              // Nama operasi bila kunci soal hanya punya satu tanda operasi (+ - x bagi), selain itu kosong
+              private String opName(String key) {
+                  int cnt = 0;
+                  String name = "";
+                  for (int i = 1; i < key.length(); i++) {
+                      char ch = key.charAt(i);
+                      if (ch == '+') {
+                          cnt++;
+                          name = OP_NAME[0];
+                      } else if (ch == '-') {
+                          cnt++;
+                          name = OP_NAME[1];
+                      } else if (ch == '\u00D7') {
+                          cnt++;
+                          name = OP_NAME[2];
+                      } else if (ch == '\u00F7') {
+                          cnt++;
+                          name = OP_NAME[3];
+                      }
+                  }
+                  return cnt == 1 ? name : "";
+              }
+
+              private String topicOf(Q q) {
+                  if (mode == 8) {
+                      return "Tabel " + tableN;
+                  }
+                  if (mode == 7) {
+                      return "Kuis soal";
+                  }
+                  if (mode == 5) {
+                      return "3 Bilangan";
+                  }
+                  if (mode == 6) {
+                      return "Isi Titik";
+                  }
+                  String op = opName(q.key);
+                  if (!op.isEmpty()) {
+                      return op;
+                  }
+                  return OP_NAME[Math.max(0, Math.min(4, mode))];
+              }
+
+              // Kunci soal untuk daftar "paling sering salah". Soal hitung hanya dicatat bila berupa fakta dasar
+              // (tambah-kurang sampai 20, kali-bagi tabel sampai 12), supaya daftar tidak penuh angka acak.
+              private String itemKeyOf(Q q) {
+                  if (mode == 8) {
+                      // Samakan dengan kunci mode hitung: "7x8" jadi 7\u00D78, "56 bagi 7" jadi 56\u00F77
+                      try {
+                          String tk = q.key;
+                          int x = tk.indexOf('x');
+                          int pos = x > 0 ? x : tk.indexOf('d');
+                          int n = Integer.parseInt(tk.substring(1, pos));
+                          int m2 = Integer.parseInt(tk.substring(pos + 1));
+                          if (x > 0) {
+                              return Math.min(n, m2) + "\u00D7" + Math.max(n, m2);
+                          }
+                          return (n * m2) + "\u00F7" + n;
+                      } catch (Exception e) {
+                          return q.key;
+                      }
+                  }
+                  if (mode == 7) {
+                      return "q:" + cutText(q.text, 100);
+                  }
+                  if (mode == 5 || q.key == null || q.key.isEmpty()) {
+                      return "";
+                  }
+                  String k = q.key;
+                  int pos = -1;
+                  char op = 0;
+                  for (int i = 1; i < k.length(); i++) {
+                      char ch = k.charAt(i);
+                      if (ch == '+' || ch == '-' || ch == '\u00D7' || ch == '\u00F7') {
+                          if (pos >= 0) {
+                              return "";
+                          }
+                          pos = i;
+                          op = ch;
+                      }
+                  }
+                  if (pos < 0) {
+                      return "";
+                  }
+                  int a;
+                  int b;
+                  try {
+                      a = Integer.parseInt(k.substring(0, pos));
+                      b = Integer.parseInt(k.substring(pos + 1));
+                  } catch (Exception e) {
+                      return "";
+                  }
+                  boolean basic;
+                  if (op == '+' || op == '-') {
+                      basic = a <= 20 && b <= 20;
+                  } else if (op == '\u00D7') {
+                      basic = a <= 12 && b <= 12;
+                  } else {
+                      basic = b >= 1 && b <= 12 && a % b == 0 && a / b <= 12;
+                  }
+                  return basic ? k : "";
+              }
+
+              private String itemTextOf(Q q) {
+                  if (mode == 7) {
+                      return cutText(q.text, 90) + " \u2192 " + cutText(optText(q, q.correctIdx), 40);
+                  }
+                  return cutText(q.full != null ? q.full : q.text, 80);
+              }
+
+              private void recordAnswer(Q q, boolean ok) {
+                  try {
+                      int sj = (mode == 7) ? subj : 0;
+                      bumpStat(stTopic, sj + "|" + kelas + "|" + topicOf(q), ok);
+                      String ik = itemKeyOf(q);
+                      if (!ik.isEmpty()) {
+                          String gk = sj + "|" + kelas + "|" + ik;
+                          bumpStat(stItem, gk, ok);
+                          if (!stText.containsKey(gk)) {
+                              stText.put(gk, itemTextOf(q));
+                          }
+                      }
+                      touchStats();
+                  } catch (Exception e) {
+                      // Pencatatan laporan tidak boleh mengganggu permainan
+                  }
+              }
+
+              private void recordMatch(int pi, boolean ok) {
+                  try {
+                      String left = matchPairs[pi][0];
+                      String right = matchPairs[pi][1];
+                      bumpStat(stTopic, matchSubj + "|" + kelas + "|Cocokkan Pasangan", ok);
+                      String gk = matchSubj + "|" + kelas + "|p:" + cutText(left, 60);
+                      bumpStat(stItem, gk, ok);
+                      if (!stText.containsKey(gk)) {
+                          stText.put(gk, cutText(left, 50) + " \u2194 " + cutText(right, 50));
+                      }
+                      touchStats();
+                  } catch (Exception e) {
+                      // abaikan
+                  }
+              }
+
+              // Kunci laporan berbentuk "mapel|kelas|isi". Hasil: {mapel, kelas, awal isi} atau null bila rusak.
+              private int[] headOf(String k) {
+                  int i1 = k.indexOf('|');
+                  if (i1 < 1) {
+                      return null;
+                  }
+                  int i2 = k.indexOf('|', i1 + 1);
+                  if (i2 < 0) {
+                      return null;
+                  }
+                  try {
+                      int sj = Integer.parseInt(k.substring(0, i1));
+                      int kl = Integer.parseInt(k.substring(i1 + 1, i2));
+                      if (sj < 0 || sj > 2 || kl < 0 || kl > 5) {
+                          return null;
+                      }
+                      return new int[]{sj, kl, i2 + 1};
+                  } catch (Exception e) {
+                      return null;
+                  }
+              }
+
+              private boolean passFilter(int[] h) {
+                  return h != null && (rpSubj < 0 || h[0] == rpSubj) && (rpKelas < 0 || h[1] == rpKelas);
+              }
+
+              private static class Rank {
+                  String name = "";
+                  String sub = "";
+                  int b;
+                  int s;
+              }
+
+              private ArrayList<Rank> rankTopics() {
+                  ArrayList<Rank> out = new ArrayList<>();
+                  for (Map.Entry<String, int[]> e : stTopic.entrySet()) {
+                      int[] h = headOf(e.getKey());
+                      int[] v = e.getValue();
+                      if (!passFilter(h) || v[0] + v[1] < 5) {
+                          continue;
+                      }
+                      Rank r = new Rank();
+                      r.name = SUBJ_NAMES[h[0]] + " \u2022 Kelas " + (h[1] + 1) + " \u2022 " + e.getKey().substring(h[2]);
+                      r.b = v[0];
+                      r.s = v[1];
+                      out.add(r);
+                  }
+                  Collections.sort(out, new Comparator<Rank>() {
+                      @Override
+                      public int compare(Rank x, Rank y) {
+                          double px = (double) x.b / (x.b + x.s);
+                          double py = (double) y.b / (y.b + y.s);
+                          if (px != py) {
+                              return px < py ? -1 : 1;
+                          }
+                          return (y.b + y.s) - (x.b + x.s);
+                      }
+                  });
+                  return out;
+              }
+
+              private ArrayList<Rank> rankItems() {
+                  ArrayList<Rank> out = new ArrayList<>();
+                  for (Map.Entry<String, int[]> e : stItem.entrySet()) {
+                      int[] h = headOf(e.getKey());
+                      int[] v = e.getValue();
+                      if (!passFilter(h) || v[1] < 2) {
+                          continue;
+                      }
+                      Rank r = new Rank();
+                      String tx = stText.get(e.getKey());
+                      r.name = (tx == null || tx.isEmpty()) ? e.getKey().substring(h[2]) : tx;
+                      r.sub = SUBJ_NAMES[h[0]] + " \u2022 Kelas " + (h[1] + 1);
+                      r.b = v[0];
+                      r.s = v[1];
+                      out.add(r);
+                  }
+                  Collections.sort(out, new Comparator<Rank>() {
+                      @Override
+                      public int compare(Rank x, Rank y) {
+                          if (x.s != y.s) {
+                              return y.s - x.s;
+                          }
+                          double px = (double) x.b / (x.b + x.s);
+                          double py = (double) y.b / (y.b + y.s);
+                          return px < py ? -1 : (px > py ? 1 : 0);
+                      }
+                  });
+                  return out;
+              }
+
+              private int pctColor(int pct) {
+                  return pct < 60 ? RED : (pct < 80 ? ORANGE : GREEN);
+              }
+
+              private LinearLayout barView(int pct, int color) {
+                  LinearLayout r = new LinearLayout(this);
+                  r.setOrientation(LinearLayout.HORIZONTAL);
+                  r.setBackground(box(GRAY_D, 5));
+                  View f = new View(this);
+                  f.setBackground(box(color, 5));
+                  r.addView(f, new LinearLayout.LayoutParams(0, MATCH, Math.max(1, pct)));
+                  r.addView(new View(this), new LinearLayout.LayoutParams(0, MATCH, Math.max(0, 100 - pct)));
+                  return r;
+              }
+
+              private void addRankRow(LinearLayout parent, String name, String sub, int pct) {
+                  TextView t = text(name, 14, DARK, true);
+                  t.setGravity(Gravity.START);
+                  parent.addView(t, lp(WRAP, 12));
+                  TextView u = text(sub, 12, DARK, false);
+                  u.setGravity(Gravity.START);
+                  parent.addView(u, lp(WRAP, 2));
+                  parent.addView(barView(pct, pctColor(pct)), lp(dp(8), 5));
+              }
+
+              private String laporanText() {
+                  StringBuilder sb = new StringBuilder();
+                  sb.append("Laporan ").append(APP_NAME);
+                  if (stSince > 0) {
+                      sb.append(" (sejak ").append(fmtDate(stSince)).append(")");
+                  }
+                  sb.append("\nJawaban tercatat: ").append(stTotal);
+                  if (rpSubj >= 0) {
+                      sb.append("\nMapel: ").append(SUBJ_NAMES[rpSubj]);
+                  }
+                  if (rpKelas >= 0) {
+                      sb.append("\nKelas: ").append(rpKelas + 1);
+                  }
+                  ArrayList<Rank> tp = rankTopics();
+                  sb.append("\n\nTopik yang perlu diulang:");
+                  if (tp.isEmpty()) {
+                      sb.append("\n(belum cukup data)");
+                  }
+                  for (int i = 0; i < tp.size() && i < 8; i++) {
+                      Rank r = tp.get(i);
+                      sb.append("\n").append(i + 1).append(". ").append(r.name).append(": ")
+                              .append(100 * r.b / (r.b + r.s)).append("% benar (").append(r.b)
+                              .append(" dari ").append(r.b + r.s).append(")");
+                  }
+                  ArrayList<Rank> its = rankItems();
+                  sb.append("\n\nSoal paling sering salah:");
+                  if (its.isEmpty()) {
+                      sb.append("\n(belum ada)");
+                  }
+                  for (int i = 0; i < its.size() && i < 10; i++) {
+                      Rank r = its.get(i);
+                      sb.append("\n").append(i + 1).append(". ").append(r.name).append(" \u2014 salah ")
+                              .append(r.s).append(" dari ").append(r.b + r.s).append(" (").append(r.sub).append(")");
+                  }
+                  return sb.toString();
+              }
+
+              private void showLaporan() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 11;
+                  nameFields = null;
+
+                  LinearLayout c = column();
+                  c.addView(text("\uD83D\uDCCA Laporan Guru", 26, ORANGE_DARK, true), lp(WRAP, 0));
+                  String since = stSince > 0 ? "Data sejak " + fmtDate(stSince) + " \u2022 " : "";
+                  c.addView(text(since + stTotal + " jawaban tercatat", 13, DARK, false), lp(WRAP, 6));
+
+                  LinearLayout cf = card();
+                  cf.addView(heading("Tampilkan"), lp(WRAP, 0));
+                  cf.addView(chips(new String[]{"Semua", "Mat", "Indo", "Ing"}, rpSubj + 1,
+                          new int[]{DARK, ORANGE, TEAL, BLUE}, idx1 -> {
+                              rpSubj = idx1 - 1;
+                              showLaporan();
+                          }), lp(dp(44), 10));
+                  cf.addView(chips(new String[]{"Semua", "1", "2", "3", "4", "5", "6"}, rpKelas + 1,
+                          new int[]{DARK, GREEN, TEAL, BLUE, PURPLE, ORANGE, RED}, idx2 -> {
+                              rpKelas = idx2 - 1;
+                              showLaporan();
+                          }), lp(dp(44), 8));
+                  c.addView(cf, lp(WRAP, 14));
+
+                  int tb = 0;
+                  int ts = 0;
+                  for (Map.Entry<String, int[]> e : stTopic.entrySet()) {
+                      if (passFilter(headOf(e.getKey()))) {
+                          tb += e.getValue()[0];
+                          ts += e.getValue()[1];
+                      }
+                  }
+                  LinearLayout cr = card();
+                  cr.addView(heading("Ringkasan"), lp(WRAP, 0));
+                  if (tb + ts == 0) {
+                      TextView none = text("Belum ada data untuk pilihan ini. Laporan terisi otomatis setelah murid bermain.",
+                              13, DARK, false);
+                      none.setGravity(Gravity.START);
+                      cr.addView(none, lp(WRAP, 8));
+                  } else {
+                      int pct = 100 * tb / (tb + ts);
+                      cr.addView(text(pct + "% jawaban benar", 22, pctColor(pct), true), lp(WRAP, 8));
+                      cr.addView(text(tb + " benar \u2022 " + ts + " salah dari " + (tb + ts) + " jawaban",
+                              13, DARK, false), lp(WRAP, 2));
+                      cr.addView(barView(pct, pctColor(pct)), lp(dp(10), 8));
+                  }
+                  c.addView(cr, lp(WRAP, 14));
+
+                  LinearLayout ct = card();
+                  ct.addView(heading("Topik yang perlu diulang"), lp(WRAP, 0));
+                  ArrayList<Rank> tp = rankTopics();
+                  if (tp.isEmpty()) {
+                      TextView none = text("Belum cukup data. Topik muncul setelah minimal 5 jawaban.", 13, DARK, false);
+                      none.setGravity(Gravity.START);
+                      ct.addView(none, lp(WRAP, 8));
+                  }
+                  for (int i = 0; i < tp.size() && i < 8; i++) {
+                      Rank r = tp.get(i);
+                      int pct = 100 * r.b / (r.b + r.s);
+                      addRankRow(ct, r.name, pct + "% benar (" + r.b + " dari " + (r.b + r.s) + ")", pct);
+                  }
+                  c.addView(ct, lp(WRAP, 14));
+
+                  LinearLayout ci = card();
+                  ci.addView(heading("Soal yang paling sering salah"), lp(WRAP, 0));
+                  ArrayList<Rank> its = rankItems();
+                  if (its.isEmpty()) {
+                      TextView none = text("Belum ada soal yang salah 2 kali atau lebih.", 13, DARK, false);
+                      none.setGravity(Gravity.START);
+                      ci.addView(none, lp(WRAP, 8));
+                  }
+                  for (int i = 0; i < its.size() && i < 10; i++) {
+                      Rank r = its.get(i);
+                      int pct = 100 * r.b / (r.b + r.s);
+                      addRankRow(ci, r.name, "Salah " + r.s + " dari " + (r.b + r.s) + " \u2022 " + r.sub, pct);
+                  }
+                  c.addView(ci, lp(WRAP, 14));
+
+                  Button share = button("Bagikan rekap", BLUE, 16);
+                  c.addView(share, lp(dp(48), 16));
+                  share.setOnClickListener(v -> {
+                      try {
+                          Intent it = new Intent(Intent.ACTION_SEND);
+                          it.setType("text/plain");
+                          it.putExtra(Intent.EXTRA_SUBJECT, "Laporan " + APP_NAME);
+                          it.putExtra(Intent.EXTRA_TEXT, laporanText());
+                          startActivity(Intent.createChooser(it, "Bagikan rekap"));
+                      } catch (Exception e) {
+                          Toast.makeText(this, "Tidak ada aplikasi untuk membagikan.", Toast.LENGTH_LONG).show();
+                      }
+                  });
+
+                  Button del = button("Hapus data laporan", RED, 14);
+                  c.addView(del, lp(dp(46), 12));
+                  del.setOnClickListener(v -> new AlertDialog.Builder(this)
+                          .setTitle("Hapus data laporan?")
+                          .setMessage("Semua hitungan benar dan salah akan dihapus. Soal guru dan rekor tidak ikut terhapus.")
+                          .setPositiveButton("Hapus", (dl, w) -> {
+                              clearStats();
+                              showLaporan();
+                          })
+                          .setNegativeButton("Batal", null)
+                          .show());
+
+                  Button back = button("Kembali", GRAY, 14);
+                  back.setTextColor(DARK);
+                  c.addView(back, lp(dp(46), 12));
+                  back.setOnClickListener(v -> showGuru());
+
+                  wrap(c);
+              }
+
+              // ---------- Cadangan data ----------
+
+              private boolean protectedKey(String k) {
+                  return k.startsWith("pin_") || k.equals("rec_hash");
+              }
+
+              private JSONArray bankJson() throws Exception {
+                  JSONArray arr = new JSONArray();
+                  for (B b : bank) {
+                      JSONObject o = new JSONObject();
+                      o.put("s", b.subj);
+                      o.put("k", b.kelas);
+                      o.put("q", b.text);
+                      JSONArray op = new JSONArray();
+                      for (int j = 0; j < 4; j++) {
+                          op.put(b.opt[j]);
+                      }
+                      o.put("o", op);
+                      o.put("a", b.key);
+                      o.put("e", b.expl);
+                      arr.put(o);
+                  }
+                  return arr;
+              }
+
+              // Isi cadangan: semua pengaturan dan kemajuan (kecuali PIN guru) dan soal guru
+              private String buildBackup() {
+                  try {
+                      JSONObject o = new JSONObject();
+                      o.put("app", "BelajarBersama");
+                      o.put("format", 1);
+                      o.put("versi", APP_VERSION);
+                      o.put("dibuat", System.currentTimeMillis());
+                      JSONObject p = new JSONObject();
+                      for (Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+                          String k = e.getKey();
+                          Object v = e.getValue();
+                          if (protectedKey(k) || v == null) {
+                              continue;
+                          }
+                          JSONObject item = new JSONObject();
+                          if (v instanceof Boolean) {
+                              item.put("t", "b");
+                              item.put("v", ((Boolean) v).booleanValue());
+                          } else if (v instanceof Integer) {
+                              item.put("t", "i");
+                              item.put("v", ((Integer) v).intValue());
+                          } else if (v instanceof Long) {
+                              item.put("t", "l");
+                              item.put("v", ((Long) v).longValue());
+                          } else if (v instanceof Float) {
+                              item.put("t", "f");
+                              item.put("v", ((Float) v).doubleValue());
+                          } else if (v instanceof String) {
+                              item.put("t", "s");
+                              item.put("v", (String) v);
+                          } else {
+                              continue;
+                          }
+                          p.put(k, item);
+                      }
+                      o.put("prefs", p);
+                      o.put("bank", bankJson());
+                      return o.toString();
+                  } catch (Exception e) {
+                      return "";
+                  }
+              }
+
+              private void startBackupSave() {
+                  saveStats();
+                  pendingBackup = buildBackup();
+                  if (pendingBackup.isEmpty()) {
+                      importMsg = "Gagal menyiapkan cadangan.";
+                      showGuru();
+                      return;
+                  }
+                  Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                  it.addCategory(Intent.CATEGORY_OPENABLE);
+                  it.setType("application/json");
+                  it.putExtra(Intent.EXTRA_TITLE, "cadangan_belajar_bersama_"
+                          + new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date()) + ".json");
+                  try {
+                      startActivityForResult(it, REQ_BACKUP_SAVE);
+                  } catch (Exception e) {
+                      pendingBackup = "";
+                      importMsg = "Tidak bisa membuka pemilih berkas di HP ini.";
+                      showGuru();
+                  }
+              }
+
+              private void writeBackup(Uri uri, String payload) {
+                  try {
+                      OutputStream out = getContentResolver().openOutputStream(uri, "wt");
+                      if (out == null) {
+                          throw new IOException("Tidak bisa menulis berkas");
+                      }
+                      try {
+                          out.write(payload.getBytes(StandardCharsets.UTF_8));
+                      } finally {
+                          out.close();
+                      }
+                      importMsg = "Berhasil: cadangan disimpan (" + bank.size() + " soal guru).";
+                  } catch (Exception e) {
+                      importMsg = "Gagal menyimpan cadangan. Coba pilih lokasi lain.";
+                  }
+                  showGuru();
+              }
+
+              private void startBackupOpen() {
+                  Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                  it.addCategory(Intent.CATEGORY_OPENABLE);
+                  it.setType("*/*");
+                  try {
+                      startActivityForResult(it, REQ_BACKUP_OPEN);
+                  } catch (Exception e) {
+                      importMsg = "Tidak bisa membuka pemilih berkas di HP ini.";
+                      showGuru();
+                  }
+              }
+
+              private void readBackup(Uri uri) {
+                  String s;
+                  try {
+                      s = readAll(getContentResolver().openInputStream(uri));
+                  } catch (Exception e) {
+                      importMsg = "Gagal membaca berkas cadangan.";
+                      showGuru();
+                      return;
+                  }
+                  try {
+                      JSONObject o = new JSONObject(s);
+                      if (!"BelajarBersama".equals(o.optString("app")) || o.optInt("format", 0) != 1
+                              || o.optJSONObject("prefs") == null) {
+                          throw new Exception("bukan cadangan");
+                      }
+                      pendingRestore = s;
+                      JSONArray bk = o.optJSONArray("bank");
+                      int nb = bk == null ? 0 : bk.length();
+                      long made = o.optLong("dibuat", 0L);
+                      new AlertDialog.Builder(this)
+                              .setTitle("Pulihkan cadangan?")
+                              .setMessage("Cadangan tanggal " + (made > 0 ? fmtDate(made) : "?") + " (versi "
+                                      + o.optString("versi", "?") + ") berisi " + nb + " soal guru.\n\n"
+                                      + "Rekor, bintang, lencana, pengaturan, laporan, dan soal guru di HP ini "
+                                      + "akan DIGANTI. PIN guru tidak berubah.")
+                              .setPositiveButton("Pulihkan", (dl, w) -> applyRestore())
+                              .setNegativeButton("Batal", (dl, w) -> pendingRestore = "")
+                              .show();
+                  } catch (Exception e) {
+                      pendingRestore = "";
+                      importMsg = "Berkas ini bukan cadangan Belajar Bersama.";
+                      showGuru();
+                  }
+              }
+
+              private void applyRestore() {
+                  String s = pendingRestore;
+                  pendingRestore = "";
+                  try {
+                      JSONObject o = new JSONObject(s);
+                      if (!"BelajarBersama".equals(o.optString("app")) || o.optInt("format", 0) != 1) {
+                          throw new Exception("bukan cadangan");
+                      }
+                      JSONObject p = o.getJSONObject("prefs");
+                      ArrayList<B> nb = new ArrayList<>();
+                      JSONArray bk = o.optJSONArray("bank");
+                      if (bk != null) {
+                          for (int i = 0; i < bk.length(); i++) {
+                              try {
+                                  JSONObject q = bk.getJSONObject(i);
+                                  B b = new B();
+                                  b.subj = q.getInt("s");
+                                  b.kelas = q.getInt("k");
+                                  b.text = q.getString("q");
+                                  JSONArray op = q.getJSONArray("o");
+                                  for (int j = 0; j < 4; j++) {
+                                      b.opt[j] = op.getString(j);
+                                  }
+                                  b.key = q.getInt("a");
+                                  b.expl = q.optString("e", "");
+                                  if (b.subj < 0 || b.subj > 2 || b.kelas < 1 || b.kelas > 6
+                                          || b.key < 0 || b.key > 3) {
+                                      continue;
+                                  }
+                                  nb.add(b);
+                              } catch (Exception e) {
+                                  // soal rusak dilewati
+                              }
+                          }
+                      }
+                      // Semua bacaan dan pemeriksaan dilakukan sebelum commit, jadi kalau gagal data lama utuh
+                      SharedPreferences.Editor ed = prefs.edit();
+                      for (String k : new ArrayList<String>(prefs.getAll().keySet())) {
+                          if (!protectedKey(k)) {
+                              ed.remove(k);
+                          }
+                      }
+                      Iterator<String> it = p.keys();
+                      while (it.hasNext()) {
+                          String k = it.next();
+                          if (protectedKey(k)) {
+                              continue;
+                          }
+                          JSONObject item = p.getJSONObject(k);
+                          String t = item.getString("t");
+                          if (t.equals("b")) {
+                              ed.putBoolean(k, item.getBoolean("v"));
+                          } else if (t.equals("i")) {
+                              ed.putInt(k, item.getInt("v"));
+                          } else if (t.equals("l")) {
+                              ed.putLong(k, item.getLong("v"));
+                          } else if (t.equals("f")) {
+                              ed.putFloat(k, (float) item.getDouble("v"));
+                          } else if (t.equals("s")) {
+                              ed.putString(k, item.getString("v"));
+                          }
+                      }
+                      ed.commit();
+                      bank.clear();
+                      bank.addAll(nb);
+                      saveBank();
+                      loadStats();
+                      Toast.makeText(this, "Data berhasil dipulihkan.", Toast.LENGTH_LONG).show();
+                      recreate();
+                  } catch (Exception e) {
+                      importMsg = "Gagal memulihkan cadangan. Data di HP ini tidak diubah.";
+                      showGuru();
+                  }
               }
 
               private LinearLayout tile(String sym, String label, int color, final int m) {
@@ -3162,7 +4034,13 @@ jobs:
                   Button cancel = button("Kembali", GRAY, 14);
                   cancel.setTextColor(DARK);
                   c.addView(cancel, lp(dp(46), 22));
-                  cancel.setOnClickListener(v -> showMenu());
+                  cancel.setOnClickListener(v -> {
+                      if (advLevel >= 0) {
+                          showPeta();
+                      } else {
+                          showMenu();
+                      }
+                  });
                   wrap(c);
               }
 
@@ -3192,6 +4070,7 @@ jobs:
                   final int a = selL;
                   final int b = selR;
                   if (a == b) {
+                      recordMatch(a, true);
                       matchedFlag[a] = true;
                       cardL[a].setBackground(box(GREEN, 18));
                       cardR[a].setBackground(box(GREEN, 18));
@@ -3209,6 +4088,7 @@ jobs:
                           handler.postDelayed(this::showMatchResult, 800);
                       }
                   } else {
+                      recordMatch(a, false);
                       matchWrong++;
                       matchBusy = true;
                       sfx(SFX_WRONG);
@@ -3228,8 +4108,14 @@ jobs:
               private void showMatchResult() {
                   handler.removeCallbacksAndMessages(null);
                   screen = 9;
+                  saveStats();
                   int stars = matchWrong == 0 ? 3 : matchWrong <= 2 ? 2 : 1;
                   freshBadges = awardBadges(2, stars, matchWrong == 0, false);
+                  boolean advMatch = advLevel >= 0;
+                  if (advMatch) {
+                      advSave(stars);
+                      awardMapBadges(freshBadges);
+                  }
                   LinearLayout c = column();
                   c.setGravity(Gravity.CENTER);
                   c.addView(text(av(0), 48, Color.WHITE, false), lp(WRAP, 0));
@@ -3253,15 +4139,19 @@ jobs:
                   c.addView(card, lp(WRAP, 18));
                   addFreshBadges(c);
 
-                  Button again = button("Main Lagi", GREEN, 22);
-                  again.setElevation(dp(4));
-                  c.addView(again, lp(dp(64), 26));
-                  again.setOnClickListener(v -> startMatch(matchSubj));
+                  if (advMatch) {
+                      addAdvButtons(c, true);
+                  } else {
+                      Button again = button("Main Lagi", GREEN, 22);
+                      again.setElevation(dp(4));
+                      c.addView(again, lp(dp(64), 26));
+                      again.setOnClickListener(v -> startMatch(matchSubj));
 
-                  Button menu = button("Menu Utama", ORANGE, 20);
-                  menu.setElevation(dp(4));
-                  c.addView(menu, lp(dp(60), 12));
-                  menu.setOnClickListener(v -> showMenu());
+                      Button menu = button("Menu Utama", ORANGE, 20);
+                      menu.setElevation(dp(4));
+                      c.addView(menu, lp(dp(60), 12));
+                      menu.setOnClickListener(v -> showMenu());
+                  }
                   wrap(c);
                   sfx(stars >= 2 ? SFX_WIN : SFX_OK);
                   if (stars >= 2) {
@@ -3324,6 +4214,10 @@ jobs:
               }
 
               private void buildQuestions() {
+                  if (mode == 8) {
+                      buildTable();
+                      return;
+                  }
                   if (mode == 7) {
                       buildBank();
                       return;
@@ -3613,7 +4507,13 @@ jobs:
                   exitDialog = new AlertDialog.Builder(this)
                           .setTitle("Keluar dari permainan?")
                           .setMessage("Skor permainan ini tidak akan tersimpan.")
-                          .setPositiveButton("Keluar", (dl, w) -> showMenu())
+                          .setPositiveButton("Keluar", (dl, w) -> {
+                              if (advLevel >= 0) {
+                                  showPeta();
+                              } else {
+                                  showMenu();
+                              }
+                          })
                           .setNegativeButton("Lanjut main", null)
                           .setOnDismissListener(dl -> {
                               dialogOpen = false;
@@ -3642,7 +4542,8 @@ jobs:
                   top.setOrientation(LinearLayout.HORIZONTAL);
                   top.setGravity(Gravity.CENTER_VERTICAL);
                   c.addView(top, lp(WRAP, 0));
-                  String who = (np > 1) ? av(cur) + " " + names[cur] : av(0) + " Petualang";
+                  String who = (np > 1) ? av(cur) + " " + names[cur]
+                          : (advLevel >= 0 ? av(0) + " Level " + (advLevel + 1) : av(0) + " Petualang");
                   top.addView(pill(who, np > 1 ? PLAYER_COLORS[cur] : ORANGE),
                           new LinearLayout.LayoutParams(WRAP, WRAP));
                   top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
@@ -3714,7 +4615,7 @@ jobs:
                       }
                   }
 
-                  Button back = button("Kembali ke menu", GRAY, 14);
+                  Button back = button(advLevel >= 0 ? "Kembali ke peta" : "Kembali ke menu", GRAY, 14);
                   back.setTextColor(DARK);
                   c.addView(back, lp(dp(46), 22));
                   back.setOnClickListener(v -> confirmExit());
@@ -3806,6 +4707,7 @@ jobs:
                   Q q = qs[qi - 1];
                   pPick[cur][qi - 1] = idx;
                   pRes[cur][qi - 1] = (idx == q.correctIdx) ? 1 : 2;
+                  recordAnswer(q, idx == q.correctIdx);
                   dimOthers(idx, q.correctIdx);
                   if (idx == q.correctIdx) {
                       score += 10;
@@ -3845,6 +4747,7 @@ jobs:
                   timerFill.animate().cancel();
                   timerFill.setScaleX(0f);
                   pRes[cur][qi - 1] = 3;
+                  recordAnswer(q, false);
                   tvTimer.setText("Waktu habis!");
                   tvTimer.setTextColor(RED);
                   dimOthers(q.correctIdx, q.correctIdx);
@@ -3867,7 +4770,7 @@ jobs:
                   for (int i = 0; !noLives() && i < lives; i++) {
                       h.append("\u2764\uFE0F");
                   }
-                  if (relaxed && mode != 7) {
+                  if (relaxed && mode != 7 && advLevel < 0) {
                       h.append("\uD83D\uDC9A Santai");
                   }
                   tvHearts.setText(h.toString());
@@ -3876,6 +4779,7 @@ jobs:
               }
 
               private void endTurn() {
+                  saveStats();
                   pScore[cur] = score;
                   pCorrect[cur] = correct;
                   cur++;
@@ -3892,6 +4796,10 @@ jobs:
               // ---------- Hasil ----------
 
               private void showSoloResult() {
+                  if (advLevel >= 0) {
+                      showAdvResult();
+                      return;
+                  }
                   screen = 2;
                   String key = bestKey();
                   int best = prefs.getInt(key, 0);
@@ -3911,6 +4819,10 @@ jobs:
               }
 
               private void renderSoloResult() {
+                  if (advLevel >= 0) {
+                      renderAdvResult(false);
+                      return;
+                  }
                   renderSoloResult(false);
               }
 
@@ -4178,6 +5090,911 @@ jobs:
                   menu.setElevation(dp(4));
                   c.addView(menu, lp(dp(60), 12));
                   menu.setOnClickListener(v -> showMenu());
+              }
+
+              // =====================================================================
+              // Peta Petualangan (versi 6.0): level terbuka bertahap, latihan per topik, bank soal bawaan
+              // =====================================================================
+
+              private static final String[] WORLD_NAME = {
+                      "Hutan Ceria", "Pantai Pelangi", "Gunung Berani", "Samudra Biru", "Gurun Misteri", "Angkasa Raya"
+              };
+              private static final String[] WORLD_ICON = {"\uD83C\uDF33", "\uD83C\uDFD6\uFE0F", "\u26F0\uFE0F", "\uD83C\uDF0A", "\uD83C\uDFDC\uFE0F", "\uD83D\uDE80"};
+              private static final String[] WORLD_PAL = {"#2E7D32", "#00838F", "#6D4C41", "#1565C0", "#E65100", "#4527A0"};
+              private static final String[] WORLD_PAL2 = {"#81C784", "#4DD0E1", "#BCAAA4", "#64B5F6", "#FFB74D", "#9575CD"};
+              private static final String[] BUDDY_ICON = {"\uD83D\uDC3F\uFE0F", "\uD83E\uDD80", "\uD83E\uDD85", "\uD83D\uDC2C", "\uD83D\uDC2A", "\uD83E\uDD16"};
+              private static final String[] BUDDY_NAME = {
+                      "Tupai Tito", "Kepiting Kiki", "Elang Elo", "Lumba Lulu", "Unta Uni", "Robo Rama"
+              };
+              private static final String[] MODE_DESC = {
+                      "Latihan penjumlahan", "Latihan pengurangan", "Latihan perkalian", "Latihan pembagian",
+                      "Campuran tambah, kurang, kali, dan bagi", "Hitung tiga bilangan sekaligus", "Isi titik yang hilang"
+              };
+
+              // Daftar level per kelas: ikon|judul|jenis|parameter
+              // jenis O = latihan hitung (parameter = nomor permainan), T = latihan tabel perkalian,
+              // B = kuis bawaan (pelajaran,bagian), M = Cocokkan Pasangan (pelajaran)
+              private static final String[][] LEVELS = {
+                      {
+                              "\u2795|Tambah|O|0", "\u2796|Kurang|O|1", "\uD83D\uDCD6|Kuis Indonesia|B|1,0", "\u2753|Isi Titik|O|6",
+                              "\uD83C\uDF0D|Kuis English|B|2,0", "\uD83E\uDDE9|Lawan Kata|M|1", "\uD83D\uDD22|Tiga Bilangan|O|5",
+                              "\uD83D\uDCDA|Kuis Indonesia 2|B|1,1", "\uD83C\uDF08|Kuis English 2|B|2,1", "\uD83D\uDC51|Raja Hutan|O|4"
+                      },
+                      {
+                              "\u2795|Tambah|O|0", "\u2796|Kurang|O|1", "\u2716\uFE0F|Tabel 2|T|2", "\uD83D\uDCD6|Kuis Indonesia|B|1,0",
+                              "\u2716\uFE0F|Tabel 5|T|5", "\uD83C\uDF0D|Kuis English|B|2,0", "\u2716\uFE0F|Tabel 10|T|10", "\uD83E\uDDE9|Lawan Kata|M|1",
+                              "\uD83D\uDCDA|Kuis Indonesia 2|B|1,1", "\uD83D\uDC51|Ratu Pantai|O|4"
+                      },
+                      {
+                              "\u2795|Tambah|O|0", "\u2796|Kurang|O|1", "\u2716\uFE0F|Tabel 3|T|3", "\uD83D\uDCD6|Kuis Indonesia|B|1,0",
+                              "\u2716\uFE0F|Tabel 4|T|4", "\uD83C\uDF0D|Kuis English|B|2,0", "\u2716\uFE0F|Tabel 6|T|6", "\uD83E\uDDE9|Pasangan Kata|M|2",
+                              "\u2797|Bagi|O|3", "\uD83D\uDCDA|Kuis Indonesia 2|B|1,1", "\uD83C\uDF08|Kuis English 2|B|2,1", "\uD83D\uDC51|Penguasa Gunung|O|4"
+                      },
+                      {
+                              "\u2795|Tambah|O|0", "\u2796|Kurang|O|1", "\u2716\uFE0F|Tabel 7|T|7", "\uD83D\uDCD6|Kuis Indonesia|B|1,0",
+                              "\u2716\uFE0F|Tabel 8|T|8", "\uD83C\uDF0D|Kuis English|B|2,0", "\u2716\uFE0F|Tabel 9|T|9", "\u2797|Bagi|O|3",
+                              "\uD83D\uDD22|Tiga Bilangan|O|5", "\uD83D\uDCDA|Kuis Indonesia 2|B|1,1", "\uD83C\uDF08|Kuis English 2|B|2,1", "\uD83D\uDC51|Raja Samudra|O|4"
+                      },
+                      {
+                              "\u2716\uFE0F|Kali|O|2", "\u2797|Bagi|O|3", "\u2716\uFE0F|Tabel 11|T|11", "\uD83D\uDCD6|Kuis Indonesia|B|1,0",
+                              "\u2716\uFE0F|Tabel 15|T|15", "\uD83C\uDF0D|Kuis English|B|2,0", "\u2795|Tambah|O|0", "\u2796|Kurang|O|1",
+                              "\uD83D\uDD22|Tiga Bilangan|O|5", "\uD83D\uDCDA|Kuis Indonesia 2|B|1,1", "\uD83C\uDF08|Kuis English 2|B|2,1", "\uD83D\uDC51|Penjaga Gurun|O|4"
+                      },
+                      {
+                              "\u2716\uFE0F|Kali|O|2", "\u2797|Bagi|O|3", "\u2716\uFE0F|Tabel 12|T|12", "\uD83D\uDCD6|Kuis Indonesia|B|1,0",
+                              "\u2716\uFE0F|Tabel 25|T|25", "\uD83C\uDF0D|Kuis English|B|2,0", "\u2795|Tambah|O|0", "\u2796|Kurang|O|1",
+                              "\uD83D\uDD22|Tiga Bilangan|O|5", "\uD83D\uDCDA|Kuis Indonesia 2|B|1,1", "\uD83C\uDF08|Kuis English 2|B|2,1", "\uD83D\uDC51|Komandan Angkasa|O|4"
+                      }
+              };
+
+              // Bank soal bawaan (buatan Claude, perlu dicek guru kelas).
+              // Format: pertanyaan|jawaban benar|salah 1|salah 2|salah 3|pembahasan (boleh kosong)
+              // 16 soal per kelas; 8 soal pertama = bagian 0, 8 soal berikutnya = bagian 1.
+              private static final String[][] BI_ID = {
+                  {
+                      "Lawan kata 'besar' adalah ...|kecil|tinggi|jauh|baru",
+                      "Kata yang diawali huruf m adalah ...|meja|buku|kursi|pintu|Kata meja diawali huruf m.",
+                      "Hewan yang bisa terbang adalah ...|burung|ikan|kucing|sapi|Burung punya sayap sehingga bisa terbang.",
+                      "Kita mencuci tangan dengan ...|sabun|nasi|buku|sepatu|Sabun membantu membersihkan tangan dari kuman.",
+                      "Ibu memasak di ...|dapur|kamar|kebun|kelas|Dapur adalah tempat memasak.",
+                      "Pagi hari kita berangkat ke ...|sekolah|gunung|laut|bulan|Anak-anak berangkat ke sekolah di pagi hari.",
+                      "Penulisan yang benar adalah ...|sekolah|sekolh|skolah|sekola|Tulisan yang benar: sekolah.",
+                      "Lawan kata 'panas' adalah ...|dingin|hangat|api|masak",
+                      "Kata 'apel' diawali huruf ...|a|p|e|l|Apel diawali huruf a.",
+                      "Daun yang segar biasanya berwarna ...|hijau|merah|biru|ungu|Daun segar berwarna hijau.",
+                      "Kakak itu saudara yang usianya ... daripada kita.|lebih tua|lebih muda|sama persis|belum lahir|Kakak lebih tua, adik lebih muda.",
+                      "Kita melihat dengan ...|mata|telinga|hidung|kaki|Mata adalah alat untuk melihat.",
+                      "Kita mendengar dengan ...|telinga|mata|tangan|gigi|Telinga adalah alat untuk mendengar.",
+                      "Kalimat yang benar adalah ...|Ani membaca buku.|Buku membaca Ani makan.|Ani buku membaca ke.|Membaca Ani di.|Kalimat yang baik punya susunan kata yang jelas.",
+                      "Pagi hari kita mengucapkan ...|selamat pagi|selamat malam|selamat tidur|sampai jumpa|Salam yang tepat untuk pagi hari adalah selamat pagi.",
+                      "Hewan yang hidup di air adalah ...|ikan|ayam|kucing|kambing|Ikan hidup di dalam air."
+                  },
+                  {
+                      "Persamaan kata (sinonim) 'pandai' adalah ...|pintar|malas|nakal|lambat|Pandai dan pintar artinya sama.",
+                      "Lawan kata 'rajin' adalah ...|malas|giat|tekun|cepat",
+                      "Kalimat tanya diakhiri dengan tanda ...|tanya (?)|titik (.)|koma (,)|seru (!)|Kalimat tanya ditutup tanda tanya.",
+                      "Hari setelah hari Senin adalah ...|Selasa|Rabu|Minggu|Kamis",
+                      "Air yang mengalir dari gunung ke laut disebut ...|sungai|pasir|batu|awan",
+                      "Kalimat dengan huruf kapital yang benar adalah ...|Adik makan nasi.|adik makan nasi.|adik Makan nasi.|adik makan Nasi.|Huruf pertama kalimat ditulis dengan huruf kapital.",
+                      "Lawan kata 'jauh' adalah ...|dekat|panjang|tinggi|berat",
+                      "Kata 'sepatu' dipisah menjadi suku kata ...|se-pa-tu|sep-a-tu|s-epa-tu|sepa-t-u|Sepatu memiliki tiga suku kata: se-pa-tu.",
+                      "Kata dasar dari 'membaca' adalah ...|baca|mem|membac|bacaan|Awalan mem- ditambahkan pada kata dasar baca.",
+                      "Perintah yang sopan adalah ...|Tolong ambilkan bukuku.|Ambil bukuku!|Cepat, bukumu!|Buku, ambil.|Kata tolong membuat perintah terdengar sopan.",
+                      "Padi menghasilkan ...|beras|gula|garam|susu|Padi diolah menjadi beras.",
+                      "Saat menerima hadiah, kita mengucapkan ...|terima kasih|maaf|permisi|selamat tidur",
+                      "Saat lewat di depan orang, kita mengucapkan ...|permisi|terima kasih|selamat ulang tahun|sampai jumpa",
+                      "Pasangan kata yang berlawanan adalah ...|tinggi - rendah|besar - luas|cepat - kilat|senang - gembira|Tinggi lawan katanya rendah.",
+                      "Ibu membeli sayur di ...|pasar|bengkel|bandara|stasiun|Sayur dijual di pasar.",
+                      "Lawan kata 'bersih' adalah ...|kotor|rapi|indah|wangi"
+                  },
+                  {
+                      "Kata baku yang benar adalah ...|apotek|apotik|appotek|apoteek",
+                      "Kata baku yang benar adalah ...|aktif|aktip|aktiv|akthif",
+                      "Kata baku yang benar adalah ...|risiko|resiko|risikho|risiqo",
+                      "Persamaan kata (sinonim) 'gembira' adalah ...|senang|marah|sedih|takut|Gembira dan senang artinya sama.",
+                      "Lawan kata 'dermawan' adalah ...|kikir|murah hati|ramah|rajin|Dermawan suka memberi, kikir sulit memberi.",
+                      "Kata tanya untuk menanyakan orang adalah ...|siapa|dan|di|ke|Siapa dipakai untuk menanyakan orang.",
+                      "Huruf pertama nama orang ditulis dengan huruf ...|kapital|kecil|miring|tebal|Nama orang diawali huruf kapital.",
+                      "Kalimat berita diakhiri tanda ...|titik (.)|koma (,)|tanda tanya (?)|titik dua (:)|Kalimat berita ditutup dengan tanda titik.",
+                      "Ide pokok paragraf adalah ...|gagasan utama paragraf|kalimat terakhir saja|judul buku|nama tokoh|Ide pokok adalah hal terpenting yang dibahas dalam paragraf.",
+                      "Kata ganti orang pertama tunggal adalah ...|aku|kamu|dia|mereka|Aku dipakai untuk menyebut diri sendiri.",
+                      "Kata ganti 'kita' mencakup ...|pembicara dan lawan bicara|hanya pembicara|hanya orang lain|hanya hewan|Kita berarti kamu dan aku (kami berdua).",
+                      "Kata 'berlari' memakai awalan ...|ber-|me-|di-|ter-|Berlari = ber- + lari.",
+                      "Kata 'dimakan' memakai awalan ...|di-|ber-|me-|se-|Dimakan = di- + makan.",
+                      "Cerita tentang binatang yang bisa berbicara disebut ...|fabel|legenda|biografi|puisi|Fabel adalah cerita dengan tokoh binatang.",
+                      "Karangan tentang kehidupan seseorang disebut ...|biografi|fabel|pantun|dongeng|Biografi menceritakan riwayat hidup seseorang.",
+                      "Satu bait pantun umumnya terdiri dari ... baris.|4|2|3|6|Pantun biasanya terdiri dari empat baris."
+                  },
+                  {
+                      "Kalimat yang penulisannya benar adalah ...|Dia pergi ke Bandung kemarin.|dia pergi ke bandung kemarin.|Dia pergi ke bandung Kemarin.|Dia Pergi ke Bandung kemarin.|Awal kalimat dan nama kota memakai huruf kapital.",
+                      "Kata baku yang benar adalah ...|analisis|analisa|analisys|analises",
+                      "Kata baku yang benar adalah ...|teknik|tehnik|tekhnik|tekknik",
+                      "Kata baku yang benar adalah ...|silakan|silahkan|silakhan|sielakan",
+                      "Kata baku yang benar adalah ...|manajemen|menejemen|managemen|manajmen",
+                      "Persamaan kata (sinonim) 'cermat' adalah ...|teliti|ceroboh|lengah|santai|Cermat dan teliti artinya sama.",
+                      "Lawan kata 'ramah' adalah ...|ketus|sopan|baik|lembut|Orang yang ketus tidak ramah.",
+                      "Kata dasar dari 'menulis' adalah ...|tulis|menu|lis|menulis|Menulis = me- + tulis.",
+                      "Kalimat seru adalah ...|Wah, indah sekali pemandangannya!|Kamu pergi ke mana?|Tolong buka jendela.|Ayah membaca koran.|Kalimat seru menyatakan kekaguman atau rasa kuat.",
+                      "Kata ganti 'mereka' menunjuk pada ...|orang ketiga banyak|diri sendiri|orang yang diajak bicara|benda mati saja|Mereka adalah kata ganti orang ketiga jamak.",
+                      "Gagasan utama dalam paragraf disebut ...|ide pokok|judul|tokoh|alur",
+                      "Bagian cerita saat tokoh menghadapi masalah disebut ...|konflik|pembukaan|penutup|judul",
+                      "Tempat dan waktu terjadinya cerita disebut ...|latar|tema|amanat|tokoh|Latar adalah tempat, waktu, dan suasana cerita.",
+                      "Pesan yang ingin disampaikan penulis dalam cerita disebut ...|amanat|latar|judul|tokoh|Amanat adalah pesan moral cerita.",
+                      "Dua baris pertama pantun disebut ...|sampiran|isi|judul|amanat|Sampiran ada di dua baris awal, isi di dua baris akhir.",
+                      "Tanda koma (,) dipakai untuk ...|memisahkan unsur pemerincian|mengakhiri kalimat berita|menulis judul buku|membuka kalimat|Contoh: Ibu membeli apel, jeruk, dan pisang."
+                  },
+                  {
+                      "Kata baku yang benar adalah ...|nasihat|nasehat|nasihaat|nasiahat",
+                      "Kata baku yang benar adalah ...|izin|ijin|izzin|ihzin",
+                      "Kata baku yang benar adalah ...|objek|obyek|ogjek|obiek",
+                      "Kata baku yang benar adalah ...|kualitas|kwalitas|kualites|qualitas",
+                      "Kata baku yang benar adalah ...|standar|standard|setandar|stanndar",
+                      "Kata hubung yang dipakai untuk menghubungkan dua hal yang setara adalah ...|dan|karena|jika|sehingga|Dan menghubungkan dua hal yang kedudukannya sama.",
+                      "Kata hubung 'karena' menyatakan ...|sebab|akibat|waktu|tujuan|Contoh: Aku terlambat karena hujan.",
+                      "Kata hubung 'tetapi' menyatakan ...|pertentangan|sebab|syarat|waktu|Contoh: Dia pintar tetapi pemalu.",
+                      "Pembaca adalah ...|orang yang membaca|alat untuk membaca|tempat membaca|hasil membaca|Awalan pe- menyatakan pelaku.",
+                      "Kata ulang 'buku-buku' menyatakan ...|jamak (banyak)|tunggal|pekerjaan|waktu|Kata ulang sering menyatakan jumlah banyak.",
+                      "Pidato yang baik disampaikan dengan ...|suara jelas dan sopan|suara pelan sekali|membelakangi pendengar|tanpa persiapan",
+                      "Ungkapan 'panjang tangan' berarti ...|suka mencuri|tangannya panjang|rajin bekerja|tinggi badan|Panjang tangan adalah ungkapan untuk orang yang suka mencuri.",
+                      "Ungkapan 'besar kepala' berarti ...|sombong|kepalanya besar|pandai|marah|Besar kepala adalah ungkapan untuk orang sombong.",
+                      "Kalimat efektif adalah kalimat yang ...|jelas dan tidak berbelit-belit|panjang dan rumit|tanpa subjek|tanpa tanda baca",
+                      "Surat untuk teman atau keluarga disebut surat ...|pribadi|dinas|kuasa|undangan|Surat pribadi ditulis untuk keperluan pribadi.",
+                      "Penutup surat pribadi yang cocok adalah ...|Salam hangat,|Dengan hormat,|Perihal:|Lampiran:|Salam hangat cocok untuk menutup surat pribadi."
+                  },
+                  {
+                      "Kata baku yang benar adalah ...|aktivitas|aktifitas|aktivitaz|aktipitas",
+                      "Kata baku yang benar adalah ...|metode|metoda|metodhe|metoode",
+                      "Kata baku yang benar adalah ...|sistem|sistim|sisthem|sistemm",
+                      "Kata baku yang benar adalah ...|praktik|praktek|praktikk|praktiq",
+                      "Kata baku yang benar adalah ...|konsekuen|konsekwen|konsekuenn|qonsekuen",
+                      "'Dia bagaikan singa di medan perang' adalah majas ...|simile (perumpamaan)|personifikasi|hiperbola|ironi|Simile membandingkan dengan kata seperti, bagaikan, bak.",
+                      "Majas yang memberi sifat manusia pada benda adalah ...|personifikasi|hiperbola|ironi|simile|Contoh: Angin berbisik di telingaku.",
+                      "'Tangisannya membanjiri seisi rumah' adalah majas ...|hiperbola|personifikasi|metafora|litotes|Hiperbola adalah ungkapan yang berlebihan.",
+                      "Fakta adalah informasi yang ...|dapat dibuktikan kebenarannya|hanya pendapat|belum tentu ada|berdasarkan perasaan|Fakta bisa dibuktikan dengan data atau bukti.",
+                      "Kalimat opini biasanya mengandung ...|pendapat atau penilaian|angka pasti|data resmi|tanggal kejadian|Opini adalah pendapat seseorang.",
+                      "Kalimat yang berisi fakta adalah ...|Indonesia merdeka pada tahun 1945.|Menurutku Indonesia paling indah.|Mungkin besok hujan deras.|Sepertinya bulan lebih bagus.|Tahun kemerdekaan dapat dibuktikan.",
+                      "Tujuan teks eksplanasi adalah ...|menjelaskan proses atau sebab akibat|menghibur dengan lelucon|memberi perintah|membuat puisi",
+                      "Teks yang mengajak orang membeli suatu produk disebut ...|iklan|biografi|berita|puisi|Iklan bertujuan menawarkan barang atau jasa.",
+                      "Dalam berita 5W+1H, 'what' berarti ...|apa|siapa|kapan|di mana|What = apa.",
+                      "Unsur 'siapa' dalam 5W+1H adalah ...|who|when|why|how|Who = siapa.",
+                      "Bentuk serapan dari kata 'computer' adalah ...|komputer|kompoter|kumputer|komputar|Serapan baku: komputer."
+                  }
+              };
+
+              private static final String[][] BI_EN = {
+                  {
+                      "Apa bahasa Inggris dari 'kucing'?|cat|dog|cow|hen",
+                      "Apa bahasa Inggris dari 'merah'?|red|blue|green|black",
+                      "Apa bahasa Inggris dari 'satu'?|one|two|three|four",
+                      "Apa bahasa Inggris dari 'dua'?|two|one|ten|six",
+                      "Apa bahasa Inggris dari 'anjing'?|dog|cat|bird|fish",
+                      "Apa bahasa Inggris dari 'apel'?|apple|banana|orange|grape",
+                      "Apa bahasa Inggris dari 'buku'?|book|pen|bag|desk",
+                      "Apa bahasa Inggris dari 'biru'?|blue|red|pink|white",
+                      "Apa bahasa Inggris dari 'ibu'?|mother|father|sister|brother",
+                      "Apa bahasa Inggris dari 'ayah'?|father|mother|baby|friend",
+                      "Apa bahasa Inggris dari 'mata'?|eye|ear|nose|hand",
+                      "Apa bahasa Inggris dari 'tiga'?|three|five|seven|eight",
+                      "Bertemu di pagi hari, kita bilang ...|Good morning|Good night|Goodbye|Sorry|Good morning artinya selamat pagi.",
+                      "Apa bahasa Inggris dari 'terima kasih'?|thank you|sorry|please|hello",
+                      "Apa bahasa Inggris dari 'hijau'?|green|yellow|brown|gray",
+                      "Apa bahasa Inggris dari 'ikan'?|fish|frog|duck|goat"
+                  },
+                  {
+                      "Apa bahasa Inggris dari 'kuning'?|yellow|orange|purple|pink",
+                      "Hewan berhidung panjang dalam bahasa Inggris adalah ...|elephant|monkey|rabbit|tiger|Gajah = elephant.",
+                      "Apa bahasa Inggris dari 'kursi'?|chair|table|door|window",
+                      "Apa bahasa Inggris dari 'meja'?|table|chair|bed|lamp",
+                      "Apa bahasa Inggris dari 'sepuluh'?|ten|six|nine|twelve",
+                      "Jawaban yang tepat untuk 'How are you?' adalah ...|I am fine, thank you.|Good night.|See you tomorrow.|It is red.|How are you? artinya apa kabar?",
+                      "Apa bahasa Inggris dari 'sekolah'?|school|home|market|garden",
+                      "Apa bahasa Inggris dari 'guru'?|teacher|doctor|farmer|driver",
+                      "Apa bahasa Inggris dari 'tangan'?|hand|foot|head|leg",
+                      "Apa bahasa Inggris dari 'kepala'?|head|hand|nose|mouth",
+                      "Apa bahasa Inggris dari 'makan'?|eat|sleep|run|read",
+                      "Apa bahasa Inggris dari 'tidur'?|sleep|eat|jump|sing",
+                      "Lengkapi: I ... a student.|am|is|are|be|Setelah I kita pakai am.",
+                      "Lengkapi: She ... my sister.|is|am|are|be|Setelah she kita pakai is.",
+                      "Apa bahasa Inggris dari 'pisang'?|banana|apple|mango|grape",
+                      "Apa bahasa Inggris dari 'nol'?|zero|one|ten|nine"
+                  },
+                  {
+                      "Lengkapi: They ... playing football.|are|is|am|be|Setelah they kita pakai are.",
+                      "Lengkapi: He ... a book.|has|have|having|haves|Setelah he kita pakai has.",
+                      "Lengkapi: I ... two cats.|have|has|is|are|Setelah I kita pakai have.",
+                      "Apa arti 'window'?|jendela|pintu|atap|lantai",
+                      "Apa arti 'door'?|pintu|jendela|dinding|meja",
+                      "Hari setelah Monday adalah ...|Tuesday|Wednesday|Sunday|Friday|Monday = Senin, Tuesday = Selasa.",
+                      "Apa bahasa Inggris dari 'air'?|water|milk|tea|rice",
+                      "Apa bahasa Inggris dari 'nasi'?|rice|bread|egg|meat",
+                      "Apa bahasa Inggris dari 'dokter'?|doctor|nurse|farmer|police",
+                      "Lawan kata 'big' adalah ...|small|tall|long|fast|Big = besar, small = kecil.",
+                      "Lawan kata 'hot' adalah ...|cold|warm|dry|new|Hot = panas, cold = dingin.",
+                      "Lengkapi: What ... your name?|is|are|am|do|Setelah what kita pakai is untuk satu benda.",
+                      "Jawaban untuk 'What is your name?' adalah ...|My name is Budi.|I am fine.|It is red.|Yes, I do.|Pertanyaan tentang nama dijawab dengan My name is ...",
+                      "Five + two = ...|seven|six|eight|nine|Five = 5, two = 2, jadi 7 = seven.",
+                      "Apa bahasa Inggris dari 'rumah'?|house|school|room|road",
+                      "Apa arti 'brother'?|saudara laki-laki|saudara perempuan|ayah|paman"
+                  },
+                  {
+                      "Lengkapi: She ... to school every day.|goes|go|going|gone|Setelah she, kata kerja diberi -es/-s: goes.",
+                      "Lengkapi: We ... English now.|study|studies|studied|studying|Setelah we kita pakai study.",
+                      "Lengkapi: Kucing di bawah meja. The cat is ... the table.|under|on|above|beside|Under artinya di bawah.",
+                      "Apa bahasa Inggris dari 'sungai'?|river|mountain|lake|sea",
+                      "Apa arti 'kitchen'?|dapur|kamar tidur|kamar mandi|ruang tamu",
+                      "Apa arti 'bathroom'?|kamar mandi|dapur|garasi|halaman",
+                      "Jawaban untuk 'What time is it?' (pukul 3) adalah ...|It is three o'clock.|It is Monday.|I am three.|It is red.|Pukul tiga = three o'clock.",
+                      "Lengkapi: There ... three books on the desk.|are|is|am|be|Untuk benda banyak kita pakai there are.",
+                      "Lengkapi: There ... a pen on the desk.|is|are|am|be|Untuk satu benda kita pakai there is.",
+                      "Apa bahasa Inggris dari 'mereka'?|they|we|she|you",
+                      "Apa bahasa Inggris dari 'kami'?|we|they|he|it",
+                      "Lengkapi: My father ... a farmer.|is|are|am|do|Setelah my father kita pakai is.",
+                      "Apa arti 'beautiful'?|cantik atau indah|jelek|besar|cepat",
+                      "Apa arti 'fast'?|cepat|lambat|tinggi|berat",
+                      "Hari setelah Friday adalah ...|Saturday|Thursday|Sunday|Monday|Friday = Jumat, Saturday = Sabtu.",
+                      "Bulan pertama dalam setahun adalah ...|January|March|June|December|January = Januari."
+                  },
+                  {
+                      "Lengkapi: I ... reading a book now.|am|is|are|was|Setelah I kita pakai am.",
+                      "Lengkapi: She ... washing the dishes.|is|are|am|do|Setelah she kita pakai is.",
+                      "Lengkapi: They ... football yesterday.|played|play|plays|playing|Kata 'yesterday' menunjukkan masa lampau.",
+                      "Lengkapi: I ... to the market yesterday.|went|go|goes|gone|Bentuk lampau dari go adalah went.",
+                      "Bentuk lampau dari 'eat' adalah ...|ate|eated|eaten|eats",
+                      "Bentuk lampau dari 'see' adalah ...|saw|seen|seed|sees",
+                      "Apa arti 'beautiful garden'?|taman yang indah|rumah yang besar|sungai yang dalam|kota yang ramai",
+                      "Apa arti 'always'?|selalu|kadang-kadang|tidak pernah|kemarin",
+                      "Apa arti 'never'?|tidak pernah|selalu|sering|besok",
+                      "Lengkapi: Ani is ... than Budi.|taller|tallest|more tall|tall|Untuk membandingkan dua orang kita pakai taller.",
+                      "Lengkapi: Everest is the ... mountain in the world.|highest|higher|high|more high|Untuk yang paling kita pakai highest.",
+                      "Lengkapi: How ... apples do you have?|many|much|any|a|Apples bisa dihitung, jadi pakai many.",
+                      "Lengkapi: How ... water do you need?|much|many|few|a|Water tidak bisa dihitung, jadi pakai much.",
+                      "Lengkapi: The bank is ... the post office and the school.|between|on|under|at|Between artinya di antara.",
+                      "Apa arti 'library'?|perpustakaan|toko buku|kantin|lapangan",
+                      "Apa arti 'hospital'?|rumah sakit|apotek|sekolah|pasar"
+                  },
+                  {
+                      "Lengkapi: If it rains, I ... at home.|will stay|stayed|staying|have stay|Kalimat pengandaian (if) memakai will.",
+                      "Lengkapi: She has ... in Jakarta since 2020.|lived|live|living|lives|Has/have diikuti bentuk ketiga: lived.",
+                      "Lengkapi: I am going to ... a letter.|write|wrote|written|writing|Setelah to kita pakai bentuk dasar: write.",
+                      "Bentuk lampau dari 'buy' adalah ...|bought|buyed|buys|brought",
+                      "Bentuk lampau dari 'go' adalah ...|went|goed|gone|going",
+                      "Bentuk lampau dari 'write' adalah ...|wrote|writed|written|writes",
+                      "Lengkapi: The letter was ... by Budi.|written|write|wrote|writing|Kalimat pasif memakai was + bentuk ketiga.",
+                      "'My mother is cooking in the kitchen.' artinya ...|Ibuku sedang memasak di dapur.|Ibuku akan memasak besok.|Ibuku sudah memasak kemarin.|Ibuku tidak suka memasak.|Is cooking menunjukkan sedang berlangsung.",
+                      "Apa arti 'environment'?|lingkungan|pemerintah|pengetahuan|perjalanan",
+                      "Apa arti 'knowledge'?|pengetahuan|lingkungan|kebahagiaan|pekerjaan",
+                      "Apa arti 'dangerous'?|berbahaya|aman|penting|mudah",
+                      "Lawan kata 'difficult' adalah ...|easy|hard|heavy|serious|Difficult = sulit, easy = mudah.",
+                      "Lengkapi: He can ... English very well.|speak|speaks|spoke|speaking|Setelah can kita pakai bentuk dasar.",
+                      "Lengkapi: You must ... your homework.|do|does|did|doing|Setelah must kita pakai bentuk dasar.",
+                      "Lengkapi: She ... TV when I called her.|was watching|watches|watched|will watch|Kejadian sedang berlangsung di masa lampau memakai was watching.",
+                      "Apa arti 'Good luck!'?|Semoga berhasil!|Selamat tidur!|Sampai jumpa!|Terima kasih!"
+                  }
+              };
+
+              // Level yang sedang dimainkan di peta (-1 = bukan permainan peta)
+              private int advLevel = -1;
+              private int advK = 0;
+              private int advPart = 0;
+              private int tableN = 2;
+              private boolean advWorldNew = false;
+
+              private String[] lv(int k, int l) {
+                  return LEVELS[k][l].split("\\|");
+              }
+
+              private int advStarsOf(int k, int l) {
+                  return prefs.getInt("adv_" + k + "_" + l, 0);
+              }
+
+              private boolean advOpen(int k, int l) {
+                  return l == 0 || advStarsOf(k, l - 1) >= 1;
+              }
+
+              private int advDone(int k) {
+                  int d = 0;
+                  for (int l = 0; l < LEVELS[k].length; l++) {
+                      if (advStarsOf(k, l) >= 1) {
+                          d++;
+                      }
+                  }
+                  return d;
+              }
+
+              private int advStarSum(int k) {
+                  int s = 0;
+                  for (int l = 0; l < LEVELS[k].length; l++) {
+                      s += advStarsOf(k, l);
+                  }
+                  return s;
+              }
+
+              private String advSummary() {
+                  return WORLD_NAME[kelas] + " \u2022 " + advDone(kelas) + " dari " + LEVELS[kelas].length + " level";
+              }
+
+              // Bintang level peta: 3 bintang bila benar 90% ke atas, 2 bila 70%, 1 bila 50% (lulus)
+              private int advStarsFor(int ok, int tot) {
+                  int pct = tot > 0 ? ok * 100 / tot : 0;
+                  return pct >= 90 ? 3 : pct >= 70 ? 2 : pct >= 50 ? 1 : 0;
+              }
+
+              private String starText(int n) {
+                  StringBuilder s = new StringBuilder();
+                  for (int i = 0; i < 3; i++) {
+                      s.append(i < n ? "\u2B50" : "\u2606");
+                  }
+                  return s.toString();
+              }
+
+              private void advSave(int stars) {
+                  String key = "adv_" + advK + "_" + advLevel;
+                  if (stars > prefs.getInt(key, 0)) {
+                      prefs.edit().putInt(key, stars).apply();
+                  }
+              }
+
+              // Lencana peta: 9 = 5 level selesai, 10 = satu dunia tamat, 11 = tiga bintang di semua level satu dunia
+              private void awardMapBadges(ArrayList<Integer> fresh) {
+                  int clear = 0;
+                  boolean worldDone = false;
+                  boolean allStars = false;
+                  for (int k = 0; k < LEVELS.length; k++) {
+                      int n = LEVELS[k].length;
+                      int d = 0;
+                      int s3 = 0;
+                      for (int l = 0; l < n; l++) {
+                          int st = advStarsOf(k, l);
+                          if (st >= 1) {
+                              d++;
+                          }
+                          if (st >= 3) {
+                              s3++;
+                          }
+                      }
+                      clear += d;
+                      if (d == n) {
+                          worldDone = true;
+                      }
+                      if (s3 == n) {
+                          allStars = true;
+                      }
+                  }
+                  if (clear >= 5) {
+                      giveBadge(9, fresh);
+                  }
+                  if (worldDone) {
+                      giveBadge(10, fresh);
+                  }
+                  if (allStars) {
+                      giveBadge(11, fresh);
+                  }
+              }
+
+              private String levelDesc(String[] p) {
+                  char t = p[2].charAt(0);
+                  int v = Integer.parseInt(p[3].split(",")[0]);
+                  if (t == 'O') {
+                      return MODE_DESC[v];
+                  }
+                  if (t == 'T') {
+                      return "Latihan tabel perkalian " + v + ": 7 soal kali dan 3 soal bagi";
+                  }
+                  if (t == 'B') {
+                      return "Kuis " + SUBJ_NAMES[v] + " untuk " + KELAS_NAMES[kelas];
+                  }
+                  return "Cocokkan Pasangan: pasangkan kartu kiri dan kanan";
+              }
+
+              private void startLevel(int l) {
+                  String[] p = lv(kelas, l);
+                  np = 1;
+                  advLevel = l;
+                  advK = kelas;
+                  advWorldNew = false;
+                  char t = p[2].charAt(0);
+                  if (t == 'O') {
+                      startGame(Integer.parseInt(p[3]));
+                  } else if (t == 'T') {
+                      tableN = Integer.parseInt(p[3]);
+                      startGame(8);
+                  } else if (t == 'B') {
+                      String[] sp = p[3].split(",");
+                      subj = Integer.parseInt(sp[0]);
+                      advPart = Integer.parseInt(sp[1]);
+                      startGame(7);
+                  } else {
+                      startMatch(Integer.parseInt(p[3]));
+                  }
+              }
+
+              // ---------- Layar peta ----------
+
+              private void showPeta() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 10;
+                  advLevel = -1;
+                  nameFields = null;
+                  final int k = kelas;
+                  final int n = LEVELS[k].length;
+                  final int done = advDone(k);
+
+                  LinearLayout c = column();
+                  c.addView(text("\uD83D\uDDFA\uFE0F Peta Petualangan", 24, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(text("Pilih kelas", 13, DARK, false), lp(WRAP, 8));
+                  c.addView(chips(KELAS_LABEL, k, KELAS_COLOR, i -> {
+                      prefs.edit().putInt("kelas", i).apply();
+                      kelas = i;
+                      showPeta();
+                  }), lp(dp(44), 6));
+
+                  // Spanduk dunia
+                  LinearLayout hero = new LinearLayout(this);
+                  hero.setOrientation(LinearLayout.VERTICAL);
+                  hero.setGravity(Gravity.CENTER_HORIZONTAL);
+                  hero.setPadding(dp(16), dp(16), dp(16), dp(16));
+                  GradientDrawable hg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                          new int[]{Color.parseColor(WORLD_PAL[k]), Color.parseColor(WORLD_PAL2[k])});
+                  hg.setCornerRadius(dp(28));
+                  hero.setBackground(hg);
+                  hero.setElevation(dp(5));
+                  hero.addView(text(WORLD_ICON[k] + " " + WORLD_NAME[k], 22, Color.WHITE, true), lp(WRAP, 0));
+                  hero.addView(text(KELAS_NAMES[k] + " \u2022 " + done + " dari " + n + " level \u2022 \u2B50 "
+                          + advStarSum(k) + "/" + (3 * n), 13, Color.WHITE, false), lp(WRAP, 4));
+                  LinearLayout bar = new LinearLayout(this);
+                  bar.setOrientation(LinearLayout.HORIZONTAL);
+                  bar.setBackground(box(Color.argb(90, 255, 255, 255), 6));
+                  if (done > 0) {
+                      View fill = new View(this);
+                      fill.setBackground(box(Color.WHITE, 6));
+                      bar.addView(fill, new LinearLayout.LayoutParams(0, MATCH, done));
+                  }
+                  if (n - done > 0) {
+                      bar.addView(new View(this), new LinearLayout.LayoutParams(0, MATCH, n - done));
+                  }
+                  hero.addView(bar, lp(dp(12), 10));
+                  c.addView(hero, lp(WRAP, 12));
+
+                  // Teman pendamping
+                  LinearLayout buddy = new LinearLayout(this);
+                  buddy.setOrientation(LinearLayout.HORIZONTAL);
+                  buddy.setGravity(Gravity.CENTER_VERTICAL);
+                  buddy.addView(text(BUDDY_ICON[k], 38, DARK, false), new LinearLayout.LayoutParams(dp(56), dp(56)));
+                  String msg;
+                  if (done == 0) {
+                      msg = "Halo! Aku " + BUDDY_NAME[k] + ". Ayo mulai dari level 1!";
+                  } else if (done < n) {
+                      msg = "Hebat! Tinggal " + (n - done) + " level lagi di " + WORLD_NAME[k] + ".";
+                  } else {
+                      msg = "Dunia ini sudah tamat! Coba raih 3 bintang di semua level.";
+                  }
+                  TextView bt = text(msg, 14, DARK, false);
+                  bt.setGravity(Gravity.START);
+                  bt.setBackground(box(Color.WHITE, 18));
+                  bt.setPadding(dp(14), dp(10), dp(14), dp(10));
+                  bt.setElevation(dp(2));
+                  LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(0, WRAP, 1f);
+                  bp.leftMargin = dp(6);
+                  buddy.addView(bt, bp);
+                  c.addView(buddy, lp(WRAP, 12));
+
+                  // Tombol lanjut ke level pertama yang belum lulus
+                  int next = -1;
+                  for (int l = 0; l < n; l++) {
+                      if (advStarsOf(k, l) < 1) {
+                          next = l;
+                          break;
+                      }
+                  }
+                  if (next >= 0) {
+                      final int nl = next;
+                      Button go = button("\u25B6 Lanjut: Level " + (nl + 1) + " \u2022 " + lv(k, nl)[1], GREEN, 15);
+                      go.setElevation(dp(4));
+                      c.addView(go, lp(dp(56), 14));
+                      go.setOnClickListener(v -> startLevel(nl));
+                  }
+
+                  // Peta jalur
+                  final String[] icons = new String[n];
+                  final String[] titles = new String[n];
+                  final int[] stars = new int[n];
+                  final boolean[] open = new boolean[n];
+                  for (int l = 0; l < n; l++) {
+                      String[] p = lv(k, l);
+                      icons[l] = p[0];
+                      titles[l] = p[1];
+                      stars[l] = advStarsOf(k, l);
+                      open[l] = advOpen(k, l);
+                  }
+                  MapView mv = new MapView(this, icons, titles, stars, open, Color.parseColor(WORLD_PAL[k]), li -> {
+                      if (open[li]) {
+                          dialogLevel(li);
+                      } else {
+                          Toast.makeText(this, "Selesaikan level sebelumnya dulu ya!", Toast.LENGTH_SHORT).show();
+                      }
+                  });
+                  mv.setBackground(box(Color.argb(170, 255, 255, 255), 26));
+                  c.addView(mv, lp(dp(100) * n + dp(30), 14));
+
+                  Button back = button("Kembali ke Menu", GRAY, 14);
+                  back.setTextColor(DARK);
+                  c.addView(back, lp(dp(46), 18));
+                  back.setOnClickListener(v -> showMenu());
+
+                  wrap(c);
+              }
+
+              private void dialogLevel(final int l) {
+                  String[] p = lv(kelas, l);
+                  int st = advStarsOf(kelas, l);
+                  LinearLayout c = new LinearLayout(this);
+                  c.setOrientation(LinearLayout.VERTICAL);
+                  c.setGravity(Gravity.CENTER_HORIZONTAL);
+                  c.setPadding(dp(18), dp(16), dp(18), dp(16));
+                  c.addView(text(p[0], 44, DARK, false), lp(WRAP, 0));
+                  c.addView(text("Level " + (l + 1) + ": " + p[1], 22, ORANGE_DARK, true), lp(WRAP, 6));
+                  c.addView(text(levelDesc(p), 14, DARK, false), lp(WRAP, 6));
+                  c.addView(text(st >= 1 ? starText(st) : "Belum diselesaikan", st >= 1 ? 24 : 14, ORANGE, st < 1), lp(WRAP, 8));
+                  c.addView(text(timeLabel() + " (bisa diubah di menu)", 12, DARK, false), lp(WRAP, 6));
+                  c.addView(text("Lulus bila benar separuh atau lebih. Benar 90% ke atas dapat 3 bintang.", 12, DARK, false),
+                          lp(WRAP, 4));
+                  Button go = button("\u25B6 Mulai", GREEN, 20);
+                  flat(go);
+                  c.addView(go, lp(dp(56), 14));
+                  Button no = button("Nanti dulu", GRAY, 14);
+                  no.setTextColor(DARK);
+                  flat(no);
+                  c.addView(no, lp(dp(44), 8));
+                  final AlertDialog d = new AlertDialog.Builder(this).setView(c).create();
+                  pickDialog = d;
+                  go.setOnClickListener(v -> {
+                      d.dismiss();
+                      startLevel(l);
+                  });
+                  no.setOnClickListener(v -> d.dismiss());
+                  d.show();
+                  if (d.getWindow() != null) {
+                      d.getWindow().setBackgroundDrawable(box(Color.WHITE, 24));
+                      int maxW = getResources().getDisplayMetrics().widthPixels - dp(24);
+                      d.getWindow().setLayout(Math.min(dp(340), maxW), ViewGroup.LayoutParams.WRAP_CONTENT);
+                  }
+              }
+
+              // Gambar peta: jalur melengkung, lingkaran level, bintang, dan gembok (semua lewat kode)
+              private class MapView extends View {
+                  private final String[] icons;
+                  private final String[] titles;
+                  private final int[] stars;
+                  private final boolean[] open;
+                  private final int color;
+                  private final Pick onTap;
+                  private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+                  private final Path path = new Path();
+                  private final DashPathEffect dash = new DashPathEffect(new float[]{dp(10), dp(10)}, 0f);
+
+                  MapView(Context ctx, String[] icons, String[] titles, int[] stars, boolean[] open, int color, Pick onTap) {
+                      super(ctx);
+                      this.icons = icons;
+                      this.titles = titles;
+                      this.stars = stars;
+                      this.open = open;
+                      this.color = color;
+                      this.onTap = onTap;
+                  }
+
+                  private float nodeX(int i, int w) {
+                      return w * (0.5f + 0.27f * (float) Math.sin(i * Math.PI / 2.0));
+                  }
+
+                  private float nodeY(int i) {
+                      return dp(56) + i * dp(100);
+                  }
+
+                  private float baseY(Paint p, float cy) {
+                      return cy - (p.ascent() + p.descent()) / 2f;
+                  }
+
+                  @Override
+                  protected void onDraw(Canvas c) {
+                      int w = getWidth();
+                      int n = icons.length;
+                      float r = dp(30);
+                      paint.setStyle(Paint.Style.STROKE);
+                      paint.setStrokeCap(Paint.Cap.ROUND);
+                      for (int i = 0; i + 1 < n; i++) {
+                          float x1 = nodeX(i, w);
+                          float y1 = nodeY(i);
+                          float x2 = nodeX(i + 1, w);
+                          float y2 = nodeY(i + 1);
+                          float my = (y1 + y2) / 2f;
+                          path.reset();
+                          path.moveTo(x1, y1);
+                          path.cubicTo(x1, my, x2, my, x2, y2);
+                          boolean lit = stars[i] >= 1;
+                          paint.setColor(lit ? color : GRAY_D);
+                          paint.setStrokeWidth(lit ? dp(8) : dp(6));
+                          paint.setPathEffect(lit ? null : dash);
+                          c.drawPath(path, paint);
+                      }
+                      paint.setPathEffect(null);
+                      for (int i = 0; i < n; i++) {
+                          float x = nodeX(i, w);
+                          float y = nodeY(i);
+                          boolean isOpen = open[i];
+                          boolean done = stars[i] >= 1;
+                          paint.setStyle(Paint.Style.FILL);
+                          paint.setColor(Color.WHITE);
+                          c.drawCircle(x, y, r + dp(4), paint);
+                          paint.setColor(!isOpen ? GRAY_D : done ? GREEN : color);
+                          c.drawCircle(x, y, r, paint);
+                          if (isOpen && !done) {
+                              paint.setStyle(Paint.Style.STROKE);
+                              paint.setStrokeWidth(dp(3));
+                              paint.setColor(GOLD);
+                              c.drawCircle(x, y, r + dp(9), paint);
+                          }
+                          tp.setTextAlign(Paint.Align.CENTER);
+                          tp.setFakeBoldText(false);
+                          tp.setColor(Color.WHITE);
+                          tp.setTextSize(dp(isOpen ? 26 : 22));
+                          c.drawText(isOpen ? icons[i] : "\uD83D\uDD12", x, baseY(tp, y), tp);
+                          if (done) {
+                              tp.setTextSize(dp(15));
+                              for (int j = 0; j < 3; j++) {
+                                  tp.setColor(j < stars[i] ? GOLD : GRAY_D);
+                                  c.drawText("\u2605", x + (j - 1) * dp(17), baseY(tp, y + r + dp(18)), tp);
+                              }
+                          }
+                          tp.setFakeBoldText(true);
+                          tp.setTextSize(dp(13));
+                          tp.setColor(isOpen ? DARK : SILVER);
+                          boolean right = x <= w / 2f + 1f;
+                          float gap = r + dp(16);
+                          float avail = right ? (w - x - gap - dp(6)) : (x - gap - dp(6));
+                          String lab = (i + 1) + ". " + titles[i];
+                          CharSequence ell = TextUtils.ellipsize(lab, tp, Math.max(dp(40), avail), TextUtils.TruncateAt.END);
+                          tp.setTextAlign(right ? Paint.Align.LEFT : Paint.Align.RIGHT);
+                          c.drawText(ell, 0, ell.length(), right ? x + gap : x - gap, baseY(tp, y), tp);
+                      }
+                  }
+
+                  @Override
+                  public boolean onTouchEvent(MotionEvent e) {
+                      int act = e.getActionMasked();
+                      if (act == MotionEvent.ACTION_DOWN) {
+                          return true;
+                      }
+                      if (act == MotionEvent.ACTION_UP) {
+                          int w = getWidth();
+                          float lim = dp(44);
+                          for (int i = 0; i < icons.length; i++) {
+                              float dx = e.getX() - nodeX(i, w);
+                              float dy = e.getY() - nodeY(i);
+                              if (dx * dx + dy * dy <= lim * lim) {
+                                  performClick();
+                                  onTap.on(i);
+                                  return true;
+                              }
+                          }
+                      }
+                      return true;
+                  }
+
+                  @Override
+                  public boolean performClick() {
+                      return super.performClick();
+                  }
+              }
+
+              // ---------- Soal peta: kuis bawaan dan latihan tabel ----------
+
+              private String autoExpl(String q, String ans) {
+                  int a = q.indexOf('\'');
+                  int b = a >= 0 ? q.indexOf('\'', a + 1) : -1;
+                  String w = (a >= 0 && b > a) ? q.substring(a + 1, b) : "";
+                  boolean hasW = !w.isEmpty();
+                  if (q.startsWith("Apa bahasa Inggris dari") && hasW) {
+                      return "'" + w + "' dalam bahasa Inggris adalah " + ans + ".";
+                  }
+                  if (q.startsWith("Apa arti") && hasW) {
+                      return "'" + w + "' artinya " + ans + ".";
+                  }
+                  if (q.startsWith("Lawan kata") && hasW) {
+                      return "Lawan kata '" + w + "' adalah " + ans + ".";
+                  }
+                  if (q.startsWith("Bentuk lampau") && hasW) {
+                      return "Bentuk lampau dari '" + w + "' adalah " + ans + ".";
+                  }
+                  if (q.startsWith("Kata baku")) {
+                      return "Penulisan baku yang benar adalah " + ans + ".";
+                  }
+                  return "Jawaban yang benar adalah " + ans + ".";
+              }
+
+              private void buildBuiltin() {
+                  String[] src = (subj == 1 ? BI_ID : BI_EN)[kelas];
+                  int half = src.length / 2;
+                  int from = advPart == 0 ? 0 : half;
+                  int to = advPart == 0 ? half : src.length;
+                  ArrayList<String> pool = new ArrayList<>();
+                  for (int i = from; i < to; i++) {
+                      pool.add(src[i]);
+                  }
+                  Collections.shuffle(pool, rnd);
+                  total = Math.min(TOTAL, pool.size());
+                  for (int i = 0; i < total; i++) {
+                      String[] f = pool.get(i).split("\\|");
+                      ArrayList<Integer> ord = new ArrayList<>();
+                      for (int j = 0; j < 4; j++) {
+                          ord.add(j);
+                      }
+                      Collections.shuffle(ord, rnd);
+                      Q q = new Q();
+                      q.text = f[0];
+                      q.full = f[0];
+                      q.sopts = new String[4];
+                      for (int j = 0; j < 4; j++) {
+                          q.sopts[j] = f[1 + ord.get(j)];
+                          if (ord.get(j) == 0) {
+                              q.correctIdx = j;
+                          }
+                      }
+                      q.expl = (f.length > 5 && !f[5].isEmpty()) ? f[5] : autoExpl(f[0], f[1]);
+                      qs[i] = q;
+                  }
+              }
+
+              // Latihan tabel perkalian: 7 soal kali, lalu 3 soal bagi dengan angka yang sama
+              private void buildTable() {
+                  total = TOTAL;
+                  int n = tableN;
+                  ArrayList<Integer> ms = new ArrayList<>();
+                  for (int i = 1; i <= 10; i++) {
+                      ms.add(i);
+                  }
+                  Collections.shuffle(ms, rnd);
+                  for (int i = 0; i < TOTAL; i++) {
+                      int m = ms.get(i);
+                      Q q = new Q();
+                      if (i < 7) {
+                          boolean swap = rnd.nextBoolean();
+                          q.text = (swap ? m + " \u00D7 " + n : n + " \u00D7 " + m) + " = ?";
+                          q.answer = n * m;
+                          q.full = n + " \u00D7 " + m + " = " + fmt(n * m);
+                          q.key = "t" + n + "x" + m;
+                          fillTableOptions(q, n);
+                      } else {
+                          q.text = fmt(n * m) + " \u00F7 " + n + " = ?";
+                          q.answer = m;
+                          q.full = fmt(n * m) + " \u00F7 " + n + " = " + m;
+                          q.key = "t" + n + "d" + m;
+                          fillTableOptions(q, 1);
+                      }
+                      qs[i] = q;
+                  }
+              }
+
+              // Pilihan jawaban yang mirip dengan jawaban benar (selisih satu langkah tabel, atau 1, 2, 10)
+              private void fillTableOptions(Q q, int step) {
+                  int ans = q.answer;
+                  ArrayList<Integer> cand = new ArrayList<>();
+                  int[] ds = {step, -step, 1, -1, 2 * step, -2 * step, 10, -10, 2, -2};
+                  for (int d : ds) {
+                      int v = ans + d;
+                      if (v >= 1 && v != ans && !cand.contains(v)) {
+                          cand.add(v);
+                      }
+                  }
+                  Collections.shuffle(cand, rnd);
+                  int pos = rnd.nextInt(4);
+                  Arrays.fill(q.opts, -1);
+                  q.opts[pos] = ans;
+                  q.correctIdx = pos;
+                  int ci = 0;
+                  for (int k = 0; k < 4; k++) {
+                      if (k == pos) {
+                          continue;
+                      }
+                      q.opts[k] = cand.get(ci++);
+                  }
+              }
+
+              // ---------- Hasil level peta ----------
+
+              private void showAdvResult() {
+                  screen = 2;
+                  int stars = advStarsFor(pCorrect[0], total);
+                  boolean perfect = total >= 5 && pCorrect[0] == total;
+                  int old = advStarsOf(advK, advLevel);
+                  advSave(stars);
+                  advWorldNew = old < 1 && stars >= 1 && advDone(advK) == LEVELS[advK].length;
+                  freshBadges = awardBadges(0, stars, perfect, false);
+                  awardMapBadges(freshBadges);
+                  renderAdvResult(true);
+              }
+
+              private void renderAdvResult(boolean fx) {
+                  screen = 2;
+                  final int stars = advStarsFor(pCorrect[0], total);
+                  boolean passed = stars >= 1;
+                  String[] p = lv(advK, advLevel);
+
+                  LinearLayout c = column();
+                  c.setGravity(Gravity.CENTER);
+                  c.addView(text(BUDDY_ICON[advK], 48, Color.WHITE, false), lp(WRAP, 0));
+                  TextView title = text(passed ? "Level selesai!" : "Ayo coba lagi!", 30, ORANGE_DARK, true);
+                  c.addView(title, lp(WRAP, 4));
+                  c.addView(pill("Level " + (advLevel + 1) + " \u2022 " + p[1], KELAS_COLOR[advK]), lpw(10));
+
+                  LinearLayout card = card();
+                  card.setGravity(Gravity.CENTER_HORIZONTAL);
+                  LinearLayout starRow = new LinearLayout(this);
+                  starRow.setOrientation(LinearLayout.HORIZONTAL);
+                  starRow.setGravity(Gravity.CENTER);
+                  TextView[] st = new TextView[3];
+                  for (int i = 0; i < 3; i++) {
+                      st[i] = text(i < stars ? "\u2B50" : "\u2606", 44, ORANGE, false);
+                      starRow.addView(st[i], new LinearLayout.LayoutParams(WRAP, WRAP));
+                  }
+                  card.addView(starRow, lp(WRAP, 0));
+                  TextView sc = text("Skor: " + pScore[0], 24, DARK, true);
+                  card.addView(sc, lp(WRAP, 10));
+                  TextView ben = text("Benar " + pCorrect[0] + " dari " + total, 16, DARK, false);
+                  card.addView(ben, lp(WRAP, 6));
+                  String hint = !passed ? "Butuh benar separuh atau lebih untuk membuka level berikutnya."
+                          : stars < 3 ? "Benar 90% ke atas dapat 3 bintang." : "Sempurna! Tiga bintang di level ini.";
+                  card.addView(text(hint, 13, DARK, false), lp(WRAP, 6));
+                  card.addView(text("\uD83C\uDF1F Total bintang: " + totalStars(), 14, DARK, false), lp(WRAP, 6));
+                  c.addView(card, lp(WRAP, 18));
+
+                  if (advWorldNew) {
+                      LinearLayout wd = card();
+                      wd.setGravity(Gravity.CENTER_HORIZONTAL);
+                      wd.addView(text("\uD83C\uDFF0 Dunia " + WORLD_NAME[advK] + " tamat!", 18, PURPLE, true), lp(WRAP, 0));
+                      wd.addView(text("Kamu menyelesaikan semua level " + KELAS_NAMES[advK] + ".", 13, DARK, false),
+                              lp(WRAP, 4));
+                      c.addView(wd, lp(WRAP, 14));
+                  }
+                  addFreshBadges(c);
+
+                  if (hasMistakes()) {
+                      Button rev = button("Lihat Pembahasan", BLUE, 18);
+                      rev.setElevation(dp(4));
+                      c.addView(rev, lp(dp(56), 18));
+                      rev.setOnClickListener(v -> {
+                          reviewPlayer = 0;
+                          showReview();
+                      });
+                  }
+                  addAdvButtons(c, passed);
+                  wrap(c);
+                  if (fx) {
+                      playResultFx(title, st, stars, sc, ben, null, false);
+                      if (advWorldNew) {
+                          handler.postDelayed(() -> launchConfetti(200), 1800);
+                      }
+                  }
+              }
+
+              // Tombol di akhir level peta: berikutnya, ulangi, kembali ke peta
+              private void addAdvButtons(LinearLayout c, boolean passed) {
+                  final boolean hasNext = passed && advLevel + 1 < LEVELS[advK].length;
+                  if (hasNext) {
+                      Button nx = button("Level berikutnya \u25B6", GREEN, 22);
+                      nx.setElevation(dp(4));
+                      c.addView(nx, lp(dp(64), 18));
+                      nx.setOnClickListener(v -> startLevel(advLevel + 1));
+                  }
+                  Button again = button("Ulangi level", hasNext ? BLUE : GREEN, hasNext ? 18 : 22);
+                  again.setElevation(dp(4));
+                  c.addView(again, lp(dp(hasNext ? 56 : 64), hasNext ? 12 : 18));
+                  again.setOnClickListener(v -> startLevel(advLevel));
+
+                  Button map = button("\uD83D\uDDFA\uFE0F Kembali ke Peta", ORANGE, 20);
+                  map.setElevation(dp(4));
+                  c.addView(map, lp(dp(60), 12));
+                  map.setOnClickListener(v -> showPeta());
               }
           }
           PB_EOF
