@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.4.1"
+                  versionName "6.5.0"
               }
 
               signingConfigs {
@@ -4490,7 +4490,7 @@ jobs:
                       "#F8BBD0", "#5D3A1E", "#C77B30", "#F06292", "#FFFFFF", "#E6D5B8"};
 
               // ---------- Avatar 3D tahap 1: data mesh balok ----------
-              private static final int MAXF = 96;
+              private static final int MAXF = 160;
               // Sisi balok: depan, belakang, kanan, kiri, atas (indeks sudut: bit0=x, bit1=y, bit2=z)
               private static final int[][] BOX_FACES = {{4, 5, 7, 6}, {1, 0, 2, 3}, {5, 1, 3, 7}, {0, 4, 6, 2}, {0, 1, 5, 4}};
               private static final float[][] BOX_NORM = {{0f, 0f, 1f}, {0f, 0f, -1f}, {1f, 0f, 0f}, {-1f, 0f, 0f}, {0f, -1f, 0f}};
@@ -4633,6 +4633,7 @@ jobs:
                   private int curHid = -1;
                   private int curHairC = 0;
                   private boolean curHood = false;
+                  private boolean curSkipFace = false;
                   private float curHt = 13.5f;
 
                   private int shade(int color, float k) {
@@ -4873,7 +4874,7 @@ jobs:
                       float m = (hood || hijab) ? 3f : 1.5f;
                       // penutup atas + poni (stiker topi menempel di sisi depan balok ini)
                       srcRect(33f, 14f, 67f, 46f);
-                      addBox(hx0 - m, hy0 - m - 1.5f, hx1 + m, hy0 + 7f, -hz - m, hz + m, hc, hc, hc, 4);
+                      addBox(hx0 - m, hy0 - m - 1.5f, hx1 + m, hy0 + 7f, -hz - m, hz + m, hc, hc, hc, 0);
                       // belakang kepala
                       float backBottom = hood ? hy1 - 6f : hijab ? hy1 + 12f : (curHid == 42 ? hy1 + 8f : hy0 + 24f);
                       addBox(hx0 - m, hy0 - m, hx1 + m, backBottom, -hz - m, -hz + 3f, hc, hc, hc, 0);
@@ -4903,7 +4904,94 @@ jobs:
                               addBox(hx0 - m, hy0 + 7f, hx1 + m, hy0 + 12f, hz - 1f, hz + m, hc, hc, hc, 0);
                           }
                       }
+                      curSkipFace = it[1] == 8 || it[1] == 10;
+                      if (it[0] >= 0) {
+                          addHat3D(it[0], hy0 - m - 1.5f);
+                      }
+                      if (curSkipFace) {
+                          addGlasses3D(it[1], hx0, hx1, hz);
+                      }
                       flushFaces(c);
+                  }
+
+                  private void bx(float x0, float y0, float x1, float y1, float z0, float z1, int color) {
+                      addBox(x0, y0, x1, y1, z0, z1, color, color, color, 0);
+                  }
+
+                  // Topi sebagai balok 3D; yT = permukaan atas kepala/penutup kepala
+                  private void addHat3D(int id, float yT) {
+                      if (id == 0) {
+                          int straw = col("#F6D77A");
+                          bx(40f, yT - 9f, 60f, yT, -10f, 10f, straw);
+                          bx(39.6f, yT - 4f, 60.4f, yT - 0.5f, -10.4f, 10.4f, col("#E53935"));
+                          bx(29f, yT - 1f, 71f, yT + 2f, -21f, 21f, straw);
+                      } else if (id == 1) {
+                          int pk = col("#F06292");
+                          bx(52f, yT - 5f, 60f, yT + 1f, -2f, 2f, pk);
+                          bx(62f, yT - 5f, 70f, yT + 1f, -2f, 2f, pk);
+                          bx(59f, yT - 4f, 63f, yT, -3f, 3f, col("#C2185B"));
+                      } else if (id == 2) {
+                          int pt = col("#F8BBD0");
+                          bx(54.5f, yT - 3f, 58.5f, yT + 1f, -2f, 2f, pt);
+                          bx(61.5f, yT - 3f, 65.5f, yT + 1f, -2f, 2f, pt);
+                          bx(58f, yT - 6.5f, 62f, yT - 2.5f, -2f, 2f, pt);
+                          bx(58f, yT + 0.5f, 62f, yT + 4.5f, -2f, 2f, pt);
+                          bx(58.5f, yT - 2f, 61.5f, yT + 1f, -2.6f, 2.6f, col("#FFC107"));
+                      } else if (id == 3) {
+                          bx(38f, yT - 5f, 62f, yT, -11f, 11f, col("#212121"));
+                          bx(28f, yT - 8f, 72f, yT - 5f, -22f, 22f, col("#263238"));
+                          int gold = col("#FFC107");
+                          bx(64.5f, yT - 7.5f, 67f, yT + 5f, -1f, 1f, gold);
+                          bx(64f, yT + 5f, 67.5f, yT + 8f, -1.5f, 1.5f, gold);
+                      } else if (id == 4) {
+                          bx(35f, yT - 9f, 65f, yT + 1f, -19f, 19f, col("#E53935"));
+                          bx(33f, yT, 67f, yT + 3f, -19f, 24f, col("#C62828"));
+                          bx(47.5f, yT - 7f, 52.5f, yT - 2f, 19f, 19.8f, Color.WHITE);
+                      } else if (id == 5) {
+                          int blk = col("#212121");
+                          bx(40f, yT - 14f, 60f, yT, -10f, 10f, blk);
+                          bx(39.6f, yT - 6f, 60.4f, yT - 2f, -10.4f, 10.4f, col("#C62828"));
+                          bx(34f, yT - 1f, 66f, yT + 2f, -20f, 20f, blk);
+                      } else if (id == 6) {
+                          int gold = col("#FFC107");
+                          bx(47f, yT - 15f, 53f, yT - 1f, -2.5f, 2.5f, gold);
+                          bx(41f, yT - 11f, 59f, yT - 5f, -2.5f, 2.5f, gold);
+                      } else if (id == 7) {
+                          int gold = col("#FFC107");
+                          bx(37f, yT - 4f, 63f, yT + 1f, -13f, 13f, gold);
+                          bx(37f, yT - 10f, 43f, yT - 4f, -4f, 4f, gold);
+                          bx(47f, yT - 12f, 53f, yT - 4f, -4f, 4f, gold);
+                          bx(57f, yT - 10f, 63f, yT - 4f, -4f, 4f, gold);
+                          bx(48.5f, yT - 3f, 51.5f, yT, 13f, 14.2f, col("#D32F2F"));
+                      }
+                  }
+
+                  // Kacamata 3D: bingkai di depan wajah + gagang ke samping kepala
+                  private void addGlasses3D(int id, float hx0, float hx1, float hz) {
+                      float ey = 28f;
+                      float[] ex = {42.8f, 57.2f};
+                      if (id == 8) {
+                          int fr = col("#263238");
+                          for (int k = 0; k < 2; k++) {
+                              float cx = ex[k];
+                              bx(cx - 5.5f, ey - 4.2f, cx + 5.5f, ey - 3f, hz, hz + 1.2f, fr);
+                              bx(cx - 5.5f, ey + 3f, cx + 5.5f, ey + 4.2f, hz, hz + 1.2f, fr);
+                              bx(cx - 5.5f, ey - 4.2f, cx - 4.3f, ey + 4.2f, hz, hz + 1.2f, fr);
+                              bx(cx + 4.3f, ey - 4.2f, cx + 5.5f, ey + 4.2f, hz, hz + 1.2f, fr);
+                          }
+                          bx(48.3f, ey - 1.5f, 51.7f, ey - 0.3f, hz, hz + 1.2f, fr);
+                          bx(hx0 - 0.8f, ey - 1.5f, hx0 + 0.4f, ey - 0.3f, -4f, hz + 1.2f, fr);
+                          bx(hx1 - 0.4f, ey - 1.5f, hx1 + 0.8f, ey - 0.3f, -4f, hz + 1.2f, fr);
+                      } else {
+                          int dk = col("#111111");
+                          for (int k = 0; k < 2; k++) {
+                              float cx = ex[k];
+                              bx(cx - 6.5f, ey - 4.2f, cx + 6.5f, ey + 4f, hz, hz + 1.2f, dk);
+                          }
+                          bx(48.5f, ey - 2.5f, 51.5f, ey - 1f, hz, hz + 1.2f, dk);
+                          bx(hx0 - 0.8f, ey - 2.5f, hx0 + 0.4f, ey - 1f, -4f, hz + 1.2f, dk);
+                          bx(hx1 - 0.4f, ey - 2.5f, hx1 + 0.8f, ey - 1f, -4f, hz + 1.2f, dk);
+                      }
                   }
 
                   private void drawFaceAll(Canvas c) {
@@ -4931,7 +5019,9 @@ jobs:
                           dot(c, 39f, 38.5f, 2.4f, 0x66FF7F7F);
                           dot(c, 61f, 38.5f, 2.4f, 0x66FF7F7F);
                       }
-                      drawFace(c, it[1]);
+                      if (!curSkipFace) {
+                          drawFace(c, it[1]);
+                      }
                   }
 
                   @Override
