@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.2.0"
+                  versionName "6.2.1"
               }
 
               signingConfigs {
@@ -553,7 +553,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.2.0";
+              private static final String APP_VERSION = "6.2.1";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -1862,6 +1862,10 @@ jobs:
                   hg.setCornerRadius(dp(32));
                   hero.setBackground(hg);
                   hero.setElevation(dp(6));
+                  hero.setOnLongClickListener(v -> {
+                      openAdmin();
+                      return true;
+                  });
                   ImageView logo = new ImageView(this);
                   logo.setImageResource(R.drawable.logo);
                   logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -4121,6 +4125,247 @@ jobs:
                       dialogWaktu();
                   });
                   return b;
+              }
+
+              // ---------- Panel Admin (untuk menguji toko) ----------
+              // Dibuka dengan menekan lama spanduk judul di menu utama, lalu dikunci PIN admin
+              // 8 sampai 12 angka. Hash PIN disimpan dengan kunci pin_adm_* (tidak ikut cadangan).
+              // Salah 3 kali: terkunci 1 menit, salah 6 kali: 2 menit, dan seterusnya dua kali lipat
+              // sampai maksimal 24 jam. Tidak ada kode pemulihan: kalau lupa, hapus data aplikasi.
+              private static final int ADM_PIN_MIN = 8;
+
+              private String admHash(String pin) {
+                  return sha(pinSalt() + ":adm:" + pin);
+              }
+
+              // Mengembalikan alasan PIN terlalu lemah, atau null kalau PIN cukup kuat
+              private String admWeak(String pin) {
+                  int n = pin.length();
+                  if (n < ADM_PIN_MIN) {
+                      return "Minimal " + ADM_PIN_MIN + " angka.";
+                  }
+                  boolean same = true;
+                  boolean up = true;
+                  boolean down = true;
+                  for (int i = 1; i < n; i++) {
+                      int d = pin.charAt(i) - pin.charAt(i - 1);
+                      if (d != 0) {
+                          same = false;
+                      }
+                      if (d != 1) {
+                          up = false;
+                      }
+                      if (d != -1) {
+                          down = false;
+                      }
+                  }
+                  if (same || up || down) {
+                      return "PIN terlalu mudah ditebak (angka sama atau berurutan).";
+                  }
+                  for (int ch = 1; ch <= 4; ch++) {
+                      if (n % ch == 0) {
+                          StringBuilder sb = new StringBuilder();
+                          for (int k = 0; k < n / ch; k++) {
+                              sb.append(pin, 0, ch);
+                          }
+                          if (sb.toString().equals(pin)) {
+                              return "PIN terlalu mudah ditebak (pola berulang).";
+                          }
+                      }
+                  }
+                  return null;
+              }
+
+              private String waitText(long ms) {
+                  long s = (ms + 999) / 1000;
+                  if (s < 120) {
+                      return s + " detik";
+                  }
+                  if (s < 7200) {
+                      return (s / 60) + " menit";
+                  }
+                  return (s / 3600) + " jam";
+              }
+
+              private EditText adminField(String hint) {
+                  EditText e = pinField(hint);
+                  e.setFilters(new InputFilter[]{new InputFilter.LengthFilter(12)});
+                  e.setTextSize(20 * ui);
+                  return e;
+              }
+
+              private void openAdmin() {
+                  long left = prefs.getLong("pin_adm_lock", 0L) - System.currentTimeMillis();
+                  if (left > 0) {
+                      Toast.makeText(this, "Panel Admin terkunci. Coba lagi " + waitText(left) + " lagi.",
+                              Toast.LENGTH_LONG).show();
+                      return;
+                  }
+                  if (prefs.getString("pin_adm_hash", "").isEmpty()) {
+                      dialogBuatAdmin(false);
+                  } else {
+                      dialogMasukAdmin();
+                  }
+              }
+
+              private void dialogBuatAdmin(final boolean ganti) {
+                  LinearLayout c = cardBody(ganti ? "Ganti PIN admin" : "Buat PIN admin");
+                  TextView info = text("Pakai " + ADM_PIN_MIN + " sampai 12 angka yang sulit ditebak, bukan tanggal lahir "
+                          + "atau nomor berurutan. Catat di tempat aman, karena tidak ada kode pemulihan.", 13, DARK, false);
+                  info.setGravity(Gravity.START);
+                  c.addView(info, lp(WRAP, 8));
+                  final EditText p1 = adminField("PIN baru");
+                  c.addView(p1, lp(dp(54), 12));
+                  final EditText p2 = adminField("Ulangi PIN");
+                  c.addView(p2, lp(dp(54), 8));
+                  final TextView err = text(" ", 13, RED, true);
+                  c.addView(err, lp(WRAP, 8));
+                  Button simpan = button("Simpan", GREEN, 18);
+                  flat(simpan);
+                  c.addView(simpan, lp(dp(52), 10));
+                  Button batal = button("Batal", GRAY, 14);
+                  batal.setTextColor(DARK);
+                  flat(batal);
+                  c.addView(batal, lp(dp(44), 8));
+                  final AlertDialog d = showCard(c, 340, true);
+                  simpan.setOnClickListener(v -> {
+                      String a = p1.getText().toString();
+                      String why = admWeak(a);
+                      if (why != null) {
+                          err.setText(why);
+                          return;
+                      }
+                      if (!a.equals(p2.getText().toString())) {
+                          err.setText("Kedua PIN tidak sama.");
+                          return;
+                      }
+                      prefs.edit().putString("pin_adm_hash", admHash(a)).putInt("pin_adm_fail", 0)
+                              .putLong("pin_adm_lock", 0L).apply();
+                      d.dismiss();
+                      Toast.makeText(this, "PIN admin tersimpan.", Toast.LENGTH_SHORT).show();
+                      dialogAdmin();
+                  });
+                  batal.setOnClickListener(v -> {
+                      d.dismiss();
+                      if (ganti) {
+                          dialogAdmin();
+                      }
+                  });
+              }
+
+              private void dialogMasukAdmin() {
+                  LinearLayout c = cardBody("PIN admin");
+                  TextView info = text("Masukkan PIN admin untuk membuka Panel Admin.", 13, DARK, false);
+                  info.setGravity(Gravity.START);
+                  c.addView(info, lp(WRAP, 8));
+                  final EditText p = adminField("PIN admin");
+                  c.addView(p, lp(dp(54), 12));
+                  final TextView err = text(" ", 13, RED, true);
+                  c.addView(err, lp(WRAP, 8));
+                  Button masuk = button("Masuk", GREEN, 18);
+                  flat(masuk);
+                  c.addView(masuk, lp(dp(52), 10));
+                  Button batal = button("Batal", GRAY, 14);
+                  batal.setTextColor(DARK);
+                  flat(batal);
+                  c.addView(batal, lp(dp(44), 8));
+                  final AlertDialog d = showCard(c, 340, true);
+                  masuk.setOnClickListener(v -> {
+                      String a = p.getText().toString();
+                      if (admHash(a).equals(prefs.getString("pin_adm_hash", ""))) {
+                          prefs.edit().putInt("pin_adm_fail", 0).apply();
+                          d.dismiss();
+                          dialogAdmin();
+                          return;
+                      }
+                      int f = prefs.getInt("pin_adm_fail", 0) + 1;
+                      prefs.edit().putInt("pin_adm_fail", f).apply();
+                      p.setText("");
+                      if (f % 3 == 0) {
+                          long ms = Math.min(86400000L, 60000L << Math.min(f / 3 - 1, 10));
+                          prefs.edit().putLong("pin_adm_lock", System.currentTimeMillis() + ms).apply();
+                          d.dismiss();
+                          Toast.makeText(this, "PIN salah " + f + " kali. Terkunci " + waitText(ms) + ".",
+                                  Toast.LENGTH_LONG).show();
+                      } else {
+                          err.setText("PIN salah. " + (3 - f % 3) + " percobaan lagi sebelum terkunci.");
+                      }
+                  });
+                  batal.setOnClickListener(v -> d.dismiss());
+              }
+
+              private void dialogAdmin() {
+                  LinearLayout c = cardBody("\uD83D\uDEE0\uFE0F Panel Admin");
+                  TextView info = text("Untuk menguji toko. Tidak mengubah bintang dan lencana.", 12, DARK, false);
+                  c.addView(info, lp(WRAP, 4));
+                  c.addView(pill("\uD83D\uDCB0 " + coins() + " koin", ORANGE), lpw(8));
+
+                  int[] adds = {100, 500, 1000};
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  for (int i = 0; i < adds.length; i++) {
+                      final int n = adds[i];
+                      Button b = button("+" + n, GREEN, 15);
+                      flat(b);
+                      b.setOnClickListener(v -> {
+                          prefs.edit().putInt("coins", coins() + n).apply();
+                          dialogAdmin();
+                      });
+                      row.addView(b, weight(i == 0 ? 0 : 4, 0));
+                  }
+                  c.addView(row, lp(dp(48), 12));
+
+                  Button all = button("\uD83D\uDD13 Buka semua barang", BLUE, 15);
+                  flat(all);
+                  c.addView(all, lp(dp(48), 10));
+                  all.setOnClickListener(v -> {
+                      SharedPreferences.Editor ed = prefs.edit();
+                      for (int i = 0; i < ITEMS.length; i++) {
+                          ed.putBoolean("own" + i, true);
+                      }
+                      ed.apply();
+                      Toast.makeText(this, "Semua barang terbuka.", Toast.LENGTH_SHORT).show();
+                      dialogAdmin();
+                  });
+
+                  Button reset = button("\uD83E\uDDF9 Reset koin dan koleksi", RED, 15);
+                  flat(reset);
+                  c.addView(reset, lp(dp(48), 10));
+                  reset.setOnClickListener(v -> new AlertDialog.Builder(this)
+                          .setMessage("Hapus semua koin, barang, dan dandanan avatar di HP ini?")
+                          .setPositiveButton("Reset", (dd, w) -> {
+                              SharedPreferences.Editor ed = prefs.edit();
+                              ed.putInt("coins", 0);
+                              for (int i = 0; i < ITEMS.length; i++) {
+                                  ed.remove("own" + i);
+                              }
+                              for (int pl = 0; pl < MAX_PLAYERS; pl++) {
+                                  for (int sl = 0; sl < 5; sl++) {
+                                      ed.remove("eq" + pl + "_" + sl);
+                                  }
+                              }
+                              ed.apply();
+                              dialogAdmin();
+                          })
+                          .setNegativeButton("Batal", null)
+                          .show());
+
+                  Button ganti = button("\uD83D\uDD11 Ganti PIN admin", PURPLE, 14);
+                  flat(ganti);
+                  c.addView(ganti, lp(dp(44), 10));
+                  Button tutup = button("Tutup", GRAY, 14);
+                  tutup.setTextColor(DARK);
+                  flat(tutup);
+                  c.addView(tutup, lp(dp(44), 8));
+                  final AlertDialog d = showCard(c, 340, false);
+                  ganti.setOnClickListener(v -> {
+                      d.dismiss();
+                      dialogBuatAdmin(true);
+                  });
+                  tutup.setOnClickListener(v -> {
+                      d.dismiss();
+                      showMenu();
+                  });
               }
 
               // ---------- Koin dan Toko Avatar ----------
