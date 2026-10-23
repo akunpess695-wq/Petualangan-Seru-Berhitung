@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.1.1"
+                  versionName "6.2.0"
               }
 
               signingConfigs {
@@ -519,6 +519,7 @@ jobs:
           import android.widget.Button;
           import android.widget.EditText;
           import android.widget.FrameLayout;
+          import android.widget.HorizontalScrollView;
           import android.widget.ImageView;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
@@ -552,7 +553,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.1.1";
+              private static final String APP_VERSION = "6.2.0";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -1845,10 +1846,9 @@ jobs:
                   dspLp.leftMargin = dp(10);
                   bar.addView(dsp, dspLp);
                   bar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
-                  TextView avb = text(av(0), 26, DARK, false);
-                  avb.setBackground(box(Color.WHITE, 26));
+                  AvatarView avb = avatarView(0);
                   avb.setElevation(dp(3));
-                  avb.setOnClickListener(v -> dialogAvatar());
+                  avb.setOnClickListener(v -> showToko());
                   bar.addView(avb, new LinearLayout.LayoutParams(dp(52), dp(52)));
                   c.addView(bar, lp(WRAP, 0));
 
@@ -1942,6 +1942,13 @@ jobs:
                       t.setOnClickListener(v -> openSubject(sj));
                       rt.addView(t, lp(dp(96), 14));
                   }
+
+                  // Toko Avatar
+                  Button tk = button("\uD83D\uDECD\uFE0F Toko Avatar \u2022 \uD83D\uDCB0 " + coins() + " koin", PINK, 15);
+                  flat(tk);
+                  tk.setElevation(dp(3));
+                  tk.setOnClickListener(v -> showToko());
+                  c.addView(tk, lp(dp(54), 18));
 
                   // Soal dari guru dan rekor skor, sebaris
                   LinearLayout foot = new LinearLayout(this);
@@ -2335,6 +2342,12 @@ jobs:
                   int games = prefs.getInt("games_total", 0) + 1;
                   int sum = prefs.getInt("stars_total", 0) + stars;
                   prefs.edit().putInt("games_total", games).putInt("stars_total", sum).apply();
+                  // Koin: 10 per bintang, bonus untuk nilai sempurna dan rekor baru
+                  int gain = stars > 0 ? stars * 10 + (perfect ? 10 : 0) + (rekorBroken ? 5 : 0) : 0;
+                  lastCoinGain = gain;
+                  if (gain > 0) {
+                      prefs.edit().putInt("coins", prefs.getInt("coins", 0) + gain).apply();
+                  }
                   giveBadge(0, fresh);
                   if (stars >= 3) {
                       giveBadge(1, fresh);
@@ -2365,6 +2378,18 @@ jobs:
 
               // Kartu "Lencana baru!" di layar hasil
               private void addFreshBadges(LinearLayout c) {
+                  if (lastCoinGain > 0) {
+                      LinearLayout cc = card();
+                      cc.setGravity(Gravity.CENTER_HORIZONTAL);
+                      cc.addView(text("\uD83D\uDCB0 +" + lastCoinGain + " koin!", 20, ORANGE_DARK, true), lp(WRAP, 0));
+                      cc.addView(text("Total " + coins() + " koin", 13, DARK, false), lp(WRAP, 4));
+                      Button sh = button("\uD83D\uDECD\uFE0F Belanja di Toko Avatar", PINK, 15);
+                      flat(sh);
+                      sh.setElevation(dp(3));
+                      cc.addView(sh, lp(dp(46), 10));
+                      sh.setOnClickListener(v -> showToko());
+                      c.addView(cc, lp(WRAP, 14));
+                  }
                   if (freshBadges == null || freshBadges.isEmpty()) {
                       return;
                   }
@@ -4096,6 +4121,362 @@ jobs:
                       dialogWaktu();
                   });
                   return b;
+              }
+
+              // ---------- Koin dan Toko Avatar ----------
+              // Koin didapat dari bintang tiap permainan. Barang dan koin disimpan di HP ini
+              // (ikut tercadangkan). Nomor urut barang = id yang tersimpan, jadi barang baru
+              // hanya boleh DITAMBAH di akhir daftar, jangan disisipkan atau diurutkan ulang.
+              // Kolom: slot (0 topi, 1 wajah, 2 pegang, 3 teman, 4 latar), ikon, nama, harga.
+              // Untuk latar, "ikon" berisi daftar warna gradasi.
+              private static final Object[][] ITEMS = {
+                      {0, "\uD83D\uDC52", "Topi Jerami", 35},
+                      {0, "\uD83C\uDF80", "Pita Cantik", 40},
+                      {0, "\uD83C\uDF38", "Bunga Sakura", 50},
+                      {0, "\uD83C\uDF93", "Topi Wisuda", 60},
+                      {0, "\u26D1\uFE0F", "Helm Penolong", 80},
+                      {0, "\uD83C\uDFA9", "Topi Sulap", 120},
+                      {0, "\uD83C\uDF1F", "Bintang Emas", 250},
+                      {0, "\uD83D\uDC51", "Mahkota Raja", 400},
+                      {1, "\uD83D\uDC53", "Kacamata Pintar", 40},
+                      {1, "\u2764\uFE0F", "Pipi Hati", 70},
+                      {1, "\uD83D\uDD76\uFE0F", "Kacamata Keren", 90},
+                      {1, "\uD83C\uDFAD", "Topeng Teater", 180},
+                      {2, "\u26BD", "Bola Sepak", 50},
+                      {2, "\uD83C\uDFC0", "Bola Basket", 50},
+                      {2, "\uD83C\uDFA8", "Palet Lukis", 70},
+                      {2, "\uD83D\uDD2D", "Teropong", 120},
+                      {2, "\uD83C\uDFB8", "Gitar Rock", 150},
+                      {2, "\u2694\uFE0F", "Pedang Ksatria", 220},
+                      {2, "\uD83D\uDE80", "Roket Angkasa", 300},
+                      {3, "\uD83D\uDC23", "Anak Ayam", 80},
+                      {3, "\uD83D\uDC22", "Kura-kura", 100},
+                      {3, "\uD83D\uDC1D", "Lebah Madu", 120},
+                      {3, "\uD83E\uDD8B", "Kupu-kupu", 150},
+                      {3, "\uD83D\uDC7B", "Hantu Lucu", 250},
+                      {3, "\uD83E\uDD16", "Robot Teman", 350},
+                      {3, "\uD83D\uDC09", "Naga Mini", 700},
+                      {3, "\uD83E\uDD84", "Unicorn Ajaib", 900},
+                      {4, "#4FC3F7,#E1F5FE", "Langit Biru", 30},
+                      {4, "#66BB6A,#E8F5E9", "Hutan Hijau", 40},
+                      {4, "#F06292,#F8BBD0", "Permen Pink", 100},
+                      {4, "#FF7043,#FFCA28", "Senja Jingga", 100},
+                      {4, "#311B92,#7E57C2", "Galaksi", 300},
+                      {4, "#E53935,#FB8C00,#FDD835,#43A047,#1E88E5,#8E24AA", "Pelangi", 500},
+                      {4, "#FFD54F,#FF8F00", "Emas Sultan", 1000}
+              };
+              private static final int ITEM_GALAKSI = 31;
+              private static final String[] RAR_NAME = {"Biasa", "Keren", "Epik", "Legendaris"};
+              private static final int[] RAR_COLOR = {SILVER, BLUE, PURPLE, GOLD};
+              private static final String[] SHOP_TAB_ICON = {
+                      "\uD83D\uDC3E", "\uD83C\uDFA9", "\uD83D\uDD76\uFE0F", "\u26BD", "\uD83D\uDC23", "\uD83C\uDFA8"};
+              private static final String[] SHOP_TAB_NAME = {"Hewan", "Topi", "Wajah", "Pegang", "Teman", "Latar"};
+
+              private int lastCoinGain = 0;
+              private int shopPl = 0;
+              private int shopTab = 0;
+
+              private static int itSlot(int i) {
+                  return (Integer) ITEMS[i][0];
+              }
+
+              private static String itIcon(int i) {
+                  return (String) ITEMS[i][1];
+              }
+
+              private static String itName(int i) {
+                  return (String) ITEMS[i][2];
+              }
+
+              private static int itPrice(int i) {
+                  return (Integer) ITEMS[i][3];
+              }
+
+              private static int itRar(int i) {
+                  int p = itPrice(i);
+                  return p < 70 ? 0 : p < 200 ? 1 : p < 600 ? 2 : 3;
+              }
+
+              private boolean owns(int i) {
+                  return prefs.getBoolean("own" + i, false);
+              }
+
+              private int coins() {
+                  return prefs.getInt("coins", 0);
+              }
+
+              private int eq(int pl, int slot) {
+                  return prefs.getInt("eq" + pl + "_" + slot, -1);
+              }
+
+              private GradientDrawable bgDrawable(int i, float radiusPx) {
+                  String[] cs = itIcon(i).split(",");
+                  int[] cols = new int[cs.length];
+                  for (int k = 0; k < cs.length; k++) {
+                      cols[k] = Color.parseColor(cs[k]);
+                  }
+                  GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, cols);
+                  g.setCornerRadius(radiusPx);
+                  return g;
+              }
+
+              // Avatar gabungan: hewan + topi + wajah + barang pegang + teman + latar
+              private class AvatarView extends View {
+                  private final String animal;
+                  private final int[] it = new int[5];
+                  private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+                  AvatarView(Context ctx, String animal, int[] items) {
+                      super(ctx);
+                      this.animal = animal;
+                      for (int k = 0; k < 5; k++) {
+                          it[k] = items[k];
+                      }
+                      p.setTextAlign(Paint.Align.CENTER);
+                  }
+
+                  private void emoji(Canvas c, String s, float cx, float cy, float size) {
+                      p.setTextSize(size);
+                      Paint.FontMetrics fm = p.getFontMetrics();
+                      c.drawText(s, cx, cy - (fm.ascent + fm.descent) / 2f, p);
+                  }
+
+                  @Override
+                  protected void onDraw(Canvas c) {
+                      float w = getWidth();
+                      float h = getHeight();
+                      float s = Math.min(w, h);
+                      float cx = w / 2f;
+                      float cy = h / 2f;
+                      float left = cx - s / 2f;
+                      float top = cy - s / 2f;
+                      p.setStyle(Paint.Style.FILL);
+                      if (it[4] >= 0) {
+                          GradientDrawable g = bgDrawable(it[4], s * 0.24f);
+                          g.setBounds((int) left, (int) top, (int) (left + s), (int) (top + s));
+                          g.draw(c);
+                          if (it[4] == ITEM_GALAKSI) {
+                              p.setColor(Color.WHITE);
+                              float[][] st = {{0.15f, 0.2f}, {0.82f, 0.15f}, {0.3f, 0.86f}, {0.9f, 0.62f},
+                                      {0.08f, 0.55f}, {0.6f, 0.1f}, {0.74f, 0.9f}};
+                              for (int k = 0; k < st.length; k++) {
+                                  c.drawCircle(left + st[k][0] * s, top + st[k][1] * s,
+                                          s * (k % 2 == 0 ? 0.016f : 0.011f), p);
+                              }
+                          }
+                      } else {
+                          p.setColor(Color.parseColor("#ECEFF1"));
+                          c.drawRoundRect(new RectF(left, top, left + s, top + s), s * 0.24f, s * 0.24f, p);
+                      }
+                      p.setColor(Color.BLACK);
+                      emoji(c, animal, cx, cy + 0.04f * s, 0.56f * s);
+                      if (it[3] >= 0) {
+                          emoji(c, itIcon(it[3]), cx + 0.30f * s, cy + 0.34f * s, 0.26f * s);
+                      }
+                      if (it[2] >= 0) {
+                          emoji(c, itIcon(it[2]), cx - 0.30f * s, cy + 0.34f * s, 0.26f * s);
+                      }
+                      if (it[1] >= 0) {
+                          emoji(c, itIcon(it[1]), cx, cy - 0.03f * s, 0.34f * s);
+                      }
+                      if (it[0] >= 0) {
+                          emoji(c, itIcon(it[0]), cx, cy - 0.27f * s, 0.30f * s);
+                      }
+                  }
+              }
+
+              private AvatarView avatarView(int pl) {
+                  int[] items = new int[5];
+                  for (int k = 0; k < 5; k++) {
+                      int e = eq(pl, k);
+                      items[k] = (e >= 0 && e < ITEMS.length && itSlot(e) == k && owns(e)) ? e : -1;
+                  }
+                  return new AvatarView(this, av(pl), items);
+              }
+
+              private View shopCell(final int id) {
+                  final boolean own = owns(id);
+                  final boolean on = eq(shopPl, itSlot(id)) == id;
+                  int rar = itRar(id);
+                  int rc = RAR_COLOR[rar];
+                  LinearLayout cell = new LinearLayout(this);
+                  cell.setOrientation(LinearLayout.VERTICAL);
+                  cell.setGravity(Gravity.CENTER_HORIZONTAL);
+                  cell.setPadding(dp(4), dp(10), dp(4), dp(8));
+                  GradientDrawable bg = box(Color.WHITE, 18);
+                  bg.setStroke(dp(on ? 4 : 2), on ? GREEN : rc);
+                  cell.setBackground(bg);
+                  cell.setElevation(dp(3));
+                  if (itSlot(id) == 4) {
+                      View sw = new View(this);
+                      sw.setBackground(bgDrawable(id, dp(12)));
+                      cell.addView(sw, new LinearLayout.LayoutParams(dp(40), dp(40)));
+                  } else {
+                      cell.addView(text(itIcon(id), 30, DARK, false), new LinearLayout.LayoutParams(WRAP, WRAP));
+                  }
+                  cell.addView(text(itName(id), 11, DARK, true), lp(WRAP, 4));
+                  cell.addView(text(RAR_NAME[rar], 10, rc, true), lp(WRAP, 0));
+                  TextView st;
+                  if (on) {
+                      st = text("\u2705 Dipakai", 12, Color.WHITE, true);
+                      st.setBackground(box(GREEN, 12));
+                  } else if (own) {
+                      st = text("Pakai", 12, Color.WHITE, true);
+                      st.setBackground(box(BLUE, 12));
+                  } else {
+                      st = text("\uD83D\uDCB0 " + itPrice(id), 12, Color.WHITE, true);
+                      st.setBackground(box(coins() >= itPrice(id) ? ORANGE : SILVER, 12));
+                  }
+                  st.setPadding(dp(8), dp(3), dp(8), dp(3));
+                  cell.addView(st, lpw(6));
+                  cell.setOnClickListener(v -> tapItem(id));
+                  return cell;
+              }
+
+              private void tapItem(int id) {
+                  int slot = itSlot(id);
+                  if (owns(id)) {
+                      boolean on = eq(shopPl, slot) == id;
+                      prefs.edit().putInt("eq" + shopPl + "_" + slot, on ? -1 : id).apply();
+                      sfx(SFX_OK);
+                      showToko();
+                      return;
+                  }
+                  int price = itPrice(id);
+                  int have = coins();
+                  if (have < price) {
+                      sfx(SFX_WRONG);
+                      Toast.makeText(this, "Koin kurang " + (price - have) + " lagi. Ayo main dulu!",
+                              Toast.LENGTH_SHORT).show();
+                      return;
+                  }
+                  prefs.edit().putInt("coins", have - price).putBoolean("own" + id, true)
+                          .putInt("eq" + shopPl + "_" + slot, id).apply();
+                  sfx(SFX_WIN);
+                  Toast.makeText(this, itName(id) + " dibeli dan dipakai!", Toast.LENGTH_SHORT).show();
+                  showToko();
+              }
+
+              private void showToko() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 20;
+                  nameFields = null;
+                  loadPrefs();
+                  if (shopPl >= np) {
+                      shopPl = 0;
+                  }
+
+                  LinearLayout c = column();
+                  c.addView(text("\uD83D\uDECD\uFE0F Toko Avatar", 28, ORANGE_DARK, true), lp(WRAP, 0));
+                  c.addView(pill("\uD83D\uDCB0 " + coins() + " koin", ORANGE), lpw(8));
+
+                  if (np > 1) {
+                      LinearLayout pr = new LinearLayout(this);
+                      pr.setOrientation(LinearLayout.HORIZONTAL);
+                      for (int i = 0; i < np; i++) {
+                          final int pl = i;
+                          boolean sel = i == shopPl;
+                          TextView t = text(av(i) + " " + names[i], 14, sel ? Color.WHITE : DARK, true);
+                          t.setBackground(box(sel ? PLAYER_COLORS[i] : GRAY, 16));
+                          t.setOnClickListener(v -> {
+                              shopPl = pl;
+                              showToko();
+                          });
+                          pr.addView(t, weight(i == 0 ? 0 : 4, 0));
+                      }
+                      c.addView(pr, lp(dp(44), 12));
+                  }
+
+                  LinearLayout pv = card();
+                  pv.setGravity(Gravity.CENTER_HORIZONTAL);
+                  pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(170), dp(170)));
+                  pv.addView(text(names[shopPl], 16, DARK, true), lp(WRAP, 8));
+                  pv.addView(text("Ketuk barang untuk membeli, ketuk lagi untuk memakai atau melepas", 12, DARK, false),
+                          lp(WRAP, 2));
+                  c.addView(pv, lp(WRAP, 12));
+
+                  HorizontalScrollView hs = new HorizontalScrollView(this);
+                  hs.setHorizontalScrollBarEnabled(false);
+                  LinearLayout tr = new LinearLayout(this);
+                  tr.setOrientation(LinearLayout.HORIZONTAL);
+                  for (int t = 0; t < SHOP_TAB_NAME.length; t++) {
+                      final int tab = t;
+                      boolean sel = t == shopTab;
+                      TextView chip = text(SHOP_TAB_ICON[t] + " " + SHOP_TAB_NAME[t], 14, sel ? Color.WHITE : DARK, true);
+                      chip.setBackground(box(sel ? ORANGE : GRAY, 18));
+                      chip.setPadding(dp(14), dp(8), dp(14), dp(8));
+                      chip.setOnClickListener(v -> {
+                          shopTab = tab;
+                          showToko();
+                      });
+                      LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(WRAP, WRAP);
+                      cl.rightMargin = dp(6);
+                      tr.addView(chip, cl);
+                  }
+                  hs.addView(tr);
+                  c.addView(hs, lp(WRAP, 14));
+
+                  if (shopTab == 0) {
+                      c.addView(text("Pilih hewan (gratis)", 13, DARK, true), lp(WRAP, 12));
+                      for (int r = 0; r < 3; r++) {
+                          LinearLayout row = new LinearLayout(this);
+                          row.setOrientation(LinearLayout.HORIZONTAL);
+                          for (int q = 0; q < 4; q++) {
+                              final int k = r * 4 + q;
+                              boolean on = avatar[shopPl] == k;
+                              TextView t = text(AVATARS[k], 28, Color.WHITE, false);
+                              t.setBackground(on ? box(PLAYER_COLORS[shopPl], 16) : box(GRAY, 16));
+                              t.setOnClickListener(v -> {
+                                  for (int j = 0; j < np; j++) {
+                                      if (j != shopPl && avatar[j] == k) {
+                                          avatar[j] = avatar[shopPl];
+                                          prefs.edit().putInt("avatar" + j, avatar[j]).apply();
+                                      }
+                                  }
+                                  avatar[shopPl] = k;
+                                  prefs.edit().putInt("avatar" + shopPl, k).apply();
+                                  showToko();
+                              });
+                              row.addView(t, weight(q == 0 ? 0 : 4, q == 3 ? 0 : 4));
+                          }
+                          c.addView(row, lp(dp(56), 8));
+                      }
+                  } else {
+                      int slot = shopTab - 1;
+                      ArrayList<Integer> ids = new ArrayList<>();
+                      for (int i = 0; i < ITEMS.length; i++) {
+                          if (itSlot(i) == slot) {
+                              ids.add(i);
+                          }
+                      }
+                      for (int s = 0; s < ids.size(); s += 3) {
+                          LinearLayout row = new LinearLayout(this);
+                          row.setOrientation(LinearLayout.HORIZONTAL);
+                          for (int q = 0; q < 3; q++) {
+                              if (s + q < ids.size()) {
+                                  row.addView(shopCell(ids.get(s + q)), weight(q == 0 ? 0 : 5, q == 2 ? 0 : 5));
+                              } else {
+                                  row.addView(new View(this), weight(q == 0 ? 0 : 5, q == 2 ? 0 : 5));
+                              }
+                          }
+                          c.addView(row, lp(WRAP, 10));
+                      }
+                      int have = 0;
+                      for (int i = 0; i < ITEMS.length; i++) {
+                          if (owns(i)) {
+                              have++;
+                          }
+                      }
+                      c.addView(text("\uD83D\uDDC2\uFE0F Koleksi: " + have + "/" + ITEMS.length + " barang", 13, DARK, true),
+                              lp(WRAP, 16));
+                  }
+
+                  Button back = button("Kembali", GRAY, 14);
+                  back.setTextColor(DARK);
+                  c.addView(back, lp(dp(46), 18));
+                  back.setOnClickListener(v -> showMenu());
+
+                  wrap(c);
               }
 
               private void dialogAvatar() {
