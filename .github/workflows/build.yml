@@ -485,8 +485,7 @@ jobs:
             echo "Dipakai: $SRC"
             cp "$SRC" "$DEST"
           elif [ -f "$GITHUB_WORKSPACE/proj/$DEST" ]; then
-            echo "Dipakai: proj/$DEST (sudah ada di repo)"
-            cp "$GITHUB_WORKSPACE/proj/$DEST" "$DEST"
+            echo "Dipakai: proj/$DEST (sudah ada di repo, tidak perlu disalin)"
           else
             echo "::error::MainActivity.java tidak ditemukan di repo (termasuk di folder proj)."
             exit 1
