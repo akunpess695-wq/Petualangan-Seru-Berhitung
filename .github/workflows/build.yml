@@ -4633,7 +4633,7 @@ jobs:
                   private int curHid = -1;
                   private int curHairC = 0;
                   private boolean curHood = false;
-                  private boolean curSkipFace = false;
+                  private boolean curSkipFace = false; private float zBias = 0f;
                   private float curHt = 13.5f;
 
                   private int shade(int color, float k) {
@@ -4682,7 +4682,7 @@ jobs:
                           int i = fn++;
                           fc[i] = shade(base, 0.62f + 0.43f * lit);
                           fk[i] = f == 0 ? kind : 0;
-                          fz[i] = (pzs[q[0]] + pzs[q[1]] + pzs[q[2]] + pzs[q[3]]) / 4f;
+                          fz[i] = (pzs[q[0]] + pzs[q[1]] + pzs[q[2]] + pzs[q[3]]) / 4f + zBias;
                           for (int k = 0; k < 4; k++) {
                               fq[i * 8 + k * 2] = pxs[q[k]];
                               fq[i * 8 + k * 2 + 1] = pys[q[k]];
@@ -4803,7 +4803,7 @@ jobs:
                       final int skin = col("#F2CFA5");
                       final boolean hood = animal >= 0 && animal < NO_HOOD;
                       final boolean girl = gender == 1;
-                      final boolean hijab = girl && !hood && it[6] < 0;
+                      final boolean hijab = girl && !hood;
                       curHood = hood;
                       curHt = hood ? 8f : 13.5f;
                       curHid = it[6];
@@ -4863,7 +4863,7 @@ jobs:
                       // badan
                       srcRect(34f, 44f, 66f, 68f);
                       addBox(36f, 42f, 64f, 64f, -7f, 7f, shirt, shirt, shirt, 2);
-                      if (hijab) {
+                      if (girl) {
                           int wh = col("#F7F7F7");
                           addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
                       }
@@ -4885,7 +4885,7 @@ jobs:
                       addBox(hx1 - 3f, hy0 - m, hx1 + m, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
                       if (hood) {
                           // sedikit poni di dahi di bawah tudung
-                          addBox(hx0 + 3f, hy0 + 7f, hx1 - 3f, hy0 + 11f, hz - 0.5f, hz + 0.8f, curHairC, curHairC, curHairC, 0);
+                          int bangC = girl ? col("#F7F7F7") : curHairC; addBox(hx0 + 3f, hy0 + 7f, hx1 - 3f, hy0 + 11f, hz - 0.5f, hz + 0.8f, bangC, bangC, bangC, 0);
                           addEars(animal, hc, col(HOOD_ACC[animal]), hx0, hx1, hy0, hy1);
                       } else if (!hijab) {
                           if (curHid == 40) {
@@ -4909,7 +4909,7 @@ jobs:
                           addHat3D(it[0], hy0 - m - 1.5f);
                       }
                       if (curSkipFace) {
-                          addGlasses3D(it[1], hx0, hx1, hz);
+                          boolean cover = hood || hijab; zBias = 40f; addGlasses3D(it[1], hx0, hx1, hz, cover ? m + 0.9f : 0.9f, cover ? -4f : 0f, cover ? hz + m + 0.5f : hz + 1.2f); zBias = 0f;
                       }
                       flushFaces(c);
                   }
@@ -4967,7 +4967,7 @@ jobs:
                   }
 
                   // Kacamata 3D: bingkai di depan wajah + gagang ke samping kepala
-                  private void addGlasses3D(int id, float hx0, float hx1, float hz) {
+                  private void addGlasses3D(int id, float hx0, float hx1, float hz, float off, float zb, float zf) {
                       float ey = 28f;
                       float[] ex = {42.8f, 57.2f};
                       if (id == 8) {
@@ -4980,8 +4980,8 @@ jobs:
                               bx(cx + 4.3f, ey - 4.2f, cx + 5.5f, ey + 4.2f, hz, hz + 1.2f, fr);
                           }
                           bx(48.3f, ey - 1.5f, 51.7f, ey - 0.3f, hz, hz + 1.2f, fr);
-                          bx(hx0 - 0.8f, ey - 1.5f, hx0 + 0.4f, ey - 0.3f, -4f, hz + 1.2f, fr);
-                          bx(hx1 - 0.4f, ey - 1.5f, hx1 + 0.8f, ey - 0.3f, -4f, hz + 1.2f, fr);
+                          bx(hx0 - off, ey - 1.5f, hx0 - off + 1.2f, ey - 0.3f, zb, zf, fr);
+                          bx(hx1 + off - 1.2f, ey - 1.5f, hx1 + off, ey - 0.3f, zb, zf, fr);
                       } else {
                           int dk = col("#111111");
                           for (int k = 0; k < 2; k++) {
@@ -4989,8 +4989,8 @@ jobs:
                               bx(cx - 6.5f, ey - 4.2f, cx + 6.5f, ey + 4f, hz, hz + 1.2f, dk);
                           }
                           bx(48.5f, ey - 2.5f, 51.5f, ey - 1f, hz, hz + 1.2f, dk);
-                          bx(hx0 - 0.8f, ey - 2.5f, hx0 + 0.4f, ey - 1f, -4f, hz + 1.2f, dk);
-                          bx(hx1 - 0.4f, ey - 2.5f, hx1 + 0.8f, ey - 1f, -4f, hz + 1.2f, dk);
+                          bx(hx0 - off, ey - 2.5f, hx0 - off + 1.2f, ey - 1f, zb, zf, dk);
+                          bx(hx1 + off - 1.2f, ey - 2.5f, hx1 + off, ey - 1f, zb, zf, dk);
                       }
                   }
 
@@ -5152,12 +5152,12 @@ jobs:
 
                       int hid = it[6];
                       int hairC = hid >= 0 ? col(itIcon(hid)) : col("#5D4037");
-                      if (hid == 42) {
+                      if (hid == 42 && gender != 1) {
                           rect(c, 31f, 20f, 38f, 58f, 3f, hairC);
                           rect(c, 62f, 20f, 69f, 58f, 3f, hairC);
                       }
                       rect(c, 33f, 14f, 67f, 46f, 6f, skin);
-                      boolean hijab2d = gender == 1 && !hood && hid < 0;
+                      boolean hijab2d = gender == 1 && !hood;
                       if (hijab2d) {
                           int wh = col("#F7F7F7");
                           hoodRects(c, wh, 0f);
