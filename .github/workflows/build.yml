@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.0.6"
+                  versionName "6.1.0"
               }
 
               signingConfigs {
@@ -552,11 +552,16 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.0.6";
+              private static final String APP_VERSION = "6.1.0";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
-              private static final int TOTAL = 10;
+              private static final int TOTAL = 10; // Peta Petualangan dan latihan tabel selalu 10 soal
+              private static final int MAX_Q = 20;
+              // Jumlah soal per permainan menurut kelas (Peta Petualangan tetap 10)
+              private static final int[] KELAS_Q = {10, 10, 15, 15, 20, 20};
+              // Waktu per soal bawaan untuk mode berwaktu (detik). Guru tetap bisa mengubahnya.
+              private static final int[] KELAS_SECS = {20, 15, 12, 12, 10, 10};
               private static final int MAX_PLAYERS = 4;
               private static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
               private static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
@@ -583,18 +588,18 @@ jobs:
                       "Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"
               };
               private static final String[] KELAS_DESC = {
-                  "Sampai 10\u201320 \u2022 kali-bagi: pengayaan ringan",
-                  "Sampai 15\u201320 \u2022 kali-bagi: pengayaan",
+                  "Sampai 10 \u2022 tambah dan kurang",
+                  "Sampai 20 \u2022 tambah dan kurang",
                   "Sampai 100\u2013500 \u2022 kali-bagi sampai 70",
                   "Sampai 500\u20131.000 \u2022 kali-bagi sampai 100",
                   "Sampai 1.000\u201310.000 \u2022 kali-bagi 2 angka",
                   "Sampai 10.000\u2013100.000 \u2022 kali-bagi 3 angka"
               };
               private static final int[] KELAS_COLOR = {GREEN, TEAL, BLUE, PURPLE, ORANGE, RED};
-              private static final int[] KELAS_LIVES = {5, 5, 4, 4, 3, 3};
+              private static final int[] KELAS_LIVES = {5, 5, 5, 5, 5, 5};
               // Penjumlahan dan pengurangan: batas bilangan di soal 1 dan di soal 10
-              private static final int[] ADD_LO = {10, 15, 100, 500, 1000, 10000};
-              private static final int[] ADD_HI = {20, 20, 500, 1000, 10000, 100000};
+              private static final int[] ADD_LO = {5, 10, 100, 500, 1000, 10000};
+              private static final int[] ADD_HI = {10, 20, 500, 1000, 10000, 100000};
               // Isi Titik dan 3 Bilangan: batas bilangan di soal 1 dan soal 10 (Kelas 1-2 lebih ringan)
               private static final int[] EASY_LO = {6, 10, 100, 500, 1000, 10000};
               private static final int[] EASY_HI = {10, 20, 500, 1000, 10000, 100000};
@@ -965,12 +970,12 @@ jobs:
               private EditText[] nameFields;
 
               // Hasil per pemain
-              private final Q[] qs = new Q[TOTAL];
+              private final Q[] qs = new Q[MAX_Q];
               private final int[] pScore = new int[MAX_PLAYERS];
               private final int[] pCorrect = new int[MAX_PLAYERS];
               // Catatan tiap soal per pemain: 0 belum dijawab, 1 benar, 2 salah, 3 waktu habis
-              private final int[][] pRes = new int[MAX_PLAYERS][TOTAL];
-              private final int[][] pPick = new int[MAX_PLAYERS][TOTAL];
+              private final int[][] pRes = new int[MAX_PLAYERS][MAX_Q];
+              private final int[][] pPick = new int[MAX_PLAYERS][MAX_Q];
               private boolean rekorNow;
               private int reviewPlayer;
               private final ArrayList<B> bank = new ArrayList<>();
@@ -1030,7 +1035,7 @@ jobs:
               private FrameLayout timerBox;
               private View timerFill;
               private LinearLayout cardQ;
-              private final View[] dots = new View[TOTAL];
+              private final View[] dots = new View[MAX_Q];
               private final Button[] opts = new Button[4];
               private Button correctBtn;
 
@@ -1747,7 +1752,7 @@ jobs:
               }
 
               private String timeLabel() {
-                  return timed ? "Berwaktu " + secs + " detik" : "Tanpa waktu";
+                  return timed ? "Berwaktu " + secsNow() + " detik" : "Tanpa waktu";
               }
 
               private String modeLabel() {
@@ -1890,7 +1895,7 @@ jobs:
                   bp.setElevation(dp(3));
                   bp.setOnClickListener(v -> dialogPemain());
                   opt.addView(bp, weight(4, 4));
-                  Button bw = button("\u23F1\uFE0F " + (timed ? secs + " detik" : "Bebas"), Color.WHITE, 13);
+                  Button bw = button("\u23F1\uFE0F " + (timed ? secsNow() + " detik" : "Bebas"), Color.WHITE, 13);
                   bw.setTextColor(DARK);
                   flat(bw);
                   bw.setElevation(dp(3));
@@ -2581,11 +2586,14 @@ jobs:
                   c.addView(r1, lp(dp(96), 10));
                   r1.addView(tile("+", "Tambah", ORANGE, 0), weight(0, 6));
                   r1.addView(tile("\u2212", "Kurang", BLUE, 1), weight(6, 0));
-                  LinearLayout r2 = new LinearLayout(this);
-                  r2.setOrientation(LinearLayout.HORIZONTAL);
-                  c.addView(r2, lp(dp(96), 12));
-                  r2.addView(tile("\u00D7", "Kali", GREEN, 2), weight(0, 6));
-                  r2.addView(tile("\u00F7", "Bagi", TEAL, 3), weight(6, 0));
+                  if (kelas >= 2) {
+                      // Kali dan Bagi disembunyikan di Kelas 1-2
+                      LinearLayout r2 = new LinearLayout(this);
+                      r2.setOrientation(LinearLayout.HORIZONTAL);
+                      c.addView(r2, lp(dp(96), 12));
+                      r2.addView(tile("\u00D7", "Kali", GREEN, 2), weight(0, 6));
+                      r2.addView(tile("\u00F7", "Bagi", TEAL, 3), weight(6, 0));
+                  }
                   LinearLayout r3 = new LinearLayout(this);
                   r3.setOrientation(LinearLayout.HORIZONTAL);
                   c.addView(r3, lp(dp(96), 12));
@@ -3008,7 +3016,7 @@ jobs:
                       }
                   }
                   Collections.shuffle(pool, rnd);
-                  total = Math.min(TOTAL, pool.size());
+                  total = Math.min(qCount(), pool.size());
                   for (int i = 0; i < total; i++) {
                       B b = pool.get(i);
                       Q q = new Q();
@@ -4063,7 +4071,7 @@ jobs:
                       b.addView(srow, lp(dp(52), 12));
                       srow.addView(stepButton("\u22125", -5), fixed(52));
                       srow.addView(stepButton("\u22121", -1), fixed(52));
-                      srow.addView(text(secs + " detik", 18, PURPLE, true),
+                      srow.addView(text(secsNow() + " detik", 18, PURPLE, true),
                               new LinearLayout.LayoutParams(0, MATCH, 1f));
                       srow.addView(stepButton("+1", 1), fixed(52));
                       srow.addView(stepButton("+5", 5), fixed(52));
@@ -4074,11 +4082,16 @@ jobs:
                   showDialogView("Waktu menjawab", b);
               }
 
+              // Waktu per soal: pilihan guru kalau pernah diubah, kalau belum memakai waktu bawaan kelas
+              private int secsNow() {
+                  return prefs.contains("secs") ? secs : KELAS_SECS[kelas];
+              }
+
               private Button stepButton(String label, final int delta) {
                   Button b = button(label, ORANGE, 14);
                   flat(b);
                   b.setOnClickListener(v -> {
-                      secs = Math.max(SECS_MIN, Math.min(SECS_MAX, secs + delta));
+                      secs = Math.max(SECS_MIN, Math.min(SECS_MAX, secsNow() + delta));
                       prefs.edit().putInt("secs", secs).apply();
                       dialogWaktu();
                   });
@@ -4831,13 +4844,18 @@ jobs:
                   }
               }
 
+              // Jumlah soal permainan ini: Peta selalu 10, selain itu menurut kelas
+              private int qCount() {
+                  return advLevel >= 0 ? TOTAL : KELAS_Q[kelas];
+              }
+
               private int range(int lo, int hi) {
                   return lo + rnd.nextInt(hi - lo + 1);
               }
 
               // Nilai yang naik pelan-pelan dari s (soal 1) ke e (soal 10)
               private int grow(int s, int e, int n) {
-                  return s + (e - s) * (n - 1) / (TOTAL - 1);
+                  return s + (e - s) * (n - 1) / (Math.max(2, qCount()) - 1);
               }
 
               // Titik pemisah ribuan gaya Indonesia: 1250000 -> 1.250.000
@@ -4872,18 +4890,20 @@ jobs:
                       buildBank();
                       return;
                   }
-                  total = TOTAL;
+                  total = qCount();
                   ArrayList<String> seen = new ArrayList<>();
-                  for (int i = 0; i < TOTAL; i++) {
+                  for (int i = 0; i < total; i++) {
                       Q q = null;
                       // Ulangi sampai dapat soal yang belum muncul di permainan ini.
                       // Percobaan 0-29 juga menghindari soal dari permainan sebelumnya.
                       // Percobaan 60 ke atas menaikkan tingkat soal sedikit supaya pilihan angkanya lebih luas.
                       for (int t = 0; t < 120; t++) {
                           q = new Q();
-                          int lvl = (t < 60) ? i + 1 : Math.min(TOTAL, i + 2 + (t - 60) / 10);
+                          int lvl = (t < 60) ? i + 1 : Math.min(total, i + 2 + (t - 60) / 10);
                           if (mode == 5) {
                               buildThree(q, lvl);
+                          } else if (kelas <= 2 && (mode == 0 || mode == 1 || mode == 4) && rnd.nextInt(100) < 30) {
+                              buildVariety(q, lvl);
                           } else {
                               buildTwo(q, lvl);
                           }
@@ -4893,11 +4913,120 @@ jobs:
                           }
                       }
                       seen.add(q.key);
-                      fillOptions(q);
+                      if (q.sopts == null) {
+                          fillOptions(q);
+                      }
                       qs[i] = q;
                   }
-                  lastKeys.clear();
+                  // Ingat soal dari beberapa permainan terakhir supaya tidak muncul berturut-turut
                   lastKeys.addAll(seen);
+                  while (lastKeys.size() > 40) {
+                      lastKeys.remove(0);
+                  }
+              }
+
+              // Bentuk soal lain (Kelas 1-3, Tambah/Kurang/Campur): bilangan terbesar/terkecil,
+              // bilangan yang hilang di deret, dan membandingkan hasil
+              private void buildVariety(Q q, int n) {
+                  int form = rnd.nextInt(3);
+                  int top = Math.max(10, grow(ADD_LO[kelas], ADD_HI[kelas], n));
+                  boolean big = rnd.nextBoolean();
+                  if (form == 1) {
+                      int step;
+                      int start;
+                      if (kelas == 0) {
+                          step = rnd.nextInt(3) == 0 ? 2 : 1;
+                          start = range(1, 10 - 4 * step);
+                      } else if (kelas == 1) {
+                          step = range(1, 4);
+                          start = range(1, 20 - 4 * step);
+                      } else {
+                          int[] st = {2, 5, 10, 20, 25};
+                          step = st[rnd.nextInt(st.length)];
+                          start = range(1, 300);
+                      }
+                      int[] v = new int[5];
+                      for (int i = 0; i < 5; i++) {
+                          v[i] = start + i * step;
+                      }
+                      boolean down = kelas >= 1 && rnd.nextBoolean();
+                      if (down) {
+                          for (int i = 0; i < 2; i++) {
+                              int t = v[i];
+                              v[i] = v[4 - i];
+                              v[4 - i] = t;
+                          }
+                      }
+                      int hide = range(1, 3);
+                      StringBuilder sb = new StringBuilder();
+                      StringBuilder fl = new StringBuilder();
+                      for (int i = 0; i < 5; i++) {
+                          sb.append(i == hide ? "\u2026" : fmt(v[i])).append(i < 4 ? ", " : "");
+                          fl.append(fmt(v[i])).append(i < 4 ? ", " : "");
+                      }
+                      q.text = sb.toString();
+                      q.full = fl.toString();
+                      q.answer = v[hide];
+                      q.key = "deret" + fl;
+                      q.expl = "Bilangan di deret ini " + (down ? "turun " : "naik ") + step + " setiap langkah. "
+                              + "Jadi yang hilang adalah " + fmt(v[hide]) + ".";
+                      return;
+                  }
+                  // Empat bilangan berjauhan: dipakai untuk "paling besar/kecil" dan untuk membandingkan hasil
+                  int lo = (form == 2 && mode == 0) ? 2 : 1;
+                  int hi = (form == 2 && mode == 1) ? top - 1 : top;
+                  int gap = kelas == 0 ? 2 : Math.max(2, top / 10);
+                  ArrayList<Integer> nums = new ArrayList<>();
+                  for (int g = 0; g < 400 && nums.size() < 4; g++) {
+                      int x = range(lo, hi);
+                      boolean ok = true;
+                      for (int y : nums) {
+                          if (Math.abs(x - y) < (g < 300 ? gap : 1)) {
+                              ok = false;
+                          }
+                      }
+                      if (ok) {
+                          nums.add(x);
+                      }
+                  }
+                  ArrayList<Integer> sorted = new ArrayList<>(nums);
+                  Collections.sort(sorted);
+                  int target = big ? sorted.get(3) : sorted.get(0);
+                  Collections.shuffle(nums, rnd);
+                  q.sopts = new String[4];
+                  String word = big ? "besar" : "kecil";
+                  String[] ex = new String[4];
+                  for (int i = 0; i < 4; i++) {
+                      int r = nums.get(i);
+                      if (form == 0) {
+                          q.sopts[i] = fmt(r);
+                      } else {
+                          boolean add = (mode == 0) || (mode == 4 && r >= 2 && (r == top || rnd.nextBoolean()));
+                          if (mode == 1 || r < 2) {
+                              add = false;
+                          }
+                          if (add) {
+                              int a = range(1, r - 1);
+                              ex[i] = fmt(a) + " + " + fmt(r - a);
+                          } else {
+                              int b = range(1, Math.max(1, top - r));
+                              ex[i] = fmt(r + b) + " - " + fmt(b);
+                          }
+                          q.sopts[i] = ex[i];
+                      }
+                      if (r == target) {
+                          q.correctIdx = i;
+                      }
+                  }
+                  if (form == 0) {
+                      q.text = "Mana bilangan yang paling " + word + "?";
+                      q.expl = fmt(target) + " adalah bilangan yang paling " + word + ".";
+                  } else {
+                      q.text = "Hasil mana yang paling " + word + "?";
+                      q.expl = q.sopts[q.correctIdx] + " = " + fmt(target) + ". Itu hasil yang paling " + word + ".";
+                  }
+                  q.full = q.text;
+                  q.key = "bdg" + form + word + sorted;
               }
 
               private void buildTwo(Q q, int n) {
@@ -4906,7 +5035,7 @@ jobs:
                       // Isi titik: Kelas 1-2 hanya tambah dan kurang, Kelas 3-6 semua operasi
                       op = rnd.nextInt(kelas <= 1 ? 2 : 4);
                   } else if (mode == 4) {
-                      op = rnd.nextInt(4);
+                      op = rnd.nextInt(kelas <= 1 ? 2 : 4);
                   } else {
                       op = mode;
                   }
@@ -5049,7 +5178,7 @@ jobs:
               // adalah jawaban kalau dihitung dari kiri ke kanan (jebakan).
               private void fillOptions(Q q) {
                   int ans = q.answer;
-                  int spread = Math.max(5, ans / 10);
+                  int spread = kelas <= 1 ? Math.max(8, ans) : Math.max(5, ans / 10);
                   int pos = rnd.nextInt(4);
                   Arrays.fill(q.opts, -1);
                   q.opts[pos] = ans;
@@ -5066,11 +5195,20 @@ jobs:
                       }
                       int v;
                       boolean bad;
+                      int tries = 0;
+                      // Kelas 1-2: pilihan berjauhan (selisih minimal 2) dan tidak melewati batas bilangan kelas
+                      int cap = (kelas == 0 && ans <= 10) ? 10 : (kelas == 1 && ans <= 20) ? 20 : Integer.MAX_VALUE;
                       do {
-                          v = ans + rnd.nextInt(2 * spread + 1) - spread;
+                          tries++;
+                          if (tries < 200) {
+                              v = range(Math.max(1, ans - spread), Math.min(cap, ans + spread));
+                          } else {
+                              v = ans + rnd.nextInt(2 * spread + 1) - spread;
+                          }
                           bad = (v < 1 || v == ans);
+                          int gap = (kelas <= 1 && tries < 40) ? 2 : 1;
                           for (int j = 0; j < 4 && !bad; j++) {
-                              if (q.opts[j] == v) {
+                              if (q.opts[j] != -1 && Math.abs(q.opts[j] - v) < gap) {
                                   bad = true;
                               }
                           }
@@ -5144,7 +5282,7 @@ jobs:
                       resumeNext = false;
                       handler.postDelayed(this::showQuestion, 600);
                   } else if (timed && timeLeft > 0) {
-                      timerFill.setScaleX(timeLeft / (float) secs);
+                      timerFill.setScaleX(timeLeft / (float) secsNow());
                       timerFill.animate().scaleX(0f).setDuration(timeLeft * 1000L)
                               .setInterpolator(new LinearInterpolator()).start();
                       handler.postDelayed(tick, 1000);
@@ -5326,11 +5464,11 @@ jobs:
 
                   handler.removeCallbacks(tick);
                   if (timed) {
-                      timeLeft = secs;
+                      timeLeft = secsNow();
                       showTime();
                       timerFill.animate().cancel();
                       timerFill.setScaleX(1f);
-                      timerFill.animate().scaleX(0f).setDuration(secs * 1000L)
+                      timerFill.animate().scaleX(0f).setDuration(secsNow() * 1000L)
                               .setInterpolator(new LinearInterpolator()).start();
                       handler.postDelayed(tick, 1000);
                   }
@@ -5778,8 +5916,8 @@ jobs:
                               "\uD83D\uDCDA|Kuis Indonesia 2|B|1,1", "\uD83C\uDF08|Kuis English 2|B|2,1", "\uD83D\uDC51|Raja Hutan|O|4"
                       },
                       {
-                              "\u2795|Tambah|O|0", "\u2796|Kurang|O|1", "\u2716\uFE0F|Tabel 2|T|2", "\uD83D\uDCD6|Kuis Indonesia|B|1,0",
-                              "\u2716\uFE0F|Tabel 5|T|5", "\uD83C\uDF0D|Kuis English|B|2,0", "\u2716\uFE0F|Tabel 10|T|10", "\uD83E\uDDE9|Lawan Kata|M|1",
+                              "\u2795|Tambah|O|0", "\u2796|Kurang|O|1", "\u2753|Isi Titik|O|6", "\uD83D\uDCD6|Kuis Indonesia|B|1,0",
+                              "\uD83D\uDD22|Tiga Bilangan|O|5", "\uD83C\uDF0D|Kuis English|B|2,0", "\uD83C\uDF08|Kuis English 2|B|2,1", "\uD83E\uDDE9|Lawan Kata|M|1",
                               "\uD83D\uDCDA|Kuis Indonesia 2|B|1,1", "\uD83D\uDC51|Ratu Pantai|O|4"
                       },
                       {
@@ -5821,6 +5959,14 @@ jobs:
                       "Daun yang segar biasanya berwarna ...|hijau|merah|biru|ungu|Daun segar berwarna hijau.",
                       "Kakak itu saudara yang usianya ... daripada kita.|lebih tua|lebih muda|sama persis|belum lahir|Kakak lebih tua, adik lebih muda.",
                       "Kita melihat dengan ...|mata|telinga|hidung|kaki|Mata adalah alat untuk melihat.",
+                      "Lawan kata 'tinggi' adalah ...|rendah|merah|makan|bola|Tinggi lawannya rendah.",
+                      "\uD83D\uDC31 Gambar ini adalah ...|kucing|ikan|rumah|buku|Gambar itu adalah kucing.",
+                      "Kata 'ayam' diawali huruf ...|a|b|k|s|Ayam diawali huruf a.",
+                      "Kata 'ibu' terdiri dari ... suku kata.|dua|lima|enam|sepuluh|I-bu terdiri dari dua suku kata.",
+                      "Kata 'sepatu' dibaca se-pa-tu. Jumlah suku katanya ...|tiga|satu|enam|sembilan|Se-pa-tu ada tiga suku kata.",
+                      "Kita makan nasi dengan ...|sendok|sapu|bantal|sepatu|Sendok dipakai untuk makan.",
+                      "Untuk menulis kita memakai ...|pensil|sendok|sabun|sisir|Pensil dipakai untuk menulis.",
+                      "Nama yang ditulis dengan benar adalah ...|Budi|budi|bUdi|bUDI|Nama orang diawali huruf kapital.",
                       "Kita mendengar dengan ...|telinga|mata|tangan|gigi|Telinga adalah alat untuk mendengar.",
                       "Kalimat yang benar adalah ...|Ani membaca buku.|Buku membaca Ani makan.|Ani buku membaca ke.|Membaca Ani di.|Kalimat yang baik punya susunan kata yang jelas.",
                       "Pagi hari kita mengucapkan ...|selamat pagi|selamat malam|selamat tidur|sampai jumpa|Salam yang tepat untuk pagi hari adalah selamat pagi.",
@@ -5832,7 +5978,15 @@ jobs:
                       "Lengkapi kata: sa_un (untuk mencuci tangan).|b|d|g|r|Kata yang benar: sabun.",
                       "Tulisan yang benar adalah ...|rumah|rmah|ruamh|rumha|Tulisan yang benar: rumah.",
                       "Tulisan yang benar adalah ...|pensil|pesil|pensl|pnsil|Tulisan yang benar: pensil.",
-                      "Kalimat yang benar adalah ...|Aku makan nasi.|Nasi aku makan di.|Makan nasi ke aku.|Aku nasi makan ke.|Kalimat yang baik punya susunan kata yang jelas."
+                      "Kalimat yang benar adalah ...|Aku makan nasi.|Nasi aku makan di.|Makan nasi ke aku.|Aku nasi makan ke.|Kalimat yang baik punya susunan kata yang jelas.",
+                      "Lawan kata 'siang' adalah ...|malam|kursi|topi|jalan|Siang lawannya malam.",
+                      "Kata yang diawali huruf b adalah ...|bola|kursi|topi|meja|Bola diawali huruf b.",
+                      "Lengkapi kata: ba_u (dipakai di badan).|j|m|r|n|Kata yang benar: baju.",
+                      "Lengkapi kata: to_i (dipakai di kepala).|p|k|m|s|Kata yang benar: topi.",
+                      "Lengkapi kata: ka_i (untuk berjalan).|k|d|p|t|Kata yang benar: kaki.",
+                      "Kalimat yang benar adalah ...|Adik minum susu.|Susu adik di minum ke.|Minum adik ke susu.|Susu minum adik di.|Kalimat harus punya susunan kata yang jelas.",
+                      "Tulisan yang benar adalah ...|kelas|kels|kalse|kleas|Tulisan yang benar: kelas.",
+                      "Kata 'bola' dibaca bo-la. Suku kata pertamanya ...|bo|la|ol|ba|Bo-la: suku kata pertama adalah bo."
                   },
                   {
                       "Persamaan kata (sinonim) 'pandai' adalah ...|pintar|malas|nakal|lambat|Pandai dan pintar artinya sama.",
@@ -5847,6 +6001,13 @@ jobs:
                       "Perintah yang sopan adalah ...|Tolong ambilkan bukuku.|Ambil bukuku!|Cepat, bukumu!|Buku, ambil.|Kata tolong membuat perintah terdengar sopan.",
                       "Padi menghasilkan ...|beras|gula|garam|susu|Padi diolah menjadi beras.",
                       "Saat menerima hadiah, kita mengucapkan ...|terima kasih|maaf|permisi|selamat tidur",
+                      "Persamaan kata 'senang' adalah ...|gembira|marah|takut|lapar|Senang dan gembira artinya sama.",
+                      "Lawan kata 'terang' adalah ...|gelap|ramai|sepi|cepat|Terang lawannya gelap.",
+                      "Kalimat seru diakhiri dengan tanda ...|seru (!)|tanya (?)|titik (.)|koma (,)|Kalimat seru ditutup tanda seru.",
+                      "Kata 'meja' termasuk kata ...|benda|kerja|sifat|tanya|Meja adalah nama benda.",
+                      "Kata 'berlari' termasuk kata ...|kerja|benda|sifat|tanya|Berlari adalah kegiatan, jadi kata kerja.",
+                      "Kata 'rajin' termasuk kata ...|sifat|benda|kerja|tanya|Rajin menyatakan sifat.",
+                      "Kata 'kelinci' terdiri dari ... suku kata.|tiga|dua|lima|enam|Ke-lin-ci terdiri dari tiga suku kata.",
                       "Saat lewat di depan orang, kita mengucapkan ...|permisi|terima kasih|selamat ulang tahun|sampai jumpa",
                       "Pasangan kata yang berlawanan adalah ...|tinggi - rendah|besar - luas|cepat - kilat|senang - gembira|Tinggi lawan katanya rendah.",
                       "Ibu membeli sayur di ...|pasar|bengkel|bandara|stasiun|Sayur dijual di pasar.",
@@ -5858,7 +6019,14 @@ jobs:
                       "Kalimat seru memakai tanda seru. Kalimat yang benar adalah ...|Wah, bunganya cantik!|Wah, bunganya cantik.|Wah, bunganya cantik?|Wah, bunganya cantik,|Tanda seru (!) dipakai untuk menyatakan kekaguman.",
                       "Tulisan yang benar adalah ...|sepeda|sepdea|seeda|sepeta|Tulisan yang benar: sepeda.",
                       "Tulisan yang benar adalah ...|jendela|jedela|jandela|jendala|Tulisan yang benar: jendela.",
-                      "Susunan kata yang benar adalah ...|Adik bermain bola.|Bola adik bermain di.|Bermain bola adik ke.|Bola bermain adik.|Kalimat harus punya susunan kata yang jelas."
+                      "Susunan kata yang benar adalah ...|Adik bermain bola.|Bola adik bermain di.|Bermain bola adik ke.|Bola bermain adik.|Kalimat harus punya susunan kata yang jelas.",
+                      "Susunan kata yang benar adalah ...|Ibu memasak nasi.|Nasi ibu di memasak.|Memasak nasi ibu ke.|Ibu nasi ke memasak.|Kalimat harus punya susunan kata yang jelas.",
+                      "Tulisan yang benar adalah ...|lemari|lemri|lamari|lemary|Tulisan yang benar: lemari.",
+                      "Tulisan yang benar adalah ...|kelinci|kelinsi|klinci|kelinki|Tulisan yang benar: kelinci.",
+                      "Lengkapi: Ani pergi ... sekolah.|ke|di|dari|pada|Ke dipakai untuk menyatakan tujuan.",
+                      "Lengkapi: Buku ada ... atas meja.|di|ke|dari|dengan|Di dipakai untuk menyatakan tempat.",
+                      "Kata 'pagi' dan 'siang' menunjukkan ...|waktu|tempat|warna|rasa|Pagi dan siang adalah waktu.",
+                      "Awal kalimat ditulis dengan huruf ...|kapital|miring|kecil semua|angka|Awal kalimat selalu diawali huruf kapital."
                   },
                   {
                       "Kata baku yang benar adalah ...|apotek|apotik|appotek|apoteek",
@@ -5873,6 +6041,13 @@ jobs:
                       "Kata ganti orang pertama tunggal adalah ...|aku|kamu|dia|mereka|Aku dipakai untuk menyebut diri sendiri.",
                       "Kata ganti 'kita' mencakup ...|pembicara dan lawan bicara|hanya pembicara|hanya orang lain|hanya hewan|Kita berarti kamu dan aku (kami berdua).",
                       "Kata 'berlari' memakai awalan ...|ber-|me-|di-|ter-|Berlari = ber- + lari.",
+                      "Kata baku yang benar adalah ...|kualitas|kwalitas|kuwalitas|qualitas|Kata baku: kualitas.",
+                      "Kata baku yang benar adalah ...|izin|ijin|ijzin|idzin|Kata baku: izin.",
+                      "Kata baku yang benar adalah ...|silakan|silahkan|silakhan|sylakan|Kata baku: silakan.",
+                      "Kata baku yang benar adalah ...|teknik|tehnik|teknick|tekhnik|Kata baku: teknik.",
+                      "Kata 'tulis' diberi awalan me- menjadi ...|menulis|mentulis|metulis|mengtulis|Huruf t pada awal kata luluh: menulis.",
+                      "Kata 'petani' berasal dari kata dasar ...|tani|pe|tan|petan|Petani terdiri dari pe- dan tani.",
+                      "Kalimat tanya yang benar adalah ...|Kapan kamu pulang?|Kapan kamu pulang.|Kapan kamu pulang!|Kapan kamu pulang,|Kalimat tanya diakhiri tanda tanya.",
                       "Kata 'dimakan' memakai awalan ...|di-|ber-|me-|se-|Dimakan = di- + makan.",
                       "Cerita tentang binatang yang bisa berbicara disebut ...|fabel|legenda|biografi|puisi|Fabel adalah cerita dengan tokoh binatang.",
                       "Karangan tentang kehidupan seseorang disebut ...|biografi|fabel|pantun|dongeng|Biografi menceritakan riwayat hidup seseorang.",
@@ -5884,7 +6059,14 @@ jobs:
                       "Kalimat yang memakai tanda koma dengan benar adalah ...|Ibu membeli apel, jeruk, dan mangga.|Ibu membeli apel jeruk dan, mangga.|Ibu, membeli apel jeruk dan mangga.|Ibu membeli, apel jeruk dan mangga.|Koma memisahkan unsur-unsur yang disebutkan satu per satu.",
                       "Kata 'baca' diberi awalan me- menjadi ...|membaca|mebaca|menbaca|mengbaca|Sebelum huruf b, awalan me- berubah menjadi mem-.",
                       "Kata 'sapu' diberi awalan me- menjadi ...|menyapu|mesapu|mensapu|mengsapu|Huruf s pada awal kata luluh menjadi ny: menyapu.",
-                      "Kalimat yang memakai huruf kapital dengan benar adalah ...|Aku tinggal di Kandangan.|aku tinggal di kandangan.|Aku tinggal di kandangan.|aku tinggal di Kandangan.|Awal kalimat dan nama tempat memakai huruf kapital."
+                      "Kalimat yang memakai huruf kapital dengan benar adalah ...|Aku tinggal di Kandangan.|aku tinggal di kandangan.|Aku tinggal di kandangan.|aku tinggal di Kandangan.|Awal kalimat dan nama tempat memakai huruf kapital.",
+                      "Kalimat yang memakai huruf kapital dengan benar adalah ...|Kami pergi ke Bandung.|kami pergi ke bandung.|Kami pergi ke bandung.|kami Pergi ke Bandung.|Awal kalimat dan nama kota diawali huruf kapital.",
+                      "Persamaan kata 'gembira' adalah ...|senang|sedih|marah|takut|Gembira dan senang artinya sama.",
+                      "Lawan kata 'kuat' adalah ...|lemah|besar|berat|keras|Lawan kuat adalah lemah.",
+                      "Ibu pergi ... pasar.|ke|di|oleh|dan|Ke menunjukkan tujuan.",
+                      "Tanda koma dipakai untuk memisahkan ...|rincian|akhir kalimat tanya|kata seru|judul|Koma memisahkan rincian, misalnya apel, jeruk, dan mangga.",
+                      "Kata 'rumah' diberi akhiran -ku menjadi ...|rumahku|rumah ku|ku rumah|rumah-ku|Akhiran -ku ditulis serangkai: rumahku.",
+                      "Paragraf adalah kumpulan ... yang membahas satu hal.|kalimat|huruf|angka|gambar|Paragraf terdiri atas beberapa kalimat."
                   },
                   {
                       "Kalimat yang penulisannya benar adalah ...|Dia pergi ke Bandung kemarin.|dia pergi ke bandung kemarin.|Dia pergi ke bandung Kemarin.|Dia Pergi ke Bandung kemarin.|Awal kalimat dan nama kota memakai huruf kapital.",
@@ -5976,6 +6158,15 @@ jobs:
                       "Apa bahasa Inggris dari 'apel'?|apple|banana|orange|grape",
                       "Apa bahasa Inggris dari 'buku'?|book|pen|bag|desk",
                       "Apa bahasa Inggris dari 'biru'?|blue|red|pink|white",
+                      "\uD83D\uDC36 Apa bahasa Inggris gambar ini?|dog|cat|cow|hen|Gambar itu adalah dog (anjing).",
+                      "\uD83C\uDF4E Apa bahasa Inggris gambar ini?|apple|banana|grape|mango|Gambar itu adalah apple (apel).",
+                      "\uD83D\uDC26 Apa bahasa Inggris gambar ini?|bird|fish|frog|duck|Gambar itu adalah bird (burung).",
+                      "\uD83C\uDF19 Apa bahasa Inggris gambar ini?|moon|sun|tree|book|Gambar itu adalah moon (bulan).",
+                      "\uD83D\uDCD6 Apa bahasa Inggris gambar ini?|book|bag|pen|box|Gambar itu adalah book (buku).",
+                      "\uD83C\uDFE0 Apa bahasa Inggris gambar ini?|house|car|tree|ball|Gambar itu adalah house (rumah).",
+                      "\u26BD Apa bahasa Inggris gambar ini?|ball|book|bag|bed|Gambar itu adalah ball (bola).",
+                      "\uD83D\uDE97 Apa bahasa Inggris gambar ini?|car|cup|bed|hat|Gambar itu adalah car (mobil).",
+                      "Apa bahasa Inggris dari 'lima'?|five|two|eight|ten|Lima = five.",
                       "Apa bahasa Inggris dari 'ibu'?|mother|father|sister|brother",
                       "Apa bahasa Inggris dari 'ayah'?|father|mother|baby|friend",
                       "Apa bahasa Inggris dari 'mata'?|eye|ear|nose|hand",
@@ -5983,7 +6174,16 @@ jobs:
                       "Bertemu di pagi hari, kita bilang ...|Good morning|Good night|Goodbye|Sorry|Good morning artinya selamat pagi.",
                       "Apa bahasa Inggris dari 'terima kasih'?|thank you|sorry|please|hello",
                       "Apa bahasa Inggris dari 'hijau'?|green|yellow|brown|gray",
-                      "Apa bahasa Inggris dari 'ikan'?|fish|frog|duck|goat"
+                      "Apa bahasa Inggris dari 'ikan'?|fish|frog|duck|goat",
+                      "Apa bahasa Inggris dari 'sepuluh'?|ten|one|three|five|Sepuluh = ten.",
+                      "Apa bahasa Inggris dari 'putih'?|white|black|red|blue|Putih = white.",
+                      "Apa bahasa Inggris dari 'hitam'?|black|white|red|green|Hitam = black.",
+                      "Apa bahasa Inggris dari 'telinga'?|ear|eye|foot|hair|Telinga = ear.",
+                      "Apa bahasa Inggris dari 'tangan'?|hand|nose|leg|hair|Tangan = hand.",
+                      "Apa bahasa Inggris dari 'kepala'?|head|hand|foot|hair|Kepala = head.",
+                      "Apa bahasa Inggris dari 'susu'?|milk|rice|egg|bread|Susu = milk.",
+                      "Terima kasih dalam bahasa Inggris adalah ...|thank you|sorry|hello|goodbye|Thank you artinya terima kasih.",
+                      "Halo dalam bahasa Inggris adalah ...|hello|goodbye|sorry|please|Hello artinya halo."
                   },
                   {
                       "Apa bahasa Inggris dari 'kuning'?|yellow|orange|purple|pink",
@@ -5994,6 +6194,17 @@ jobs:
                       "Jawaban yang tepat untuk 'How are you?' adalah ...|I am fine, thank you.|Good night.|See you tomorrow.|It is red.|How are you? artinya apa kabar?",
                       "Apa bahasa Inggris dari 'sekolah'?|school|home|market|garden",
                       "Apa bahasa Inggris dari 'guru'?|teacher|doctor|farmer|driver",
+                      "Apa bahasa Inggris dari 'oranye'?|orange|blue|black|white|Oranye = orange.",
+                      "Apa bahasa Inggris dari 'merah muda'?|pink|red|green|black|Merah muda = pink.",
+                      "Apa bahasa Inggris dari 'ungu'?|purple|blue|brown|white|Ungu = purple.",
+                      "Apa bahasa Inggris dari 'coklat'?|brown|pink|white|blue|Coklat = brown.",
+                      "Apa bahasa Inggris dari 'tas'?|bag|desk|ruler|eraser|Tas = bag.",
+                      "Apa bahasa Inggris dari 'penghapus'?|eraser|ruler|pencil|book|Penghapus = eraser.",
+                      "Apa bahasa Inggris dari 'penggaris'?|ruler|eraser|pencil|bag|Penggaris = ruler.",
+                      "Apa bahasa Inggris dari 'pensil'?|pencil|paper|desk|bag|Pensil = pencil.",
+                      "Apa bahasa Inggris dari 'pintu'?|door|window|floor|wall|Pintu = door.",
+                      "Apa bahasa Inggris dari 'jendela'?|window|door|roof|floor|Jendela = window.",
+                      "Apa bahasa Inggris dari 'murid'?|student|teacher|farmer|driver|Murid = student.",
                       "Apa bahasa Inggris dari 'tangan'?|hand|foot|head|leg",
                       "Apa bahasa Inggris dari 'kepala'?|head|hand|nose|mouth",
                       "Apa bahasa Inggris dari 'makan'?|eat|sleep|run|read",
@@ -6001,7 +6212,18 @@ jobs:
                       "Lengkapi: I ... a student.|am|is|are|be|Setelah I kita pakai am.",
                       "Lengkapi: She ... my sister.|is|am|are|be|Setelah she kita pakai is.",
                       "Apa bahasa Inggris dari 'pisang'?|banana|apple|mango|grape",
-                      "Apa bahasa Inggris dari 'nol'?|zero|one|ten|nine"
+                      "Apa bahasa Inggris dari 'nol'?|zero|one|ten|nine",
+                      "Apa bahasa Inggris dari 'nenek'?|grandmother|grandfather|mother|sister|Nenek = grandmother.",
+                      "Apa bahasa Inggris dari 'kakek'?|grandfather|grandmother|father|brother|Kakek = grandfather.",
+                      "Apa bahasa Inggris dari 'saudara laki-laki'?|brother|sister|uncle|aunt|Saudara laki-laki = brother.",
+                      "Apa bahasa Inggris dari 'hidung'?|nose|mouth|ear|eye|Hidung = nose.",
+                      "Apa bahasa Inggris dari 'mulut'?|mouth|nose|eye|hair|Mulut = mouth.",
+                      "Apa bahasa Inggris dari 'rambut'?|hair|hand|foot|leg|Rambut = hair.",
+                      "Apa bahasa Inggris dari 'kaki'?|foot|hand|head|nose|Kaki = foot.",
+                      "Sore hari kita berkata '...'|Good afternoon|Good morning|Good night|Goodbye|Good afternoon artinya selamat sore.",
+                      "Sebelum tidur kita berkata '...'|Good night|Good morning|Good afternoon|Hello|Good night artinya selamat malam.",
+                      "Apa arti 'Thank you'?|terima kasih|maaf|selamat tinggal|tolong|Thank you artinya terima kasih.",
+                      "Apa arti 'sorry'?|maaf|terima kasih|tolong|silakan|Sorry artinya maaf."
                   },
                   {
                       "Lengkapi: They ... playing football.|are|is|am|be|Setelah they kita pakai are.",
@@ -6012,6 +6234,16 @@ jobs:
                       "Hari setelah Monday adalah ...|Tuesday|Wednesday|Sunday|Friday|Monday = Senin, Tuesday = Selasa.",
                       "Apa bahasa Inggris dari 'air'?|water|milk|tea|rice",
                       "Apa bahasa Inggris dari 'nasi'?|rice|bread|egg|meat",
+                      "Lengkapi: She ... a student.|is|are|am|be|Setelah she kita pakai is.",
+                      "Lengkapi: We ... happy.|are|is|am|be|Setelah we kita pakai are.",
+                      "Lengkapi: I ... a boy.|am|is|are|be|Setelah I kita pakai am.",
+                      "Lengkapi: It ... a cat.|is|are|am|do|Setelah it kita pakai is.",
+                      "Lengkapi: She ... a cat.|has|have|having|haves|Setelah she kita pakai has.",
+                      "Lengkapi: This is ... apple.|an|a|two|any|Kata apple diawali bunyi vokal, jadi memakai an.",
+                      "Lengkapi: This is ... book.|a|an|are|is|Kata book diawali bunyi konsonan, jadi memakai a.",
+                      "Apa arti 'beautiful'?|cantik|besar|cepat|dingin|Beautiful artinya cantik.",
+                      "Apa arti 'tall'?|tinggi|pendek|gemuk|kecil|Tall artinya tinggi.",
+                      "Apa arti 'hungry'?|lapar|haus|lelah|senang|Hungry artinya lapar.",
                       "Apa bahasa Inggris dari 'dokter'?|doctor|nurse|farmer|police",
                       "Lawan kata 'big' adalah ...|small|tall|long|fast|Big = besar, small = kecil.",
                       "Lawan kata 'hot' adalah ...|cold|warm|dry|new|Hot = panas, cold = dingin.",
@@ -6019,7 +6251,17 @@ jobs:
                       "Jawaban untuk 'What is your name?' adalah ...|My name is Budi.|I am fine.|It is red.|Yes, I do.|Pertanyaan tentang nama dijawab dengan My name is ...",
                       "Five + two = ...|seven|six|eight|nine|Five = 5, two = 2, jadi 7 = seven.",
                       "Apa bahasa Inggris dari 'rumah'?|house|school|room|road",
-                      "Apa arti 'brother'?|saudara laki-laki|saudara perempuan|ayah|paman"
+                      "Apa arti 'brother'?|saudara laki-laki|saudara perempuan|ayah|paman",
+                      "Apa arti 'thirsty'?|haus|lapar|sedih|marah|Thirsty artinya haus.",
+                      "Apa bahasa Inggris dari 'hari Senin'?|Monday|Sunday|Friday|Tuesday|Hari Senin = Monday.",
+                      "Apa bahasa Inggris dari 'hari Minggu'?|Sunday|Monday|Saturday|Friday|Hari Minggu = Sunday.",
+                      "Apa arti 'January'?|Januari|Juli|Juni|Maret|January = Januari.",
+                      "Apa bahasa Inggris dari 'dapur'?|kitchen|bedroom|garden|bathroom|Dapur = kitchen.",
+                      "Apa bahasa Inggris dari 'kamar tidur'?|bedroom|kitchen|garage|classroom|Kamar tidur = bedroom.",
+                      "Apa bahasa Inggris dari 'petani'?|farmer|doctor|teacher|driver|Petani = farmer.",
+                      "Lengkapi: I ... milk every morning.|drink|drinks|drinking|drank|Setelah I kita pakai bentuk dasar drink.",
+                      "Lengkapi: He ... to school.|goes|go|going|gone|Setelah he kita pakai goes.",
+                      "Lengkapi: They ... in the garden.|play|plays|playing|played|Setelah they kita pakai play."
                   },
                   {
                       "Lengkapi: She ... to school every day.|goes|go|going|gone|Setelah she, kata kerja diberi -es/-s: goes.",
@@ -6520,14 +6762,19 @@ jobs:
 
               // Bentuk soal: pertanyaan|jawaban benar|salah 1|salah 2|salah 3|pembahasan
               private String alamQ(String text, int ans, String expl) {
-                  ArrayList<Integer> ds = new ArrayList<>(Arrays.asList(1, -1, 2, -2, 3, -3, 10, -10));
+                  // Kelas 1-2: pengecoh berjauhan dan tidak melewati batas bilangan kelas
+                  boolean low = kelas <= 1;
+                  int cap = kelas == 0 ? 10 : kelas == 1 ? 20 : Integer.MAX_VALUE;
+                  ArrayList<Integer> ds = new ArrayList<>(low
+                          ? Arrays.asList(3, -3, 5, -5, 7, -7, 10, -10)
+                          : Arrays.asList(1, -1, 2, -2, 3, -3, 10, -10));
                   Collections.shuffle(ds, rnd);
                   StringBuilder sb = new StringBuilder();
                   sb.append(text).append('|').append(fmt(ans));
                   int added = 0;
                   for (int d : ds) {
                       int v = ans + d;
-                      if (v < 0 || v == ans) {
+                      if (v < (low ? 1 : 0) || v == ans || (low && v > cap)) {
                           continue;
                       }
                       sb.append('|').append(fmt(v));
@@ -6538,6 +6785,97 @@ jobs:
                   }
                   sb.append('|').append(expl);
                   return sb.toString();
+              }
+
+              // Templat cerita Kelas 1-3. Awalan: A tambah, S kurang, M kali, D bagi.
+              // Penanda: {a} {b} {n} {m} {t} {nm} {sy} {bh}. Buatan Claude, perlu dicek guru kelas.
+              private static final String[] ALAM_STORY_S = {
+                  "A|{nm} memetik {a} {sy} pagi hari dan {b} {sy} sore hari. Berapa semuanya?",
+                  "A|Di sawah ada {a} bebek. Lalu datang {b} bebek lagi. Berapa semua bebek?",
+                  "A|Di sungai ada {a} ikan kecil dan {b} ikan besar. Berapa semua ikan?",
+                  "A|Di hutan ada {a} burung di pohon mangga dan {b} burung di pohon jambu. Berapa semua burung?",
+                  "A|{nm} mengumpulkan {a} kerang di pantai. Temannya mengumpulkan {b} kerang. Berapa semua kerang?",
+                  "A|Kebun {nm} punya {a} bunga merah dan {b} bunga kuning. Berapa semua bunga?",
+                  "A|Pak Tani menanam {a} pohon {bh} di kebun dan {b} pohon di halaman. Berapa semua pohon?",
+                  "A|Ada {a} kupu-kupu di bunga dan {b} kupu-kupu di daun. Berapa semua kupu-kupu?",
+                  "S|Ada {a} burung di pohon. {b} burung terbang pergi. Berapa burung yang masih di pohon?",
+                  "S|Di kolam ada {a} ikan. {b} ikan dimakan bebek. Berapa ikan yang tersisa?",
+                  "S|Kebun {nm} punya {a} bunga. {b} bunga dipetik untuk guru. Berapa bunga yang tersisa?",
+                  "S|Di sawah ada {a} bebek. {b} bebek pulang ke kandang. Berapa bebek yang masih di sawah?",
+                  "S|{nm} punya {a} kerang. {b} kerang diberikan kepada adik. Berapa kerang yang tersisa?",
+                  "S|Di hutan ada {a} kelinci. {b} kelinci masuk ke lubang. Berapa kelinci di luar lubang?",
+                  "S|Pohon {bh} punya {a} buah. {b} buah jatuh ke tanah. Berapa buah yang masih di pohon?",
+                  "S|Ada {a} perahu di sungai. {b} perahu pergi ke laut. Berapa perahu yang tersisa di sungai?"
+              };
+              private static final String[] ALAM_STORY_L = {
+                  "A|Hasil panen padi pagi hari {a} kg dan siang hari {b} kg. Berapa kg hasil panen seluruhnya?",
+                  "A|Pak Tani menjual {a} butir telur hari Senin dan {b} butir telur hari Selasa. Berapa butir telur yang terjual?",
+                  "A|Nelayan mendapat {a} ikan di sungai dan {b} ikan di pantai. Berapa ikan yang didapat seluruhnya?",
+                  "A|Di hutan lindung ada {a} pohon jati dan {b} pohon mahoni. Berapa semua pohon?",
+                  "A|{nm} memetik {a} {bh} di kebun pagi hari dan {b} {bh} sore hari. Berapa {bh} yang dipetik?",
+                  "A|Sawah Pak Dimas menghasilkan {a} kg gabah dan sawah Pak Udin {b} kg. Berapa kg gabah seluruhnya?",
+                  "S|Gudang punya {a} kg beras. Sebanyak {b} kg dijual. Berapa kg beras yang tersisa?",
+                  "S|Peternak punya {a} telur. Sebanyak {b} telur dikirim ke pasar. Berapa telur yang tersisa?",
+                  "S|Di kolam ada {a} ikan. Sebanyak {b} ikan diambil untuk dijual. Berapa ikan yang masih di kolam?",
+                  "S|Kebun punya {a} batang pohon. Sebanyak {b} batang ditebang karena sakit. Berapa batang yang tersisa?",
+                  "S|{nm} membawa {a} kg {sy} ke pasar. Pembeli membeli {b} kg. Berapa kg {sy} yang tersisa?",
+                  "S|Penjaga pantai punya {a} botol air. Sebanyak {b} botol dibagikan. Berapa botol yang tersisa?",
+                  "M|Ada {n} keranjang. Setiap keranjang berisi {m} {bh}. Berapa semua {bh}?",
+                  "M|Satu baris sawah ditanami {m} bibit padi. Ada {n} baris. Berapa semua bibit?",
+                  "M|Ada {n} ember. Setiap ember berisi {m} ikan. Berapa semua ikan?",
+                  "M|Setiap pohon kelapa berbuah {m} kelapa. Ada {n} pohon. Berapa semua kelapa?",
+                  "M|Pantai punya {n} payung. Setiap payung dipakai {m} orang. Berapa semua orang?",
+                  "D|Ada {t} {bh} dibagi sama banyak ke {n} keranjang. Berapa {bh} di tiap keranjang?",
+                  "D|{t} bibit ditanam sama banyak di {n} baris. Berapa bibit tiap baris?",
+                  "D|{t} ikan dimasukkan sama banyak ke {n} kolam. Berapa ikan tiap kolam?",
+                  "D|Nelayan membagi {t} kerang sama banyak untuk {n} anak. Berapa kerang tiap anak?"
+              };
+
+              // Cerita Kelas 1 (sampai 10), Kelas 2 (sampai 20), Kelas 3 (ratusan, kali-bagi kecil)
+              private String alamStoryOne() {
+                  String[] pool = kelas <= 1 ? ALAM_STORY_S : ALAM_STORY_L;
+                  String tpl = pool[rnd.nextInt(pool.length)];
+                  char ty = tpl.charAt(0);
+                  String text = tpl.substring(2);
+                  text = text.replace("{nm}", alamPick(ALAM_NAMA)).replace("{sy}", alamPick(ALAM_SAYUR))
+                          .replace("{bh}", alamPick(ALAM_BUAH));
+                  int a;
+                  int b;
+                  if (ty == 'A') {
+                      if (kelas == 0) {
+                          a = range(2, 9);
+                          b = range(1, 10 - a);
+                      } else if (kelas == 1) {
+                          a = range(3, 17);
+                          b = range(2, 20 - a);
+                      } else {
+                          a = range(120, 480);
+                          b = range(100, 350);
+                      }
+                      return alamQ(text.replace("{a}", fmt(a)).replace("{b}", fmt(b)), a + b,
+                              fmt(a) + " + " + fmt(b) + " = " + fmt(a + b) + ".");
+                  } else if (ty == 'S') {
+                      if (kelas == 0) {
+                          a = range(4, 10);
+                          b = range(1, a - 1);
+                      } else if (kelas == 1) {
+                          a = range(8, 20);
+                          b = range(2, a - 2);
+                      } else {
+                          a = range(500, 900);
+                          b = range(100, 400);
+                      }
+                      return alamQ(text.replace("{a}", fmt(a)).replace("{b}", fmt(b)), a - b,
+                              fmt(a) + " \u2212 " + fmt(b) + " = " + fmt(a - b) + ".");
+                  }
+                  int n = range(3, 9);
+                  int m = range(3, 9);
+                  if (ty == 'M') {
+                      return alamQ(text.replace("{n}", "" + n).replace("{m}", "" + m), n * m,
+                              n + " \u00D7 " + m + " = " + (n * m) + ".");
+                  }
+                  return alamQ(text.replace("{t}", "" + (n * m)).replace("{n}", "" + n), m,
+                          (n * m) + " \u00F7 " + n + " = " + m + ".");
               }
 
               private String alamMathOne() {
@@ -6551,89 +6889,9 @@ jobs:
                   int m;
                   switch (kelas) {
                       case 0:
-                          if (t == 0) {
-                              a = range(2, 9);
-                              b = range(2, 9);
-                              return alamQ(nm + " memetik " + a + " " + sy + " pagi hari dan " + b + " " + sy
-                                      + " sore hari. Berapa semuanya?", a + b, a + " + " + b + " = " + (a + b) + ".");
-                          } else if (t == 1) {
-                              a = range(8, 19);
-                              b = range(1, 7);
-                              return alamQ("Ada " + a + " burung di pohon. " + b + " burung terbang pergi. Berapa burung yang masih di pohon?",
-                                      a - b, a + " \u2212 " + b + " = " + (a - b) + ".");
-                          } else if (t == 2) {
-                              a = range(3, 9);
-                              b = range(3, 9);
-                              return alamQ("Di kandang ada " + a + " ayam. Pak Tani membawa " + b + " ayam lagi. Berapa semua ayam?",
-                                      a + b, a + " + " + b + " = " + (a + b) + ".");
-                          } else if (t == 3) {
-                              a = range(10, 19);
-                              b = range(1, 6);
-                              return alamQ("Kebun " + nm + " punya " + a + " bunga. Sebanyak " + b
-                                      + " bunga dipetik untuk guru. Berapa bunga yang tersisa?", a - b,
-                                      a + " \u2212 " + b + " = " + (a - b) + ".");
-                          }
-                          a = range(2, 9);
-                          b = range(2, 9);
-                          return alamQ("Ada " + a + " kupu-kupu di bunga merah dan " + b
-                                  + " kupu-kupu di bunga kuning. Berapa semua kupu-kupu?", a + b,
-                                  a + " + " + b + " = " + (a + b) + ".");
                       case 1:
-                          if (t == 0) {
-                              a = range(20, 59);
-                              b = range(10, 34);
-                              return alamQ("Pak Tani memanen " + a + " kg jagung pagi hari dan " + b
-                                      + " kg sore hari. Berapa kg semuanya?", a + b, a + " + " + b + " = " + (a + b) + ".");
-                          } else if (t == 1) {
-                              a = range(50, 99);
-                              b = range(10, 39);
-                              return alamQ("Ada " + a + " ikan di kolam. Sebanyak " + b
-                                      + " ikan dipindahkan ke kolam lain. Berapa ikan yang tersisa?", a - b,
-                                      a + " \u2212 " + b + " = " + (a - b) + ".");
-                          } else if (t == 2) {
-                              n = range(2, 5);
-                              int[] ms = {2, 5, 10};
-                              m = ms[rnd.nextInt(3)];
-                              return alamQ("Ada " + n + " kandang. Setiap kandang berisi " + m + " ayam. Berapa semua ayam?",
-                                      n * m, n + " \u00D7 " + m + " = " + (n * m) + ".");
-                          } else if (t == 3) {
-                              a = range(30, 69);
-                              b = range(10, 29);
-                              return alamQ("Bu Guru menanam " + a + " bibit cabai dan " + b + " bibit tomat. Berapa semua bibit?",
-                                      a + b, a + " + " + b + " = " + (a + b) + ".");
-                          }
-                          a = range(40, 89);
-                          b = range(11, 38);
-                          return alamQ("Kebun sekolah punya " + a + " pohon. Sebanyak " + b
-                                  + " pohon dipindahkan ke halaman. Berapa pohon yang masih di kebun?", a - b,
-                                  a + " \u2212 " + b + " = " + (a - b) + ".");
                       case 2:
-                          if (t == 0) {
-                              a = range(120, 480);
-                              b = range(100, 350);
-                              return alamQ("Hasil panen pagi " + a + " kg dan siang " + b + " kg. Berapa kg hasil panen seluruhnya?",
-                                      a + b, a + " + " + b + " = " + (a + b) + ".");
-                          } else if (t == 1) {
-                              a = range(500, 900);
-                              b = range(100, 400);
-                              return alamQ("Gudang punya " + a + " kg beras. Sebanyak " + b + " kg dijual. Berapa kg beras yang tersisa?",
-                                      a - b, a + " \u2212 " + b + " = " + (a - b) + ".");
-                          } else if (t == 2) {
-                              n = range(3, 9);
-                              m = range(3, 9);
-                              return alamQ("Ada " + n + " keranjang. Setiap keranjang berisi " + m + " " + bh + ". Berapa semua " + bh + "?",
-                                      n * m, n + " \u00D7 " + m + " = " + (n * m) + ".");
-                          } else if (t == 3) {
-                              n = range(3, 9);
-                              m = range(3, 9);
-                              return alamQ("Ada " + (n * m) + " " + bh + " dibagi sama banyak ke " + n
-                                      + " keranjang. Berapa " + bh + " di tiap keranjang?", m,
-                                      (n * m) + " \u00F7 " + n + " = " + m + ".");
-                          }
-                          n = range(2, 6);
-                          m = range(4, 9);
-                          return alamQ("Satu baris kebun ditanami " + m + " bibit. Ada " + n + " baris. Berapa semua bibit?",
-                                  n * m, n + " \u00D7 " + m + " = " + (n * m) + ".");
+                          return alamStoryOne();
                       case 3:
                           if (t == 0) {
                               a = range(12, 47) * 100;
@@ -6739,7 +6997,7 @@ jobs:
                   ArrayList<String> out = new ArrayList<>();
                   ArrayList<String> seen = new ArrayList<>();
                   int guard = 0;
-                  while (out.size() < TOTAL && guard < 300) {
+                  while (out.size() < qCount() && guard < 300) {
                       guard++;
                       String s = alamMathOne();
                       String text = s.substring(0, s.indexOf('|'));
@@ -6760,7 +7018,7 @@ jobs:
                       pool.addAll(Arrays.asList((subj == 1 ? ALAM_ID : ALAM_EN)[kelas]));
                       Collections.shuffle(pool, rnd);
                   }
-                  total = Math.min(TOTAL, pool.size());
+                  total = Math.min(qCount(), pool.size());
                   for (int i = 0; i < total; i++) {
                       String[] f = pool.get(i).split("\\|");
                       ArrayList<Integer> ord = new ArrayList<>();
@@ -6796,7 +7054,22 @@ jobs:
                       "Lengkapi kata: po_on (tempat daun tumbuh).|h|k|m|t|Kata yang benar: pohon.",
                       "Lengkapi kata: ke_un (tempat menanam sayur).|b|d|m|s|Kata yang benar: kebun.",
                       "Kita membuang sampah di ...|tempat sampah|sungai|jalan|kelas|Sampah dibuang di tempat sampah agar lingkungan bersih.",
-                      "Kupu-kupu terbang dengan ...|sayap|roda|sirip|tanduk|Kupu-kupu punya sayap yang indah."
+                      "Kupu-kupu terbang dengan ...|sayap|roda|sirip|tanduk|Kupu-kupu punya sayap yang indah.",
+                      "\uD83C\uDF33 Pohon tumbuh di ...|tanah|air|awan|kamar|Pohon tumbuh di tanah.",
+                      "\uD83D\uDC04 Sapi makan ...|rumput|batu|kertas|sabun|Sapi makan rumput.",
+                      "Ikan bernapas dengan ...|insang|tangan|kaki|rambut|Ikan bernapas dengan insang.",
+                      "Telur ayam dihasilkan oleh ...|ayam|sapi|kucing|ikan|Telur ayam dihasilkan oleh ayam.",
+                      "Ulat akan berubah menjadi ...|kupu-kupu|ikan|burung|katak|Ulat menjadi kupu-kupu setelah menjadi kepompong.",
+                      "Awan gelap biasanya membawa ...|hujan|pasir|api|batu|Awan gelap menandakan akan turun hujan.",
+                      "Padi tumbuh di ...|sawah|laut|gurun|langit|Padi ditanam di sawah.",
+                      "Nasi berasal dari ...|padi|ikan|sapi|telur|Nasi dibuat dari beras yang berasal dari padi.",
+                      "Hewan yang hidup di hutan adalah ...|harimau|ayam|bebek|kambing|Harimau hidup di hutan.",
+                      "Kita minum air supaya tidak ...|haus|marah|gelap|takut|Minum air menghilangkan rasa haus.",
+                      "Kita merawat tanaman dengan cara ...|menyiram|membakar|menginjak|membuang|Tanaman dirawat dengan disiram.",
+                      "\uD83D\uDC1D Lebah menghasilkan ...|madu|susu|telur|beras|Lebah menghasilkan madu.",
+                      "Gunung itu ...|tinggi|kecil|pendek|rendah|Gunung adalah bagian bumi yang menjulang tinggi.",
+                      "Lengkapi kata: ik_n (hidup di air).|a|u|o|e|Kata yang benar: ikan.",
+                      "Lengkapi kata: bu_ga (ada di taman).|n|m|k|t|Kata yang benar: bunga."
                   },
                   {
                       "Kambing suka makan ...|rumput|daging|batu|plastik|Kambing memakan rumput dan daun.",
@@ -6808,7 +7081,22 @@ jobs:
                       "Kulit pisang termasuk sampah ...|organik|plastik|kaca|logam|Sampah organik berasal dari makhluk hidup dan bisa membusuk.",
                       "Kalimat yang benar adalah ...|Petani menanam padi di sawah.|Padi sawah petani di menanam.|Menanam di padi sawah.|Sawah petani padi di.|Kalimat yang baik punya susunan kata yang jelas.",
                       "Kata 'bunga' dipisah menjadi suku kata ...|bu-nga|bun-ga|b-unga|bung-a|Kata bunga dipisah menjadi bu-nga.",
-                      "Lengkapi kata: ker_au (hewan pembajak sawah).|b|d|m|p|Kata yang benar: kerbau."
+                      "Lengkapi kata: ker_au (hewan pembajak sawah).|b|d|m|p|Kata yang benar: kerbau.",
+                      "Bagian tumbuhan yang berwarna-warni dan harum adalah ...|bunga|akar|batang|tanah|Bunga berwarna-warni dan wangi.",
+                      "Bagian tumbuhan yang menopang pohon agar tegak adalah ...|batang|bunga|buah|biji|Batang menopang tumbuhan.",
+                      "Ayam berkembang biak dengan cara ...|bertelur|melahirkan|membelah diri|bertunas|Ayam bertelur.",
+                      "Kucing berkembang biak dengan cara ...|melahirkan|bertelur|bertunas|berbunga|Kucing melahirkan anak.",
+                      "Air hujan jatuh dari ...|awan|tanah|pohon|batu|Hujan turun dari awan.",
+                      "Air sungai mengalir menuju ...|laut|gunung|awan|atap|Air sungai mengalir ke laut.",
+                      "Hewan yang hidup di air dan di darat adalah ...|katak|ikan|burung|sapi|Katak hidup di air dan di darat.",
+                      "Tumbuhan hijau membuat makanan dengan bantuan cahaya ...|matahari|bulan|kilat|api|Tumbuhan membuat makanan dengan cahaya matahari.",
+                      "Pohon kelapa banyak tumbuh di daerah ...|pantai|kutub|gurun|laut dalam|Kelapa banyak tumbuh di pantai.",
+                      "Kata 'sungai' terdiri dari ... suku kata.|dua|satu|tiga|empat|Su-ngai terdiri dari dua suku kata.",
+                      "Lengkapi kata: sa_ah (tempat menanam padi).|w|b|m|k|Kata yang benar: sawah.",
+                      "Lengkapi kata: ke_inci (hewan berbulu lembut).|l|m|p|t|Kata yang benar: kelinci.",
+                      "Lawan kata 'basah' adalah ...|kering|dingin|besar|jauh|Basah lawannya kering.",
+                      "Tumbuhan di sawah yang menghasilkan beras adalah ...|padi|kelapa|pisang|kopi|Padi menghasilkan beras.",
+                      "Cacing menggemburkan tanah sehingga tanah menjadi ...|subur|keras|kering|sempit|Cacing membuat tanah gembur dan subur."
                   },
                   {
                       "Tumbuhan membuat makanan dengan bantuan cahaya matahari. Prosesnya disebut ...|fotosintesis|pernapasan|penguapan|pencernaan|Fotosintesis terjadi di daun yang hijau.",
@@ -6820,7 +7108,22 @@ jobs:
                       "Air hujan yang meresap ke dalam tanah menjadi ...|air tanah|awan|garam|lumpur|Air hujan yang meresap tersimpan sebagai air tanah.",
                       "Jika tanaman disiram setiap hari, tanaman akan ...|tumbuh subur|layu|mati|berlari|Air yang cukup membuat tanaman tumbuh subur.",
                       "Beternak artinya memelihara ...|hewan|batu|awan|mobil|Beternak berarti memelihara hewan seperti ayam atau sapi.",
-                      "Penulisan yang benar adalah ...|sayuran|sayurran|sayoran|sayuren|Tulisan yang benar: sayuran."
+                      "Penulisan yang benar adalah ...|sayuran|sayurran|sayoran|sayuren|Tulisan yang benar: sayuran.",
+                      "Hewan pemakan daging disebut ...|karnivora|herbivora|omnivora|insektivora|Karnivora memakan daging, misalnya harimau.",
+                      "Hewan pemakan tumbuhan dan daging disebut ...|omnivora|herbivora|karnivora|insektivora|Omnivora memakan tumbuhan dan daging, misalnya ayam.",
+                      "Daur hidup kupu-kupu: telur, ulat, kepompong, lalu ...|kupu-kupu|belalang|lebah|capung|Setelah kepompong menjadi kupu-kupu dewasa.",
+                      "Air berubah menjadi uap karena panas. Peristiwa ini disebut ...|penguapan|pembekuan|pengembunan|pencairan|Penguapan: air menjadi uap.",
+                      "Uap air berubah menjadi titik air di awan. Peristiwa ini disebut ...|pengembunan|penguapan|pembekuan|pencairan|Pengembunan: uap menjadi air.",
+                      "Bagian bunga yang berkembang menjadi buah adalah ...|bakal buah|mahkota|kelopak|tangkai|Bakal buah berkembang menjadi buah.",
+                      "Menanam pohon bermanfaat untuk ...|mencegah banjir dan longsor|menambah sampah|mengotori air|menghabiskan udara|Akar pohon menahan tanah dan air.",
+                      "Sampah plastik sulit terurai. Sebaiknya kita ... sampah plastik.|mengurangi|membakar di kebun|membuang ke sungai|mengubur di sawah|Mengurangi sampah plastik menjaga lingkungan.",
+                      "Sungai yang kotor dapat menyebabkan ...|penyakit|panen melimpah|udara segar|ikan bertambah|Sungai kotor menimbulkan penyakit.",
+                      "Kata 'pertanian' berasal dari kata dasar ...|tani|per|tanian|an|Pertanian terdiri dari per-, tani, dan -an.",
+                      "Penanam adalah orang yang ...|menanam|memetik|menjual|memasak|Penanam adalah orang yang menanam.",
+                      "Penulisan yang benar adalah ...|ladang|ladan|ladnag|laddang|Tulisan yang benar: ladang.",
+                      "Penulisan yang benar adalah ...|nelayan|nelyan|nealayan|nelayaan|Tulisan yang benar: nelayan.",
+                      "Kalimat yang benar adalah ...|Petani menanam padi di sawah.|Menanam petani padi di.|Padi di petani sawah menanam.|Sawah padi menanam petani di.|Kalimat harus punya susunan kata yang jelas.",
+                      "Hewan yang bernapas dengan insang dan hidup di air adalah ...|ikan|katak dewasa|burung|sapi|Ikan bernapas dengan insang."
                   },
                   {
                       "Makhluk hidup dan lingkungannya yang saling berhubungan disebut ...|ekosistem|galaksi|kota|musim|Ekosistem terdiri dari makhluk hidup dan lingkungannya.",
@@ -6871,7 +7174,22 @@ jobs:
                       "Apa bahasa Inggris dari 'ayam'?|chicken|duck|cow|goat",
                       "Apa bahasa Inggris dari 'bebek'?|duck|cow|cat|bird",
                       "Apa bahasa Inggris dari 'ikan'?|fish|bird|frog|bee",
-                      "Apa bahasa Inggris dari 'kupu-kupu'?|butterfly|bee|bird|bat"
+                      "Apa bahasa Inggris dari 'kupu-kupu'?|butterfly|bee|bird|bat",
+                      "\uD83D\uDC04 Apa bahasa Inggris dari 'sapi'?|cow|cat|dog|hen|Sapi = cow.",
+                      "\uD83D\uDC14 Apa bahasa Inggris dari 'ayam betina'?|hen|pig|cow|bee|Ayam betina = hen.",
+                      "\uD83D\uDC1D Apa bahasa Inggris dari 'lebah'?|bee|cat|rain|tree|Lebah = bee.",
+                      "\u2600\uFE0F Apa bahasa Inggris dari 'matahari'?|sun|moon|star|rain|Matahari = sun.",
+                      "\uD83C\uDF27\uFE0F Apa bahasa Inggris dari 'hujan'?|rain|sun|wind|cloud|Hujan = rain.",
+                      "\u2601\uFE0F Apa bahasa Inggris dari 'awan'?|cloud|sun|moon|star|Awan = cloud.",
+                      "Apa bahasa Inggris dari 'rumput'?|grass|glass|green|gray|Rumput = grass.",
+                      "\uD83D\uDC38 Apa bahasa Inggris dari 'katak'?|frog|fish|bird|duck|Katak = frog.",
+                      "\uD83E\uDD86 Apa bahasa Inggris dari 'bebek'?|duck|pig|bee|cow|Bebek = duck.",
+                      "\uD83D\uDC10 Apa bahasa Inggris dari 'kambing'?|goat|cow|hen|duck|Kambing = goat.",
+                      "\uD83C\uDF0A Apa bahasa Inggris dari 'laut'?|sea|tree|sun|cow|Laut = sea.",
+                      "\uD83E\uDD55 Apa bahasa Inggris dari 'wortel'?|carrot|apple|rice|milk|Wortel = carrot.",
+                      "\uD83C\uDF45 Apa bahasa Inggris dari 'tomat'?|tomato|potato|banana|corn|Tomat = tomato.",
+                      "\uD83C\uDF3D Apa bahasa Inggris dari 'jagung'?|corn|rice|egg|milk|Jagung = corn.",
+                      "Apa bahasa Inggris dari 'tanah'?|soil|sky|sun|sea|Tanah = soil."
                   },
                   {
                       "Apa bahasa Inggris dari 'kebun'?|garden|gate|game|goat",
@@ -6883,7 +7201,21 @@ jobs:
                       "Apa bahasa Inggris dari 'rumput'?|grass|glass|gas|grape",
                       "Apa bahasa Inggris dari 'biji'?|seed|seat|seven|sand",
                       "Lengkapi: The cow gives us ...|milk|eggs|honey|wool|Sapi menghasilkan susu (milk).",
-                      "Lengkapi: A bird has two ...|wings|wheels|fins|horns|Burung punya dua sayap (wings)."
+                      "Lengkapi: A bird has two ...|wings|wheels|fins|horns|Burung punya dua sayap (wings).",
+                      "Apa bahasa Inggris dari 'sawah'?|rice field|river|road|roof|Sawah = rice field.",
+                      "Apa bahasa Inggris dari 'kerbau'?|buffalo|bear|bee|bird|Kerbau = buffalo.",
+                      "Apa bahasa Inggris dari 'tanaman'?|plant|plate|plane|play|Tanaman = plant.",
+                      "Apa bahasa Inggris dari 'akar'?|root|leaf|seed|stem|Akar = root.",
+                      "Apa bahasa Inggris dari 'danau'?|lake|lamp|leaf|lion|Danau = lake.",
+                      "Apa bahasa Inggris dari 'pulau'?|island|river|road|rock|Pulau = island.",
+                      "Lengkapi: Fish swim in the ...|water|sky|tree|house|Ikan berenang di air (water).",
+                      "Lengkapi: Birds can ...|fly|dig|drive|read|Burung bisa terbang (fly).",
+                      "Lengkapi: A cat says ...|meow|moo|woof|quack|Kucing mengeong (meow).",
+                      "Lengkapi: A dog says ...|woof|meow|moo|quack|Anjing menggonggong (woof).",
+                      "Lengkapi: A cow says ...|moo|woof|meow|quack|Sapi bersuara moo.",
+                      "Apa bahasa Inggris dari 'angin'?|wind|rain|sun|cloud|Angin = wind.",
+                      "Apa bahasa Inggris dari 'pelangi'?|rainbow|rain|cloud|wind|Pelangi = rainbow.",
+                      "Apa bahasa Inggris dari 'bintang'?|star|moon|sun|sky|Bintang = star."
                   },
                   {
                       "Lengkapi: Plants need water and ... to grow.|sunlight|candy|toys|shoes|Tumbuhan butuh air dan cahaya matahari (sunlight).",
@@ -6895,7 +7227,21 @@ jobs:
                       "Lengkapi: We must ... the trees and flowers.|water|break|burn|throw|Kita menyiram (water) pohon dan bunga.",
                       "Apa bahasa Inggris dari 'ular'?|snake|snail|spider|sheep",
                       "Lengkapi: Fish live in the ...|water|tree|sky|sand|Ikan hidup di air (water).",
-                      "Lengkapi: A farmer grows rice in the ...|field|kitchen|bank|garage|Petani menanam padi di sawah (field)."
+                      "Lengkapi: A farmer grows rice in the ...|field|kitchen|bank|garage|Petani menanam padi di sawah (field).",
+                      "Lengkapi: The sun gives us ...|light|milk|paper|shoes|Matahari memberi kita cahaya (light).",
+                      "Lengkapi: Farmers plant seeds in the ...|soil|sky|sea|kitchen|Petani menanam biji di tanah (soil).",
+                      "Lengkapi: A tadpole becomes a ...|frog|fish|bird|cat|Berudu menjadi katak (frog).",
+                      "Lengkapi: A caterpillar becomes a ...|butterfly|bee|bat|bird|Ulat menjadi kupu-kupu (butterfly).",
+                      "Apa arti 'rainforest'?|hutan hujan|ladang padi|pantai|gunung|Rainforest = hutan hujan.",
+                      "Apa arti 'waterfall'?|air terjun|sungai kecil|kolam|laut|Waterfall = air terjun.",
+                      "Apa arti 'beach'?|pantai|gunung|sawah|hutan|Beach = pantai.",
+                      "Apa arti 'owl'?|burung hantu|elang|bebek|angsa|Owl = burung hantu.",
+                      "Lengkapi: We must not throw ... into the river.|trash|water|flowers|fish|Kita tidak boleh membuang sampah (trash) ke sungai.",
+                      "Lengkapi: Trees give us fresh ...|air|trash|plastic|smoke|Pohon memberi kita udara (air) yang segar.",
+                      "Apa arti 'insect'?|serangga|ikan|burung|kuda|Insect = serangga.",
+                      "Apa arti 'harvest'?|panen|menanam|menyiram|menjual|Harvest = panen.",
+                      "Lengkapi: Cows eat ...|grass|meat|plastic|stones|Sapi makan rumput (grass).",
+                      "Lengkapi: A bee makes ...|honey|milk|rice|bread|Lebah membuat madu (honey)."
                   },
                   {
                       "Lengkapi: Butterflies have colorful ...|wings|wheels|keys|boots|Kupu-kupu punya sayap (wings) yang berwarna-warni.",
@@ -6970,7 +7316,7 @@ jobs:
                       pool.add(src[i]);
                   }
                   Collections.shuffle(pool, rnd);
-                  total = Math.min(TOTAL, pool.size());
+                  total = Math.min(qCount(), pool.size());
                   for (int i = 0; i < total; i++) {
                       String[] f = pool.get(i).split("\\|");
                       ArrayList<Integer> ord = new ArrayList<>();
