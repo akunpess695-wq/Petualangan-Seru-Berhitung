@@ -562,7 +562,8 @@ jobs:
           SIZE=$(stat -c%s "$APK")
           echo "Ukuran APK: $SIZE byte"
           test "$SIZE" -gt 100000
-          unzip -l "$APK" | grep -q 'classes.dex'
+          unzip -l "$APK" > "$RUNNER_TEMP/apk-list.txt"
+          grep -q 'classes.dex' "$RUNNER_TEMP/apk-list.txt"
           unzip -p "$APK" classes.dex > "$RUNNER_TEMP/classes.dex"
           grep -a -q 'com/petualangan/berhitung/MainActivity' "$RUNNER_TEMP/classes.dex"
           echo "classes.dex berisi MainActivity: OK"
