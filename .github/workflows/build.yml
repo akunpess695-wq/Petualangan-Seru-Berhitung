@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.2.3"
+                  versionName "6.2.4"
               }
 
               signingConfigs {
@@ -553,7 +553,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.2.3";
+              private static final String APP_VERSION = "6.2.4";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -889,34 +889,6 @@ jobs:
                       vrot = new float[n];
                       color = new int[n];
                       density = ctx.getResources().getDisplayMetrics().density;
-                  }
-
-                  @Override
-                  public boolean onTouchEvent(android.view.MotionEvent event) {
-                      if (mode != 0) return super.onTouchEvent(event);
-                      switch (event.getActionMasked()) {
-                          case android.view.MotionEvent.ACTION_DOWN:
-                              lastTouchX = event.getX();
-                              getParent().requestDisallowInterceptTouchEvent(true);
-                              return true;
-                          case android.view.MotionEvent.ACTION_MOVE:
-                              float dx = event.getX() - lastTouchX;
-                              lastTouchX = event.getX();
-                              avatarAngle = (avatarAngle + dx * 1.2f) % 360f;
-                              invalidate();
-                              return true;
-                          case android.view.MotionEvent.ACTION_UP:
-                          case android.view.MotionEvent.ACTION_CANCEL:
-                              performClick();
-                              return true;
-                      }
-                      return true;
-                  }
-
-                  @Override
-                  public boolean performClick() {
-                      super.performClick();
-                      return true;
                   }
 
                   @Override
@@ -4614,6 +4586,34 @@ jobs:
                       p.setTextSize(size * u);
                       Paint.FontMetrics fm = p.getFontMetrics();
                       c.drawText(t, fx(cx), fy(cy) - (fm.ascent + fm.descent) / 2f, p);
+                  }
+
+                  @Override
+                  public boolean onTouchEvent(android.view.MotionEvent event) {
+                      if (mode != 0) return super.onTouchEvent(event);
+                      switch (event.getActionMasked()) {
+                          case android.view.MotionEvent.ACTION_DOWN:
+                              lastTouchX = event.getX();
+                              getParent().requestDisallowInterceptTouchEvent(true);
+                              return true;
+                          case android.view.MotionEvent.ACTION_MOVE:
+                              float dx = event.getX() - lastTouchX;
+                              lastTouchX = event.getX();
+                              avatarAngle = (avatarAngle + dx * 1.2f) % 360f;
+                              invalidate();
+                              return true;
+                          case android.view.MotionEvent.ACTION_UP:
+                          case android.view.MotionEvent.ACTION_CANCEL:
+                              performClick();
+                              return true;
+                      }
+                      return true;
+                  }
+
+                  @Override
+                  public boolean performClick() {
+                      super.performClick();
+                      return true;
                   }
 
                   @Override
