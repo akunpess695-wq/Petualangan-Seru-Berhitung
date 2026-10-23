@@ -479,14 +479,18 @@ jobs:
           DEST=app/src/main/java/com/petualangan/berhitung/MainActivity.java
           FOUND=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/proj" -prune -o -path "$GITHUB_WORKSPACE/.git" -prune -o -type f \( -name 'MainActivity.java' -o -name 'MainActivity-*.java' \) -print | sort)
           echo "Berkas MainActivity yang ditemukan:"; echo "$FOUND"
-          if [ -z "$FOUND" ]; then
-            echo "::error::Tidak ada MainActivity.java di repo. Unggah file MainActivity.java ke repo."
+          if [ -n "$FOUND" ]; then
+            SRC=$(echo "$FOUND" | grep '/MainActivity\.java$' | head -n 1 || true)
+            if [ -z "$SRC" ]; then SRC=$(echo "$FOUND" | tail -n 1); fi
+            echo "Dipakai: $SRC"
+            cp "$SRC" "$DEST"
+          elif [ -f "$GITHUB_WORKSPACE/proj/$DEST" ]; then
+            echo "Dipakai: proj/$DEST (sudah ada di repo)"
+            cp "$GITHUB_WORKSPACE/proj/$DEST" "$DEST"
+          else
+            echo "::error::MainActivity.java tidak ditemukan di repo (termasuk di folder proj)."
             exit 1
           fi
-          SRC=$(echo "$FOUND" | grep '/MainActivity\.java$' | head -n 1 || true)
-          if [ -z "$SRC" ]; then SRC=$(echo "$FOUND" | tail -n 1); fi
-          echo "Dipakai: $SRC"
-          cp "$SRC" "$DEST"
           grep -q 'package com.petualangan.berhitung;' "$DEST"
           mkdir -p app
           base64 -d > app/pb.keystore <<'PB_EOF'
