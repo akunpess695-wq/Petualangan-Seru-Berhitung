@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.6.4";
+    private static final String APP_VERSION = "6.7.0";
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -4064,6 +4064,15 @@ public class MainActivity extends Activity {
         private float avatarAngle = 0f;
         private float lastTouchX = 0f;
         private final long animEpoch = System.currentTimeMillis();
+        // Animasi idle (L2): waktu, goyang badan, ayunan lengan, gerak kepala.
+        private float animT = 0f;
+        private float swayDeg = 0f;
+        private float swayAmp = 1f;
+        private float headBob = 0f;
+        private float armSwing = 0f;
+        private float yShift = 0f;
+        private float zShift = 0f;
+        private boolean touching = false;
 
         private boolean isBlinking() {
             if (mode != 0) return false;
@@ -4209,8 +4218,8 @@ public class MainActivity extends Activity {
                             int colSide, int colTop, int colBack, int kind) {
             for (int i = 0; i < 8; i++) {
                 float x = ((i & 1) != 0 ? x1 : x0) - 50f;
-                float y = ((i & 2) != 0 ? y1 : y0) - 50f;
-                float z = (i & 4) != 0 ? z1 : z0;
+                float y = ((i & 2) != 0 ? y1 : y0) - 50f + yShift;
+                float z = ((i & 4) != 0 ? z1 : z0) + zShift;
                 float xr = x * c3t + z * s3t;
                 float zr = -x * s3t + z * c3t;
                 float y2 = y * c3p - zr * s3p;
@@ -4324,13 +4333,13 @@ public class MainActivity extends Activity {
                 float minY = Math.min(Math.min(fq[o + 1], fq[o + 3]), Math.min(fq[o + 5], fq[o + 7]));
                 float maxY = Math.max(Math.max(fq[o + 1], fq[o + 3]), Math.max(fq[o + 5], fq[o + 7]));
                 p.setShader(new LinearGradient(minX, minY, maxX + 1f, maxY + 1f,
-                        shade(fc[i], 1.13f), shade(fc[i], 0.88f), Shader.TileMode.CLAMP));
+                        shade(fc[i], 1.17f), shade(fc[i], 0.86f), Shader.TileMode.CLAMP));
                 c.drawPath(path, p);
                 p.setShader(null);
                 p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(0.55f * u);
+                p.setStrokeWidth(0.45f * u);
                 p.setStrokeJoin(Paint.Join.ROUND);
-                p.setColor(shade(fc[i], 0.72f));
+                p.setColor(shade(fc[i], 0.78f));
                 c.drawPath(path, p);
                 p.setStyle(Paint.Style.FILL);
                 if (fk[i] != 0) {
@@ -4382,19 +4391,37 @@ public class MainActivity extends Activity {
             curHid = it[6];
             curHairC = curHid >= 0 ? col(itIcon(curHid)) : col("#4E342E");
 
-            float th = (float) Math.toRadians(avatarAngle);
+            yShift = 0f;
+            zShift = 0f;
+            headBob = (float) Math.sin(animT * 2.0f + 0.5f) * 0.45f;
+            armSwing = (float) Math.sin(animT * 1.4f) * 1.8f;
+            float th = (float) Math.toRadians(avatarAngle + swayDeg);
             float pitch = (float) Math.toRadians(-16f);
             c3t = (float) Math.cos(th);
             s3t = (float) Math.sin(th);
             c3p = (float) Math.cos(pitch);
             s3p = (float) Math.sin(pitch);
 
+            // Bayangan lembut (gradasi radial) di bawah kaki, sedikit menyempit saat badan naik.
             p.setStyle(Paint.Style.FILL);
-            p.setColor(0x33000000);
-            rf.set(fx(20f), fy(86.5f), fx(80f), fy(96f));
-            c.drawOval(rf, p);
+            float shW = 31f - headBob * 1.2f;
+            float shCx = fx(50f);
+            float shCy = fy(91.5f);
+            float shRx = shW * u;
+            float shRy = 6.2f * u;
+            p.setShader(new android.graphics.RadialGradient(shCx, shCy, shRx,
+                    new int[]{0x55000000, 0x22000000, 0x00000000},
+                    new float[]{0f, 0.6f, 1f}, Shader.TileMode.CLAMP));
+            c.save();
+            c.translate(0f, shCy);
+            c.scale(1f, shRy / shRx);
+            c.translate(0f, -shCy);
+            c.drawCircle(shCx, shCy, shRx, p);
+            c.restore();
+            p.setShader(null);
             if (it[3] >= 0) {
-                emoji(c, itIcon(it[3]), 14f, 78f, 24f);
+                float hop = Math.abs((float) Math.sin(animT * 3.0f)) * 1.4f;
+                emoji(c, itIcon(it[3]), 14f, 78f - hop, 24f);
             }
 
             int shirt = col("#F3E6EC");
@@ -4442,11 +4469,14 @@ public class MainActivity extends Activity {
             addBox(37f, shoeTop, 49.7f, 86.6f, -5.5f, 9f, shoe, shoe, shoe, 0); addBox(36.6f, 86.6f, 50.1f, 89f, -5.9f, 9.4f, col("#F5F5F5"), col("#F5F5F5"), col("#F5F5F5"), 0);
             addBox(50.3f, shoeTop, 63f, 86.6f, -5.5f, 9f, shoe, shoe, shoe, 0); addBox(49.9f, 86.6f, 63.4f, 89f, -5.9f, 9.4f, col("#F5F5F5"), col("#F5F5F5"), col("#F5F5F5"), 0);
             // tangan: kulit bawah, lengan baju atas
+            zShift = armSwing;
             addBox(27f, 43f + armLen, 36f, 61f, -4.5f, 4.5f, skin, skin, skin, 0);
-            addBox(64f, 43f + armLen, 73f, 61f, -4.5f, 4.5f, skin, skin, skin, 0);
             addBox(27f, 43f, 36f, 43f + armLen, -4.5f, 4.5f, slv, slv, slv, 0);
+            zShift = -armSwing;
+            addBox(64f, 43f + armLen, 73f, 61f, -4.5f, 4.5f, skin, skin, skin, 0);
             srcRect(66f, 45f, 76f, longSleeve ? 61f : 53f);
             addBox(64f, 43f, 73f, 43f + armLen, -4.5f, 4.5f, slv, slv, slv, 3);
+            zShift = 0f;
             // badan
             srcRect(34f, 44f, 66f, 68f);
             addBox(36f, 42f, 64f, 64f, -7f, 7f, shirt, shirt, shirt, 2); if (!girl) { zBias = 6f; skipTop = true; addBox(35.5f, 60.6f, 64.5f, 64.6f, -7.5f, 7.5f, col("#2B2B2B"), col("#2B2B2B"), col("#2B2B2B"), 0); skipTop = false; zBias = 0f; }
@@ -4454,7 +4484,8 @@ public class MainActivity extends Activity {
                 int wh = (curHid >= 0) ? curHairC : col("#F7F7F7");
                 addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
             }
-            // kepala
+            // kepala (ikut bergerak halus naik-turun mengikuti napas)
+            yShift = headBob;
             int hc = hood ? col(HOOD_MAIN[animal]) : (hijab ? ((curHid >= 0) ? curHairC : col("#F7F7F7")) : curHairC);
             srcRect(33f, 14f, 67f, 46f);
             addBox(hx0, hy0, hx1, hy1, -hz, hz, skin, hc, hc, 1);
@@ -4503,6 +4534,7 @@ public class MainActivity extends Activity {
             if (curSkipFace) {
                 boolean cover = hood || hijab; zBias = c3t > 0.2f ? 40f : 0f; addGlasses3D(it[1], hx0, hx1, hz, cover ? m + 0.9f : 0.9f, cover ? -4f : 0f, cover ? hz + m + 0.5f : hz + 1.2f); zBias = 0f;
             }
+            yShift = 0f;
             flushFaces(c);
         }
 
@@ -4712,6 +4744,7 @@ public class MainActivity extends Activity {
             if (mode != 0) return super.onTouchEvent(event);
             switch (event.getActionMasked()) {
                 case android.view.MotionEvent.ACTION_DOWN:
+                    touching = true;
                     lastTouchX = event.getX();
                     getParent().requestDisallowInterceptTouchEvent(true);
                     return true;
@@ -4723,6 +4756,7 @@ public class MainActivity extends Activity {
                     return true;
                 case android.view.MotionEvent.ACTION_UP:
                 case android.view.MotionEvent.ACTION_CANCEL:
+                    touching = false;
                     performClick();
                     return true;
             }
@@ -4783,10 +4817,12 @@ public class MainActivity extends Activity {
             if (mode == 0) {
                 // Animasi idle ringan: napas halus dan kedipan mata berkala.
                 float t = (System.currentTimeMillis() - animEpoch) / 1000f;
-                float breath = (float) Math.sin(t * 2.0f) * 0.55f;
-                c.translate(0f, breath * u);
-                float pulse = 1f + (float) Math.sin(t * 2.0f) * 0.0025f;
-                c.scale(pulse, pulse, fx(50f), fy(54f));
+                animT = t;
+                // Napas: badan memuai sedikit (kaki tetap menapak), goyang pelan saat tidak disentuh.
+                float br = (float) Math.sin(t * 2.0f);
+                c.scale(1f - br * 0.004f, 1f + br * 0.010f, fx(50f), fy(90f));
+                swayAmp += ((touching ? 0f : 1f) - swayAmp) * 0.08f;
+                swayDeg = (float) Math.sin(t * 0.9f) * 5f * swayAmp;
                 drawChar3D(c);
                 if (isAttachedToWindow()) postInvalidateDelayed(40L);
             } else {
