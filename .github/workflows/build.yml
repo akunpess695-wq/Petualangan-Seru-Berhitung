@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.0.5"
+                  versionName "6.0.6"
               }
 
               signingConfigs {
@@ -552,7 +552,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.0.5";
+              private static final String APP_VERSION = "6.0.6";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -1743,7 +1743,7 @@ jobs:
               }
 
               private String bestKey() {
-                  return "best_k" + kelas + (mode == 7 ? "_b" + subj : "") + (timed ? "_t" : "");
+                  return "best_k" + kelas + (mode == 7 ? "_b" + subj + (alamOn() ? "a" : "") : "") + (timed ? "_t" : "");
               }
 
               private String timeLabel() {
@@ -1754,7 +1754,7 @@ jobs:
                   if (advLevel >= 0) {
                       return "Petualangan \u2022 " + timeLabel();
                   }
-                  String base = mode == 7 ? SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
+                  String base = mode == 7 ? (alamOn() ? "Kuis Alam \u2022 " : "") + SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
                   return (relaxed && mode != 7) ? base + " \u2022 Santai" : base;
               }
 
@@ -1925,9 +1925,12 @@ jobs:
                           sub = n > 0 ? n + " soal" + (pr ? " + Cocokkan Pasangan" : "")
                                   : (pr ? "Cocokkan Pasangan" : "Belum ada soal");
                           if (s == 1) {
-                              sub = "Kuis" + (pr ? " \u2022 Cocokkan Pasangan" : "")
+                              sub = "Kuis" + (pr ? " \u2022 Pasangan" : "")
                                       + (susunAvailable(0) ? " \u2022 Susun Kata" : "")
-                                      + (susunAvailable(1) ? " \u2022 Susun Kalimat" : "");
+                                      + (susunAvailable(1) ? " \u2022 Susun Kalimat" : "")
+                                      + " \u2022 Alam";
+                          } else {
+                              sub = "Kuis" + (pr ? " \u2022 Pasangan" : "") + " \u2022 Alam";
                           }
                       }
                       LinearLayout t = subjectTile(SUBJ_ICON[s], SUBJ_NAMES[s], sub, SUBJ_COLOR[s]);
@@ -2445,7 +2448,10 @@ jobs:
                               recordLine("Matematika", k, ""),
                               recordLine("Matematika (soal guru)", k, "_b0"),
                               recordLine("Bahasa Indonesia", k, "_b1"),
-                              recordLine("Bahasa Inggris", k, "_b2")
+                              recordLine("Bahasa Inggris", k, "_b2"),
+                              recordLine("Kuis Alam: Matematika", k, "_b0a"),
+                              recordLine("Kuis Alam: Indonesia", k, "_b1a"),
+                              recordLine("Kuis Alam: Inggris", k, "_b2a")
                       };
                       for (String p : parts) {
                           if (!p.isEmpty()) {
@@ -2507,12 +2513,17 @@ jobs:
               }
 
               private boolean quizAvailable(int s) {
-                  return countBank(s, kelas) > 0 || s == 1;
+                  return countBank(s, kelas) > 0 || s == 1 || s == 2;
               }
 
               private void openSubject(int s) {
                   if (s == 0) {
                       showMath();
+                      return;
+                  }
+                  if (s == 1 || s == 2) {
+                      // Indonesia dan Inggris selalu punya Kuis Alam, jadi pilihan permainan selalu tampil
+                      dialogMode(s);
                       return;
                   }
                   boolean q = quizAvailable(s);
@@ -2539,12 +2550,13 @@ jobs:
               }
 
               private void startBank(int s) {
-                  if (countBank(s, kelas) == 0 && s != 1) {
+                  if (countBank(s, kelas) == 0 && s != 1 && s != 2) {
                       showMenu();
                       return;
                   }
                   subj = s;
                   advPart = -1;
+                  alam = false;
                   startGame(7);
               }
 
@@ -2590,6 +2602,12 @@ jobs:
                   } else {
                       r4.addView(tile("?", "Isi Titik", INDIGO, 6), weight(0, 0));
                   }
+                  LinearLayout r5 = new LinearLayout(this);
+                  r5.setOrientation(LinearLayout.HORIZONTAL);
+                  c.addView(r5, lp(dp(96), 12));
+                  LinearLayout ta = tile("\uD83C\uDF31", "Cerita Alam", GREEN, 7);
+                  ta.setOnClickListener(v -> startAlam(0));
+                  r5.addView(ta, weight(0, 0));
 
                   Button back = button("Kembali", GRAY, 14);
                   back.setTextColor(DARK);
@@ -2973,8 +2991,12 @@ jobs:
                       buildBuiltin();
                       return;
                   }
-                  if (subj == 1 && countBank(1, kelas) == 0) {
-                      // Belum ada soal guru: pakai soal bawaan Bahasa Indonesia untuk kelas ini
+                  if (alamOn()) {
+                      buildAlam();
+                      return;
+                  }
+                  if ((subj == 1 || subj == 2) && countBank(subj, kelas) == 0) {
+                      // Belum ada soal guru: pakai soal bawaan Bahasa Indonesia atau Inggris untuk kelas ini
                       advPart = -1;
                       buildBuiltin();
                       return;
@@ -3300,7 +3322,7 @@ jobs:
                       return "Tabel " + tableN;
                   }
                   if (mode == 7) {
-                      return "Kuis soal";
+                      return alamOn() ? "Kuis Alam" : "Kuis soal";
                   }
                   if (mode == 5) {
                       return "3 Bilangan";
@@ -3335,6 +3357,9 @@ jobs:
                       }
                   }
                   if (mode == 7) {
+                      if (alamOn() && subj == 0) {
+                          return "";
+                      }
                       return "q:" + cutText(q.text, 100);
                   }
                   if (mode == 5 || q.key == null || q.key.isEmpty()) {
@@ -4211,7 +4236,10 @@ jobs:
                   if (sj == 1 && susunAvailable(1)) {
                       addModeButton(c, "\uD83D\uDCCB  Susun Kalimat", ORANGE, dh, () -> startSusun(1));
                   }
-                  final AlertDialog d = new AlertDialog.Builder(this).setView(c).create();
+                  addModeButton(c, "\uD83C\uDF3F  Kuis Alam", GREEN, dh, () -> startAlam(sj));
+                  ScrollView dsv = new ScrollView(this);
+                  dsv.addView(c);
+                  final AlertDialog d = new AlertDialog.Builder(this).setView(dsv).create();
                   dh[0] = d;
                   pickDialog = d;
                   d.show();
@@ -6463,6 +6491,449 @@ jobs:
                       return super.performClick();
                   }
               }
+
+              // =====================================================================
+              // Kuis Alam (versi 6.0.6): soal bertema alam untuk Matematika, Indonesia, dan Inggris
+              // Soal buatan Claude, perlu dicek guru kelas.
+              // =====================================================================
+
+              private boolean alam;
+
+              private boolean alamOn() {
+                  return alam && mode == 7 && advLevel < 0;
+              }
+
+              private void startAlam(int s) {
+                  subj = s;
+                  advPart = -1;
+                  alam = true;
+                  startGame(7);
+              }
+
+              private static final String[] ALAM_NAMA = {"Ani", "Budi", "Siti", "Dimas", "Rina", "Udin", "Dewi"};
+              private static final String[] ALAM_SAYUR = {"wortel", "tomat", "terong", "cabai", "bayam"};
+              private static final String[] ALAM_BUAH = {"mangga", "jambu", "pisang", "jeruk", "rambutan"};
+
+              private String alamPick(String[] a) {
+                  return a[rnd.nextInt(a.length)];
+              }
+
+              // Bentuk soal: pertanyaan|jawaban benar|salah 1|salah 2|salah 3|pembahasan
+              private String alamQ(String text, int ans, String expl) {
+                  ArrayList<Integer> ds = new ArrayList<>(Arrays.asList(1, -1, 2, -2, 3, -3, 10, -10));
+                  Collections.shuffle(ds, rnd);
+                  StringBuilder sb = new StringBuilder();
+                  sb.append(text).append('|').append(fmt(ans));
+                  int added = 0;
+                  for (int d : ds) {
+                      int v = ans + d;
+                      if (v < 0 || v == ans) {
+                          continue;
+                      }
+                      sb.append('|').append(fmt(v));
+                      added++;
+                      if (added == 3) {
+                          break;
+                      }
+                  }
+                  sb.append('|').append(expl);
+                  return sb.toString();
+              }
+
+              private String alamMathOne() {
+                  int t = rnd.nextInt(5);
+                  String nm = alamPick(ALAM_NAMA);
+                  String sy = alamPick(ALAM_SAYUR);
+                  String bh = alamPick(ALAM_BUAH);
+                  int a;
+                  int b;
+                  int n;
+                  int m;
+                  switch (kelas) {
+                      case 0:
+                          if (t == 0) {
+                              a = range(2, 9);
+                              b = range(2, 9);
+                              return alamQ(nm + " memetik " + a + " " + sy + " pagi hari dan " + b + " " + sy
+                                      + " sore hari. Berapa semuanya?", a + b, a + " + " + b + " = " + (a + b) + ".");
+                          } else if (t == 1) {
+                              a = range(8, 19);
+                              b = range(1, 7);
+                              return alamQ("Ada " + a + " burung di pohon. " + b + " burung terbang pergi. Berapa burung yang masih di pohon?",
+                                      a - b, a + " \u2212 " + b + " = " + (a - b) + ".");
+                          } else if (t == 2) {
+                              a = range(3, 9);
+                              b = range(3, 9);
+                              return alamQ("Di kandang ada " + a + " ayam. Pak Tani membawa " + b + " ayam lagi. Berapa semua ayam?",
+                                      a + b, a + " + " + b + " = " + (a + b) + ".");
+                          } else if (t == 3) {
+                              a = range(10, 19);
+                              b = range(1, 6);
+                              return alamQ("Kebun " + nm + " punya " + a + " bunga. Sebanyak " + b
+                                      + " bunga dipetik untuk guru. Berapa bunga yang tersisa?", a - b,
+                                      a + " \u2212 " + b + " = " + (a - b) + ".");
+                          }
+                          a = range(2, 9);
+                          b = range(2, 9);
+                          return alamQ("Ada " + a + " kupu-kupu di bunga merah dan " + b
+                                  + " kupu-kupu di bunga kuning. Berapa semua kupu-kupu?", a + b,
+                                  a + " + " + b + " = " + (a + b) + ".");
+                      case 1:
+                          if (t == 0) {
+                              a = range(20, 59);
+                              b = range(10, 34);
+                              return alamQ("Pak Tani memanen " + a + " kg jagung pagi hari dan " + b
+                                      + " kg sore hari. Berapa kg semuanya?", a + b, a + " + " + b + " = " + (a + b) + ".");
+                          } else if (t == 1) {
+                              a = range(50, 99);
+                              b = range(10, 39);
+                              return alamQ("Ada " + a + " ikan di kolam. Sebanyak " + b
+                                      + " ikan dipindahkan ke kolam lain. Berapa ikan yang tersisa?", a - b,
+                                      a + " \u2212 " + b + " = " + (a - b) + ".");
+                          } else if (t == 2) {
+                              n = range(2, 5);
+                              int[] ms = {2, 5, 10};
+                              m = ms[rnd.nextInt(3)];
+                              return alamQ("Ada " + n + " kandang. Setiap kandang berisi " + m + " ayam. Berapa semua ayam?",
+                                      n * m, n + " \u00D7 " + m + " = " + (n * m) + ".");
+                          } else if (t == 3) {
+                              a = range(30, 69);
+                              b = range(10, 29);
+                              return alamQ("Bu Guru menanam " + a + " bibit cabai dan " + b + " bibit tomat. Berapa semua bibit?",
+                                      a + b, a + " + " + b + " = " + (a + b) + ".");
+                          }
+                          a = range(40, 89);
+                          b = range(11, 38);
+                          return alamQ("Kebun sekolah punya " + a + " pohon. Sebanyak " + b
+                                  + " pohon dipindahkan ke halaman. Berapa pohon yang masih di kebun?", a - b,
+                                  a + " \u2212 " + b + " = " + (a - b) + ".");
+                      case 2:
+                          if (t == 0) {
+                              a = range(120, 480);
+                              b = range(100, 350);
+                              return alamQ("Hasil panen pagi " + a + " kg dan siang " + b + " kg. Berapa kg hasil panen seluruhnya?",
+                                      a + b, a + " + " + b + " = " + (a + b) + ".");
+                          } else if (t == 1) {
+                              a = range(500, 900);
+                              b = range(100, 400);
+                              return alamQ("Gudang punya " + a + " kg beras. Sebanyak " + b + " kg dijual. Berapa kg beras yang tersisa?",
+                                      a - b, a + " \u2212 " + b + " = " + (a - b) + ".");
+                          } else if (t == 2) {
+                              n = range(3, 9);
+                              m = range(3, 9);
+                              return alamQ("Ada " + n + " keranjang. Setiap keranjang berisi " + m + " " + bh + ". Berapa semua " + bh + "?",
+                                      n * m, n + " \u00D7 " + m + " = " + (n * m) + ".");
+                          } else if (t == 3) {
+                              n = range(3, 9);
+                              m = range(3, 9);
+                              return alamQ("Ada " + (n * m) + " " + bh + " dibagi sama banyak ke " + n
+                                      + " keranjang. Berapa " + bh + " di tiap keranjang?", m,
+                                      (n * m) + " \u00F7 " + n + " = " + m + ".");
+                          }
+                          n = range(2, 6);
+                          m = range(4, 9);
+                          return alamQ("Satu baris kebun ditanami " + m + " bibit. Ada " + n + " baris. Berapa semua bibit?",
+                                  n * m, n + " \u00D7 " + m + " = " + (n * m) + ".");
+                      case 3:
+                          if (t == 0) {
+                              a = range(12, 47) * 100;
+                              b = range(5, 24) * 100;
+                              return alamQ("Petani memanen " + fmt(a) + " kg padi. Minggu lalu ia memanen " + fmt(b)
+                                      + " kg lagi. Berapa kg padi seluruhnya?", a + b,
+                                      fmt(a) + " + " + fmt(b) + " = " + fmt(a + b) + ".");
+                          } else if (t == 1) {
+                              a = range(30, 89) * 100;
+                              b = range(5, 24) * 50;
+                              return alamQ("Gudang menyimpan " + fmt(a) + " kg gabah. Sebanyak " + fmt(b)
+                                      + " kg dikirim ke kota. Berapa kg gabah yang tersisa?", a - b,
+                                      fmt(a) + " \u2212 " + fmt(b) + " = " + fmt(a - b) + ".");
+                          } else if (t == 2) {
+                              n = range(12, 39);
+                              m = range(6, 14);
+                              return alamQ("Ada " + n + " kotak telur. Setiap kotak berisi " + m + " telur. Berapa semua telur?",
+                                      n * m, n + " \u00D7 " + m + " = " + (n * m) + ".");
+                          } else if (t == 3) {
+                              n = range(12, 39);
+                              m = range(6, 14);
+                              return alamQ("Sebanyak " + fmt(n * m) + " bibit ditanam sama banyak di " + n
+                                      + " petak. Berapa bibit di tiap petak?", m, fmt(n * m) + " \u00F7 " + n + " = " + m + ".");
+                          }
+                          a = range(2, 8) * 1000;
+                          n = range(2, 5);
+                          return alamQ("Sekilo " + sy + " harganya Rp" + fmt(a) + ". " + nm + " membeli " + n
+                                  + " kg. Berapa rupiah yang harus dibayar?", a * n,
+                                  fmt(a) + " \u00D7 " + n + " = " + fmt(a * n) + ".");
+                      case 4:
+                          if (t == 0) {
+                              n = range(25, 59);
+                              m = range(12, 29);
+                              return alamQ("Satu petak ditanami " + m + " bibit. Ada " + n + " petak. Berapa semua bibit?",
+                                      n * m, n + " \u00D7 " + m + " = " + fmt(n * m) + ".");
+                          } else if (t == 1) {
+                              n = range(12, 24);
+                              m = range(12, 39);
+                              return alamQ("Sebanyak " + fmt(n * m) + " kg jagung dimasukkan ke " + n
+                                      + " karung sama berat. Berapa kg isi tiap karung?", m,
+                                      fmt(n * m) + " \u00F7 " + n + " = " + m + ".");
+                          } else if (t == 2) {
+                              int avg = range(30, 59);
+                              int d1 = range(1, 8);
+                              int d2 = range(1, 8);
+                              int x = avg - d1;
+                              int y = avg + d2;
+                              int z = avg + d1 - d2;
+                              return alamQ("Panen tiga hari berturut-turut: " + x + " kg, " + y + " kg, dan " + z
+                                      + " kg. Berapa kg rata-rata panen per hari?", avg,
+                                      "(" + x + " + " + y + " + " + z + ") \u00F7 3 = " + avg + ".");
+                          } else if (t == 3) {
+                              a = range(40, 89) * 100;
+                              b = range(10, 39) * 100;
+                              return alamQ("Kebun A menghasilkan " + fmt(a) + " kg sayur, kebun B menghasilkan " + fmt(b)
+                                      + " kg. Berapa selisih hasilnya?", a - b,
+                                      fmt(a) + " \u2212 " + fmt(b) + " = " + fmt(a - b) + ".");
+                          }
+                          a = range(10, 29);
+                          b = range(5, 9);
+                          return alamQ("Kebun sekolah berbentuk persegi panjang, panjang " + a + " m dan lebar " + b
+                                  + " m. Berapa luas kebun (dalam m\u00B2)?", a * b,
+                                  "Luas = panjang \u00D7 lebar = " + a + " \u00D7 " + b + " = " + (a * b) + ".");
+                      default:
+                          if (t == 0) {
+                              int[] tots = {100, 200, 300, 400, 500, 800};
+                              int[] ps = {10, 20, 25, 50};
+                              a = tots[rnd.nextInt(tots.length)];
+                              b = ps[rnd.nextInt(ps.length)];
+                              return alamQ("Dari " + a + " bibit, " + b + "% tumbuh subur. Berapa bibit yang tumbuh subur?",
+                                      a * b / 100, b + "% \u00D7 " + a + " = " + (a * b / 100) + ".");
+                          } else if (t == 1) {
+                              int avg = range(40, 89);
+                              int d1 = range(1, 8);
+                              int d2 = range(1, 8);
+                              int p1 = avg - d1;
+                              int p2 = avg + d1;
+                              int p3 = avg - d2;
+                              int p4 = avg + d2;
+                              return alamQ("Panen empat hari: " + p1 + " kg, " + p2 + " kg, " + p3 + " kg, dan " + p4
+                                      + " kg. Berapa kg rata-rata panen per hari?", avg,
+                                      "(" + p1 + " + " + p2 + " + " + p3 + " + " + p4 + ") \u00F7 4 = " + avg + ".");
+                          } else if (t == 2) {
+                              a = range(15, 40);
+                              b = range(5, 14);
+                              return alamQ("Kebun berbentuk persegi panjang, panjang " + a + " m dan lebar " + b
+                                      + " m. Berapa meter keliling kebun?", 2 * (a + b),
+                                      "Keliling = 2 \u00D7 (" + a + " + " + b + ") = " + (2 * (a + b)) + ".");
+                          } else if (t == 3) {
+                              int k = range(2, 9);
+                              return alamQ("Perbandingan ayam dan bebek di peternakan adalah 3 : 2. Jika ada " + (3 * k)
+                                      + " ayam, berapa bebek?", 2 * k,
+                                      (3 * k) + " \u00F7 3 = " + k + ", lalu " + k + " \u00D7 2 = " + (2 * k) + ".");
+                          }
+                          a = range(12, 24);
+                          b = range(5, 19);
+                          return alamQ("Selang mengalirkan " + a + " liter air per menit ke kebun. Berapa liter air dalam " + b
+                                  + " menit?", a * b, a + " \u00D7 " + b + " = " + (a * b) + ".");
+                  }
+              }
+
+              private ArrayList<String> alamMathPool() {
+                  ArrayList<String> out = new ArrayList<>();
+                  ArrayList<String> seen = new ArrayList<>();
+                  int guard = 0;
+                  while (out.size() < TOTAL && guard < 300) {
+                      guard++;
+                      String s = alamMathOne();
+                      String text = s.substring(0, s.indexOf('|'));
+                      if (seen.contains(text)) {
+                          continue;
+                      }
+                      seen.add(text);
+                      out.add(s);
+                  }
+                  return out;
+              }
+
+              private void buildAlam() {
+                  ArrayList<String> pool = new ArrayList<>();
+                  if (subj == 0) {
+                      pool = alamMathPool();
+                  } else {
+                      pool.addAll(Arrays.asList((subj == 1 ? ALAM_ID : ALAM_EN)[kelas]));
+                      Collections.shuffle(pool, rnd);
+                  }
+                  total = Math.min(TOTAL, pool.size());
+                  for (int i = 0; i < total; i++) {
+                      String[] f = pool.get(i).split("\\|");
+                      ArrayList<Integer> ord = new ArrayList<>();
+                      for (int j = 0; j < 4; j++) {
+                          ord.add(j);
+                      }
+                      Collections.shuffle(ord, rnd);
+                      Q q = new Q();
+                      q.text = f[0];
+                      q.full = f[0];
+                      q.sopts = new String[4];
+                      for (int j = 0; j < 4; j++) {
+                          q.sopts[j] = f[1 + ord.get(j)];
+                          if (ord.get(j) == 0) {
+                              q.correctIdx = j;
+                          }
+                      }
+                      q.expl = (f.length > 5 && !f[5].isEmpty()) ? f[5] : autoExpl(f[0], f[1]);
+                      qs[i] = q;
+                  }
+              }
+
+              // Soal bertema alam. Format: pertanyaan|jawaban benar|salah 1|salah 2|salah 3|pembahasan (boleh kosong)
+              // 10 soal per kelas, Kelas 1 sampai 6.
+              private static final String[][] ALAM_ID = {
+                  {
+                      "Hewan yang berkokok di pagi hari adalah ...|ayam|sapi|ikan|kucing|Ayam jantan berkokok di pagi hari.",
+                      "Sapi menghasilkan ...|susu|telur|madu|beras|Sapi diperah untuk diambil susunya.",
+                      "Tumbuhan butuh air dan ... supaya tumbuh.|cahaya matahari|permen|bola|sepatu|Tumbuhan butuh air dan cahaya matahari.",
+                      "Kita menyiram tanaman dengan ...|air|pasir|batu|sabun|Air membuat tanaman tidak layu.",
+                      "Kita mencium bau bunga dengan ...|hidung|mata|kaki|tangan|Hidung adalah alat untuk mencium bau.",
+                      "Hewan yang hidup di sungai adalah ...|ikan|sapi|ayam|kambing|Ikan hidup di dalam air sungai.",
+                      "Lengkapi kata: po_on (tempat daun tumbuh).|h|k|m|t|Kata yang benar: pohon.",
+                      "Lengkapi kata: ke_un (tempat menanam sayur).|b|d|m|s|Kata yang benar: kebun.",
+                      "Kita membuang sampah di ...|tempat sampah|sungai|jalan|kelas|Sampah dibuang di tempat sampah agar lingkungan bersih.",
+                      "Kupu-kupu terbang dengan ...|sayap|roda|sirip|tanduk|Kupu-kupu punya sayap yang indah."
+                  },
+                  {
+                      "Kambing suka makan ...|rumput|daging|batu|plastik|Kambing memakan rumput dan daun.",
+                      "Biji yang ditanam di tanah akan tumbuh menjadi ...|tanaman|batu|pasir|air|Biji yang disiram akan tumbuh menjadi tanaman.",
+                      "Bagian tumbuhan yang menyerap air dari tanah adalah ...|akar|daun|bunga|buah|Akar menyerap air dari dalam tanah.",
+                      "Pak Tani menanam padi di ...|sawah|bengkel|bandara|toko|Padi ditanam di sawah.",
+                      "Persamaan kata (sinonim) 'indah' adalah ...|cantik|buruk|kotor|bau",
+                      "Lawan kata 'kering' adalah ...|basah|panas|jauh|tinggi",
+                      "Kulit pisang termasuk sampah ...|organik|plastik|kaca|logam|Sampah organik berasal dari makhluk hidup dan bisa membusuk.",
+                      "Kalimat yang benar adalah ...|Petani menanam padi di sawah.|Padi sawah petani di menanam.|Menanam di padi sawah.|Sawah petani padi di.|Kalimat yang baik punya susunan kata yang jelas.",
+                      "Kata 'bunga' dipisah menjadi suku kata ...|bu-nga|bun-ga|b-unga|bung-a|Kata bunga dipisah menjadi bu-nga.",
+                      "Lengkapi kata: ker_au (hewan pembajak sawah).|b|d|m|p|Kata yang benar: kerbau."
+                  },
+                  {
+                      "Tumbuhan membuat makanan dengan bantuan cahaya matahari. Prosesnya disebut ...|fotosintesis|pernapasan|penguapan|pencernaan|Fotosintesis terjadi di daun yang hijau.",
+                      "Hewan pemakan tumbuhan disebut ...|herbivora|karnivora|omnivora|insektivora|Herbivora memakan tumbuhan, misalnya sapi dan kambing.",
+                      "Kata dasar dari 'menanam' adalah ...|tanam|nam|menan|tanaman|Awalan me- ditambahkan pada kata dasar tanam.",
+                      "Sampah plastik sebaiknya ...|didaur ulang|dibakar|dibuang ke sungai|ditimbun di kebun|Daur ulang mengurangi sampah dan menjaga bumi.",
+                      "Persamaan kata (sinonim) 'elok' adalah ...|indah|jelek|kecil|cepat",
+                      "Kalimat yang memakai tanda baca benar adalah ...|Kami menanam cabai, tomat, dan terong.|Kami menanam cabai tomat dan terong|Kami, menanam cabai tomat. dan terong|Kami menanam, cabai tomat dan, terong|Tanda koma memisahkan benda dalam sebuah rincian.",
+                      "Air hujan yang meresap ke dalam tanah menjadi ...|air tanah|awan|garam|lumpur|Air hujan yang meresap tersimpan sebagai air tanah.",
+                      "Jika tanaman disiram setiap hari, tanaman akan ...|tumbuh subur|layu|mati|berlari|Air yang cukup membuat tanaman tumbuh subur.",
+                      "Beternak artinya memelihara ...|hewan|batu|awan|mobil|Beternak berarti memelihara hewan seperti ayam atau sapi.",
+                      "Penulisan yang benar adalah ...|sayuran|sayurran|sayoran|sayuren|Tulisan yang benar: sayuran."
+                  },
+                  {
+                      "Makhluk hidup dan lingkungannya yang saling berhubungan disebut ...|ekosistem|galaksi|kota|musim|Ekosistem terdiri dari makhluk hidup dan lingkungannya.",
+                      "Rantai makanan dimulai dari ...|tumbuhan|singa|elang|ular|Tumbuhan membuat makanan sendiri sehingga menjadi awal rantai makanan.",
+                      "Hewan pemakan tumbuhan dan daging disebut ...|omnivora|herbivora|karnivora|nokturnal|Omnivora memakan tumbuhan sekaligus daging.",
+                      "Kata baku yang benar adalah ...|kedelai|kedele|kedelei|kadelai|Penulisan baku yang benar adalah kedelai.",
+                      "Kata penanam berasal dari kata dasar ...|tanam|penan|nam|tanaman|Penanam = pe- + tanam.",
+                      "Kalimat yang tersusun baik adalah ...|Petani memanen jagung di kebun.|Jagung memanen petani di.|Di kebun jagung petani memanen mereka.|Petani itu mereka memanen jagung kebun.|Kalimat yang baik punya susunan kata yang jelas.",
+                      "Daun kering dan sisa sayur dapat diolah menjadi ...|kompos|plastik|kaca|baterai|Kompos adalah pupuk dari sisa tumbuhan dan makanan.",
+                      "Kata 'rimbun' berarti ...|lebat dan banyak daunnya|gundul|kering|kecil|Pohon yang rimbun daunnya banyak dan lebat.",
+                      "Tanda baca yang tepat: Ayo kita jaga bumi ...|!|,|;|-|Kalimat ajakan atau seruan memakai tanda seru.",
+                      "Kata 'lestari' dalam 'menjaga alam tetap lestari' artinya ...|terjaga dan tidak rusak|dibakar|ditebang|dijual|Lestari berarti tetap terjaga dan tidak rusak."
+                  },
+                  {
+                      "Hutan yang ditebang sembarangan dapat menyebabkan ...|banjir dan longsor|hujan permen|udara bersih|tanah subur|Tanpa pohon, tanah tidak tertahan dan air mudah meluap.",
+                      "Majas pada 'Angin berbisik di sela-sela daun' adalah ...|personifikasi|hiperbola|simile|ironi|Angin (benda mati) digambarkan seperti makhluk hidup yang berbisik.",
+                      "Kalimat yang berisi fakta adalah ...|Padi tumbuh di sawah yang berair.|Padi adalah tanaman paling indah.|Semua orang pasti suka padi.|Padi pasti enak sekali.|Fakta dapat dibuktikan kebenarannya.",
+                      "Kata pertanian berasal dari kata dasar ...|tani|pertan|tanian|pe|Pertanian = per- + tani + -an.",
+                      "Ungkapan 'ringan tangan' berarti ...|suka menolong|tangannya kecil|tidak mau bekerja|suka marah|Ringan tangan berarti suka membantu orang lain.",
+                      "Persamaan kata (sinonim) 'melestarikan' adalah ...|menjaga|merusak|menebang|membuang|Melestarikan berarti menjaga agar tidak rusak.",
+                      "Kalimat majemuk setara adalah ...|Kami menanam pohon, dan teman-teman menyiramnya.|Kami menanam pohon.|Pohon itu tinggi.|Teman menyiram.|Kalimat majemuk punya dua pokok kalimat atau lebih.",
+                      "Daur ulang artinya ...|mengolah barang bekas agar dapat dipakai lagi|membakar sampah|membuang sampah|menumpuk sampah|Daur ulang mengubah barang bekas menjadi barang yang berguna.",
+                      "Penulisan kata baku yang benar adalah ...|ekosistem|ekosestim|ekosistim|ecosistem|Penulisan baku yang benar adalah ekosistem.",
+                      "Peribahasa 'Sedikit demi sedikit, lama-lama menjadi bukit' mengajarkan kita untuk ...|rajin menabung dan bersabar|boros|malas bekerja|sombong|Hal kecil yang dilakukan terus-menerus akan menjadi banyak."
+                  },
+                  {
+                      "Pemanasan global terutama disebabkan oleh meningkatnya gas ... di udara.|karbon dioksida|oksigen|nitrogen|helium|Gas karbon dioksida menahan panas di atmosfer.",
+                      "Kalimat yang memakai majas hiperbola adalah ...|Tanaman itu tinggi sekali, hampir menyentuh langit.|Tanaman itu tinggi.|Tanaman itu hijau.|Tanaman itu disiram.|Hiperbola adalah gaya bahasa yang melebih-lebihkan.",
+                      "Hutan bakau (mangrove) bermanfaat bagi pantai karena ...|mencegah abrasi|menyebabkan banjir|mengeringkan laut|menambah sampah|Akar bakau menahan ombak sehingga tanah pantai tidak terkikis.",
+                      "Penulisan kata baku yang benar adalah ...|aktivitas|aktifitas|aktivitaz|aktifittas|Penulisan baku yang benar adalah aktivitas.",
+                      "Perumpamaan 'bagai air di daun talas' berarti ...|tidak tetap pendiriannya|sangat kuat|sangat basah|sangat ringan|Air di daun talas mudah bergulir, seperti orang yang tidak tetap pendirian.",
+                      "Kalimat yang berisi opini adalah ...|Kebun sekolah kita paling indah di dunia.|Kebun sekolah ditanami 20 pohon.|Kebun sekolah berada di belakang kelas.|Kebun sekolah disiram setiap pagi.|Opini adalah pendapat seseorang, bukan fakta yang bisa dibuktikan.",
+                      "Kalimat majemuk bertingkat adalah ...|Kami bersyukur karena panen berhasil.|Kami panen jagung.|Panen berhasil.|Kami bersyukur.|Ada induk kalimat dan anak kalimat yang dihubungkan kata karena.",
+                      "Persamaan kata (sinonim) 'konservasi' adalah ...|pelestarian|perusakan|penjualan|penebangan|Konservasi berarti pelestarian alam.",
+                      "Lawan kata 'subur' adalah ...|tandus|hijau|basah|lebat|Tanah yang tandus tidak subur.",
+                      "Peribahasa 'Di mana bumi dipijak, di situ langit dijunjung' artinya ...|kita menghormati adat tempat kita tinggal|kita memanjat langit|kita menanam padi|kita berjalan jauh|Kita harus menghormati aturan dan adat di tempat kita berada."
+                  }
+              };
+
+              private static final String[][] ALAM_EN = {
+                  {
+                      "Apa bahasa Inggris dari 'pohon'?|tree|bee|sea|key",
+                      "Apa bahasa Inggris dari 'bunga'?|flower|water|finger|summer",
+                      "Apa bahasa Inggris dari 'daun'?|leaf|leg|lip|lamp",
+                      "Apa bahasa Inggris dari 'matahari'?|sun|moon|star|cloud",
+                      "Apa bahasa Inggris dari 'hujan'?|rain|wind|snow|sun",
+                      "Apa bahasa Inggris dari 'sapi'?|cow|goat|duck|hen",
+                      "Apa bahasa Inggris dari 'ayam'?|chicken|duck|cow|goat",
+                      "Apa bahasa Inggris dari 'bebek'?|duck|cow|cat|bird",
+                      "Apa bahasa Inggris dari 'ikan'?|fish|bird|frog|bee",
+                      "Apa bahasa Inggris dari 'kupu-kupu'?|butterfly|bee|bird|bat"
+                  },
+                  {
+                      "Apa bahasa Inggris dari 'kebun'?|garden|gate|game|goat",
+                      "Apa bahasa Inggris dari 'sungai'?|river|rice|road|roof",
+                      "Apa bahasa Inggris dari 'gunung'?|mountain|market|moon|monkey",
+                      "Apa bahasa Inggris dari 'petani'?|farmer|teacher|doctor|driver",
+                      "Apa bahasa Inggris dari 'kambing'?|goat|cat|boat|coat",
+                      "Apa bahasa Inggris dari 'kelinci'?|rabbit|rubber|robot|ribbon",
+                      "Apa bahasa Inggris dari 'rumput'?|grass|glass|gas|grape",
+                      "Apa bahasa Inggris dari 'biji'?|seed|seat|seven|sand",
+                      "Lengkapi: The cow gives us ...|milk|eggs|honey|wool|Sapi menghasilkan susu (milk).",
+                      "Lengkapi: A bird has two ...|wings|wheels|fins|horns|Burung punya dua sayap (wings)."
+                  },
+                  {
+                      "Lengkapi: Plants need water and ... to grow.|sunlight|candy|toys|shoes|Tumbuhan butuh air dan cahaya matahari (sunlight).",
+                      "Apa bahasa Inggris dari 'hutan'?|forest|farm|flower|fish",
+                      "Apa bahasa Inggris dari 'bunga matahari'?|sunflower|sunshine|sunset|sunrise",
+                      "Apa bahasa Inggris dari 'pelangi'?|rainbow|rain|rainy|raincoat",
+                      "Apa bahasa Inggris dari 'awan'?|cloud|clock|close|clown",
+                      "Apa bahasa Inggris dari 'sampah'?|trash|train|tree|truck",
+                      "Lengkapi: We must ... the trees and flowers.|water|break|burn|throw|Kita menyiram (water) pohon dan bunga.",
+                      "Apa bahasa Inggris dari 'ular'?|snake|snail|spider|sheep",
+                      "Lengkapi: Fish live in the ...|water|tree|sky|sand|Ikan hidup di air (water).",
+                      "Lengkapi: A farmer grows rice in the ...|field|kitchen|bank|garage|Petani menanam padi di sawah (field)."
+                  },
+                  {
+                      "Lengkapi: Butterflies have colorful ...|wings|wheels|keys|boots|Kupu-kupu punya sayap (wings) yang berwarna-warni.",
+                      "Apa bahasa Inggris dari 'akar'?|root|roof|rope|road",
+                      "Apa bahasa Inggris dari 'tanah'?|soil|soap|sail|seal",
+                      "Apa bahasa Inggris dari 'pupuk'?|fertilizer|water|seed|soil",
+                      "Apa bahasa Inggris dari 'musim hujan'?|rainy season|dry season|cold season|windy day",
+                      "Lengkapi: The sun rises in the ...|east|west|north|south|Matahari terbit di timur (east).",
+                      "Lengkapi: Cows eat ... in the field.|grass|rocks|plastic|meat|Sapi makan rumput (grass).",
+                      "Apa bahasa Inggris dari 'menanam'?|plant|pick|cook|clean",
+                      "Lengkapi: Please do not ... trash into the river.|throw|plant|drink|water|Jangan membuang (throw) sampah ke sungai.",
+                      "Bentuk lampau dari 'grow' adalah ...|grew|growed|grown|growing|Bentuk lampau dari grow adalah grew."
+                  },
+                  {
+                      "Lengkapi: Farmers ... the rice in the field yesterday.|planted|plant|plants|planting|Yesterday (kemarin) memakai bentuk lampau: planted.",
+                      "Lengkapi: Look! The bird is ... in the tree.|singing|sing|sang|sings|Look! menunjukkan kegiatan yang sedang berlangsung: is singing.",
+                      "Lengkapi: She ... flowers every morning.|waters|water|watering|watered|Untuk kebiasaan dengan She, kata kerja ditambah s: waters.",
+                      "Apa bahasa Inggris dari 'sampah organik'?|organic waste|plastic waste|glass waste|metal waste",
+                      "Lengkapi: We should save water to protect the ...|environment|kitchen|market|pencil|Kita menjaga lingkungan (environment).",
+                      "Lawan kata 'clean' adalah ...|dirty|clear|cold|close",
+                      "Apa arti 'harvest'?|panen|tanam|siram|jual",
+                      "Apa arti 'recycle'?|daur ulang|buang|bakar|beli",
+                      "Lengkapi: There ... many fish in the river.|are|is|am|be|Many fish (banyak ikan) memakai are.",
+                      "Apa arti 'compost'?|kompos|kompor|komputer|kontes"
+                  },
+                  {
+                      "Lengkapi: If we plant more trees, the air ... cleaner.|will be|was|is being|were|Kalimat pengandaian masa depan memakai will be.",
+                      "Lengkapi: The river is ... than the pond.|longer|long|longest|more long|Perbandingan dua benda: longer than.",
+                      "Lengkapi: Mount Bromo is one of the ... mountains in Indonesia.|most beautiful|more beautiful|beautifulest|beautiful|Perbandingan paling: most beautiful.",
+                      "Lengkapi: Last week, we ... a tree in the school garden.|planted|plant|plants|will plant|Last week (minggu lalu) memakai bentuk lampau: planted.",
+                      "Lengkapi: The trash ... collected by the students every Friday.|is|are|was|were|Kalimat pasif kebiasaan dengan trash: is collected.",
+                      "Apa arti 'endangered animals'?|hewan yang terancam punah|hewan peliharaan|hewan buas|hewan ternak",
+                      "Apa arti 'pollution'?|pencemaran|perayaan|pelajaran|perjalanan",
+                      "Apa arti 'rainforest'?|hutan hujan tropis|hutan jati|kebun teh|padang pasir",
+                      "Bentuk lampau dari 'bring' adalah ...|brought|bringed|bringing|brang|Bentuk lampau dari bring adalah brought.",
+                      "Lengkapi: We must not cut down trees ... they give us oxygen.|because|but|or|so|Because menyatakan alasan: karena pohon memberi kita oksigen."
+                  }
+              };
 
               // ---------- Soal peta: kuis bawaan dan latihan tabel ----------
 
