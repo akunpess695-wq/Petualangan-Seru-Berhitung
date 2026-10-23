@@ -472,7 +472,7 @@ jobs:
           As0RSTF/6A/9oT/0h/7QH/pDf+gP/aE/9Jvp/wAEhA6eiVd7IQAAAABJRU5ErkJggg==
           PB_EOF
           mkdir -p app/src/main/java/com/petualangan/berhitung
-          cp ../MainActivity.java app/src/main/java/com/petualangan/berhitung/MainActivity.java
+          cp MainActivity.java app/src/main/java/com/petualangan/berhitung/MainActivity.java
           mkdir -p app
           base64 -d > app/pb.keystore <<'PB_EOF'
           MIIKKgIBAzCCCdQGCSqGSIb3DQEHAaCCCcUEggnBMIIJvTCCBbQGCSqGSIb3DQEHAaCCBaUEggWh
