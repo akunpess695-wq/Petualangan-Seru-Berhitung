@@ -22,6 +22,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      - name: Ambil kode dari repo
+        uses: actions/checkout@v4
+
       - name: Pasang Java 17
         uses: actions/setup-java@v4
         with:
@@ -472,7 +475,19 @@ jobs:
           As0RSTF/6A/9oT/0h/7QH/pDf+gP/aE/9Jvp/wAEhA6eiVd7IQAAAABJRU5ErkJggg==
           PB_EOF
           mkdir -p app/src/main/java/com/petualangan/berhitung
-          # MainActivity.java sudah berada di app/src/main/java/com/petualangan/berhitung/
+          # Salin MainActivity.java dari repo ke proyek (sebelumnya langkah ini hilang, jadi APK tanpa kode)
+          DEST=app/src/main/java/com/petualangan/berhitung/MainActivity.java
+          FOUND=$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/proj" -prune -o -path "$GITHUB_WORKSPACE/.git" -prune -o -type f \( -name 'MainActivity.java' -o -name 'MainActivity-*.java' \) -print | sort)
+          echo "Berkas MainActivity yang ditemukan:"; echo "$FOUND"
+          if [ -z "$FOUND" ]; then
+            echo "::error::Tidak ada MainActivity.java di repo. Unggah file MainActivity.java ke repo."
+            exit 1
+          fi
+          SRC=$(echo "$FOUND" | grep '/MainActivity\.java$' | head -n 1 || true)
+          if [ -z "$SRC" ]; then SRC=$(echo "$FOUND" | tail -n 1); fi
+          echo "Dipakai: $SRC"
+          cp "$SRC" "$DEST"
+          grep -q 'package com.petualangan.berhitung;' "$DEST"
           mkdir -p app
           base64 -d > app/pb.keystore <<'PB_EOF'
           MIIKKgIBAzCCCdQGCSqGSIb3DQEHAaCCCcUEggnBMIIJvTCCBbQGCSqGSIb3DQEHAaCCBaUEggWh
@@ -543,7 +558,11 @@ jobs:
           ls -l proj/app/build/outputs/apk/debug/
           SIZE=$(stat -c%s "$APK")
           echo "Ukuran APK: $SIZE byte"
-          test "$SIZE" -gt 20000
+          test "$SIZE" -gt 100000
+          unzip -l "$APK" | grep -q 'classes.dex'
+          unzip -p "$APK" classes.dex > "$RUNNER_TEMP/classes.dex"
+          grep -a -q 'com/petualangan/berhitung/MainActivity' "$RUNNER_TEMP/classes.dex"
+          echo "classes.dex berisi MainActivity: OK"
           "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK"
 
       - name: Unggah APK debug
