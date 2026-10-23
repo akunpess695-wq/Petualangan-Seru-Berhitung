@@ -562,11 +562,19 @@ jobs:
           SIZE=$(stat -c%s "$APK")
           echo "Ukuran APK: $SIZE byte"
           test "$SIZE" -gt 100000
-          unzip -l "$APK" > "$RUNNER_TEMP/apk-list.txt"
-          grep -q 'classes.dex' "$RUNNER_TEMP/apk-list.txt"
-          unzip -p "$APK" classes.dex > "$RUNNER_TEMP/classes.dex"
-          grep -a -q 'com/petualangan/berhitung/MainActivity' "$RUNNER_TEMP/classes.dex"
-          echo "classes.dex berisi MainActivity: OK"
+          python3 - "$APK" <<'PY'
+          import sys, zipfile
+          z = zipfile.ZipFile(sys.argv[1])
+          names = z.namelist()
+          print("Isi APK:", names)
+          dex = [n for n in names if n.endswith(".dex")]
+          if not dex:
+              sys.exit("GAGAL: APK tidak punya berkas .dex (tanpa kode)")
+          found = any(b"com/petualangan/berhitung/MainActivity" in z.read(n) for n in dex)
+          print("MainActivity ada di dex:", found)
+          if not found:
+              sys.exit("GAGAL: MainActivity tidak ada di dalam dex")
+          PY
           "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK"
 
       - name: Unggah APK debug
