@@ -4422,9 +4422,38 @@ jobs:
                       {6, "#6D4C41", "Rambut Acak-acakan", 40},
                       {6, "#F9C74F", "Rambut Pirang Jabrik", 60},
                       {6, "#F06292", "Rambut Pink Panjang", 100},
-                      {6, "#B0BEC5", "Rambut Perak Keren", 150}
+                      {6, "#B0BEC5", "Rambut Perak Keren", 150},
+            {5, "#F8BBD0,#F8BBD0,#AD1457", "Tunik Pink", 80},
+            {5, "#B39DDB,#B39DDB,#5E35B1", "Gamis Ungu", 100},
+            {5, "#C9A06B,#C9A06B,#8D6E63", "Pramuka Putri", 120},
+            {5, "#1565C0,#1565C0,#0D47A1", "Batik Biru", 110},
+            {5, "#80CBC4,#80CBC4,#00695C", "Tunik Mint", 90},
+            {5, "#FB8C00,#FB8C00,#1565C0", "Kaos Olahraga", 70},
+            {5, "#ECEFF1,#ECEFF1,#37474F", "Baju Koko", 100},
+            {6, "#F8BBD0", "Jilbab Pink", 40},
+            {6, "#90CAF9", "Jilbab Biru Muda", 40},
+            {6, "#A5D6A7", "Jilbab Hijau Muda", 50},
+            {6, "#CE93D8", "Jilbab Ungu", 50},
+            {6, "#BCAAA4", "Jilbab Cokelat", 60}
               };
               private static final int ITEM_GALAKSI = 31;
+    // Gender tiap barang, urut sama dengan ITEMS: u = semua, b = putra, g = putri.
+    // Untuk memindah barang ke gender lain, cukup ubah hurufnya di sini.
+    private static final String ITEM_GENDER =
+            "bggubbub" + "ugbu" + "bugubbu" + "uuuuuuuu" + "uuuuuuu" + "bbbbb" + "bbbbb" + "ggggg" + "bb" + "ggggg";
+
+    private static int itGender(int i) {
+        if (i < 0 || i >= ITEM_GENDER.length()) {
+            return -1;
+        }
+        char ch = ITEM_GENDER.charAt(i);
+        return ch == 'b' ? 0 : (ch == 'g' ? 1 : -1);
+    }
+
+    private static boolean itFits(int i, int g) {
+        int ig = itGender(i);
+        return ig < 0 || ig == g;
+    }
               private static final String[] RAR_NAME = {"Biasa", "Keren", "Epik", "Legendaris"};
               private static final int[] RAR_COLOR = {SILVER, BLUE, PURPLE, GOLD};
               private static final String[] SHOP_TAB_ICON = {
@@ -4834,7 +4863,7 @@ jobs:
                           slv = col(cs[1]);
                           longSleeve = true;
                       }
-                      int red = col("#C62828");
+                      int red = col("#C62828"); if (cl >= 0) { String[] cs3 = itIcon(cl).split(","); if (cs3.length > 2) { red = col(cs3[2]); } }
                       int shoe = col("#212121");
                       final float hx0 = 31f;
                       final float hx1 = 69f;
@@ -4864,11 +4893,11 @@ jobs:
                       srcRect(34f, 44f, 66f, 68f);
                       addBox(36f, 42f, 64f, 64f, -7f, 7f, shirt, shirt, shirt, 2);
                       if (girl) {
-                          int wh = col("#F7F7F7");
+                          int wh = (curHid >= 0) ? curHairC : col("#F7F7F7");
                           addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
                       }
                       // kepala
-                      int hc = hood ? col(HOOD_MAIN[animal]) : (hijab ? col("#F7F7F7") : curHairC);
+                      int hc = hood ? col(HOOD_MAIN[animal]) : (hijab ? ((curHid >= 0) ? curHairC : col("#F7F7F7")) : curHairC);
                       srcRect(33f, 14f, 67f, 46f);
                       addBox(hx0, hy0, hx1, hy1, -hz, hz, skin, hc, hc, 1);
                       float m = (hood || hijab) ? 3f : 1.5f;
@@ -4885,7 +4914,7 @@ jobs:
                       addBox(hx1 - 3f, hy0 - m, hx1 + m, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
                       if (hood) {
                           // sedikit poni di dahi di bawah tudung
-                          int bangC = girl ? col("#F7F7F7") : curHairC; addBox(hx0 + 3f, hy0 + 7f, hx1 - 3f, hy0 + 11f, hz - 0.5f, hz + 0.8f, bangC, bangC, bangC, 0);
+                          int bangC = (girl && curHid < 0) ? col("#F7F7F7") : curHairC; addBox(hx0 + 3f, hy0 + 7f, hx1 - 3f, hy0 + 11f, hz - 0.5f, hz + 0.8f, bangC, bangC, bangC, 0);
                           addEars(animal, hc, col(HOOD_ACC[animal]), hx0, hx1, hy0, hy1);
                       } else if (!hijab) {
                           if (curHid == 40) {
@@ -4909,7 +4938,7 @@ jobs:
                           addHat3D(it[0], hy0 - m - 1.5f);
                       }
                       if (curSkipFace) {
-                          boolean cover = hood || hijab; zBias = 40f; addGlasses3D(it[1], hx0, hx1, hz, cover ? m + 0.9f : 0.9f, cover ? -4f : 0f, cover ? hz + m + 0.5f : hz + 1.2f); zBias = 0f;
+                          boolean cover = hood || hijab; zBias = c3t > 0.2f ? 40f : 0f; addGlasses3D(it[1], hx0, hx1, hz, cover ? m + 0.9f : 0.9f, cover ? -4f : 0f, cover ? hz + m + 0.5f : hz + 1.2f); zBias = 0f;
                       }
                       flushFaces(c);
                   }
@@ -5120,7 +5149,7 @@ jobs:
                           emoji(c, itIcon(it[3]), 14f, 78f, 24f);
                       }
 
-                      int pants = col("#C62828");
+                      int pants = col("#C62828"); if (it[5] >= 0) { String[] cp = itIcon(it[5]).split(","); if (cp.length > 2) { pants = col(cp[2]); } }
                       if (gender == 1) {
                           rect(c, 35f, 64f, 65f, 86f, 3f, pants);
                       } else {
@@ -5159,7 +5188,7 @@ jobs:
                       rect(c, 33f, 14f, 67f, 46f, 6f, skin);
                       boolean hijab2d = gender == 1 && !hood;
                       if (hijab2d) {
-                          int wh = col("#F7F7F7");
+                          int wh = (hid >= 0) ? hairC : col("#F7F7F7");
                           hoodRects(c, wh, 0f);
                           rect(c, 36f, 45f, 64f, 53f, 3f, wh);
                       } else {
@@ -5521,7 +5550,7 @@ jobs:
                   int[] items = new int[7];
                   for (int k = 0; k < 7; k++) {
                       int e = eq(pl, k);
-                      items[k] = (e >= 0 && e < ITEMS.length && itSlot(e) == k && owns(e)) ? e : -1;
+                      items[k] = (e >= 0 && e < ITEMS.length && itSlot(e) == k && owns(e) && itFits(e, genderOf[pl])) ? e : -1;
                   }
                   int a = avatar[pl];
                   AvatarView av3 = new AvatarView(this, a >= NO_HOOD ? -1 : a, items, mode, true);
@@ -5558,7 +5587,7 @@ jobs:
                       cell.addView(text(itIcon(id), 30, DARK, false), new LinearLayout.LayoutParams(WRAP, WRAP));
                   } else {
                       int sl = itSlot(id);
-                      AvatarView pvw = previewView(-1, sl, id, (sl == 2 || sl == 5) ? 2 : 1);
+                      AvatarView pvw = previewView(-1, sl, id, (sl == 2 || sl == 5) ? 2 : 1); pvw.gender = itGender(id) < 0 ? genderOf[shopPl] : itGender(id);
                       pvw.setBackground(box(Color.parseColor("#ECEFF1"), 12));
                       cell.addView(pvw, new LinearLayout.LayoutParams(dp(56), dp(56)));
                   }
@@ -5666,7 +5695,7 @@ jobs:
                   for (int t = 0; t < SHOP_TAB_NAME.length; t++) {
                       final int tab = t;
                       boolean sel = t == shopTab;
-                      TextView chip = text(SHOP_TAB_ICON[t] + " " + SHOP_TAB_NAME[t], 14, sel ? Color.WHITE : DARK, true);
+                      TextView chip = text(SHOP_TAB_ICON[t] + " " + ((t == 7 && genderOf[shopPl] == 1) ? "Jilbab" : SHOP_TAB_NAME[t]), 14, sel ? Color.WHITE : DARK, true);
                       chip.setBackground(box(sel ? ORANGE : GRAY, 18));
                       chip.setPadding(dp(14), dp(8), dp(14), dp(8));
                       chip.setOnClickListener(v -> {
@@ -5692,7 +5721,7 @@ jobs:
                                   continue;
                               }
                               boolean on = avatar[shopPl] == k;
-                              AvatarView t = previewView(k >= NO_HOOD ? -1 : k, -1, -1, 1);
+                              AvatarView t = previewView(k >= NO_HOOD ? -1 : k, -1, -1, 1); t.gender = genderOf[shopPl];
                               t.setBackground(on ? box(PLAYER_COLORS[shopPl], 16) : box(GRAY, 16));
                               t.setOnClickListener(v -> {
                                   for (int j = 0; j < np; j++) {
@@ -5715,7 +5744,7 @@ jobs:
                       int slot = shopTab - 1;
                       ArrayList<Integer> ids = new ArrayList<>();
                       for (int i = 0; i < ITEMS.length; i++) {
-                          if (itSlot(i) == slot) {
+                          if (itSlot(i) == slot && itFits(i, genderOf[shopPl])) {
                               ids.add(i);
                           }
                       }
