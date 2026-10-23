@@ -4437,23 +4437,23 @@ jobs:
             {6, "#BCAAA4", "Jilbab Cokelat", 60}
               };
               private static final int ITEM_GALAKSI = 31;
-    // Gender tiap barang, urut sama dengan ITEMS: u = semua, b = putra, g = putri.
-    // Untuk memindah barang ke gender lain, cukup ubah hurufnya di sini.
-    private static final String ITEM_GENDER =
+              // Gender tiap barang, urut sama dengan ITEMS: u = semua, b = putra, g = putri.
+              // Untuk memindah barang ke gender lain, cukup ubah hurufnya di sini.
+              private static final String ITEM_GENDER =
             "bggubbub" + "ugbu" + "bugubbu" + "uuuuuuuu" + "uuuuuuu" + "bbbbb" + "bbbbb" + "ggggg" + "bb" + "ggggg";
 
-    private static int itGender(int i) {
-        if (i < 0 || i >= ITEM_GENDER.length()) {
+              private static int itGender(int i) {
+                  if (i < 0 || i >= ITEM_GENDER.length()) {
             return -1;
-        }
-        char ch = ITEM_GENDER.charAt(i);
-        return ch == 'b' ? 0 : (ch == 'g' ? 1 : -1);
-    }
+                  }
+                  char ch = ITEM_GENDER.charAt(i);
+                  return ch == 'b' ? 0 : (ch == 'g' ? 1 : -1);
+              }
 
-    private static boolean itFits(int i, int g) {
-        int ig = itGender(i);
-        return ig < 0 || ig == g;
-    }
+              private static boolean itFits(int i, int g) {
+                  int ig = itGender(i);
+                  return ig < 0 || ig == g;
+              }
               private static final String[] RAR_NAME = {"Biasa", "Keren", "Epik", "Legendaris"};
               private static final int[] RAR_COLOR = {SILVER, BLUE, PURPLE, GOLD};
               private static final String[] SHOP_TAB_ICON = {
