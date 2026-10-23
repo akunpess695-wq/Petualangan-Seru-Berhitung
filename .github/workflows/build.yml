@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.3.0"
+                  versionName "6.4.1"
               }
 
               signingConfigs {
@@ -761,6 +761,8 @@ jobs:
                       "\uD83D\uDE42"
               };
               private final int[] avatar = new int[MAX_PLAYERS];
+              // 0 = putra, 1 = putri (dipakai avatar 3D)
+              private final int[] genderOf = new int[MAX_PLAYERS];
 
               private String av(int i) {
                   return AVATARS[Math.max(0, Math.min(AVATARS.length - 1, avatar[i]))];
@@ -1811,6 +1813,7 @@ jobs:
                   for (int i = 0; i < MAX_PLAYERS; i++) {
                       names[i] = prefs.getString("name" + i, "Pemain " + (i + 1));
                       avatar[i] = Math.max(0, Math.min(AVATARS.length - 1, prefs.getInt("avatar" + i, i)));
+                      genderOf[i] = prefs.getInt("gender" + i, 0) == 1 ? 1 : 0;
                   }
               }
 
@@ -4487,7 +4490,7 @@ jobs:
                       "#F8BBD0", "#5D3A1E", "#C77B30", "#F06292", "#FFFFFF", "#E6D5B8"};
 
               // ---------- Avatar 3D tahap 1: data mesh balok ----------
-              private static final int MAXF = 64;
+              private static final int MAXF = 96;
               // Sisi balok: depan, belakang, kanan, kiri, atas (indeks sudut: bit0=x, bit1=y, bit2=z)
               private static final int[][] BOX_FACES = {{4, 5, 7, 6}, {1, 0, 2, 3}, {5, 1, 3, 7}, {0, 4, 6, 2}, {0, 1, 5, 4}};
               private static final float[][] BOX_NORM = {{0f, 0f, 1f}, {0f, 0f, -1f}, {1f, 0f, 0f}, {-1f, 0f, 0f}, {0f, -1f, 0f}};
@@ -4611,6 +4614,18 @@ jobs:
                   private final float[] srcPts = new float[8];
                   private final android.graphics.Matrix decalM = new android.graphics.Matrix();
                   private int fn = 0;
+                  int gender = 0;
+                  private boolean srcOn = false;
+                  private final float[] ovr = new float[4];
+
+                  // Atur persegi sumber stiker untuk balok berikutnya (koordinat gambar 2D asli).
+                  private void srcRect(float l, float t, float r, float b) {
+                      ovr[0] = l;
+                      ovr[1] = t;
+                      ovr[2] = r;
+                      ovr[3] = b;
+                      srcOn = true;
+                  }
                   private float c3t = 1f;
                   private float s3t = 0f;
                   private float c3p = 1f;
@@ -4671,11 +4686,12 @@ jobs:
                               fq[i * 8 + k * 2] = pxs[q[k]];
                               fq[i * 8 + k * 2 + 1] = pys[q[k]];
                           }
-                          fsrc[i * 4] = x0;
-                          fsrc[i * 4 + 1] = y0;
-                          fsrc[i * 4 + 2] = x1;
-                          fsrc[i * 4 + 3] = y1;
+                          fsrc[i * 4] = srcOn ? ovr[0] : x0;
+                          fsrc[i * 4 + 1] = srcOn ? ovr[1] : y0;
+                          fsrc[i * 4 + 2] = srcOn ? ovr[2] : x1;
+                          fsrc[i * 4 + 3] = srcOn ? ovr[3] : y1;
                       }
+                      srcOn = false;
                   }
 
                   // Gambar stiker 2D di sisi depan sebuah balok, ikut miring dan menyempit mengikuti perspektif.
@@ -4699,11 +4715,8 @@ jobs:
                               rect(c, 62f, 20f, 69f, 58f, 3f, curHairC);
                           }
                       } else if (kind == 1) {
-                          drawHair(c, curHid, curHairC, curHood);
-                          if (curHood) {
-                              drawHood(c, animal);
-                          }
                           drawFaceAll(c);
+                      } else if (kind == 4) {
                           drawHat(c, it[0], curHt);
                       } else if (kind == 2) {
                           if (it[5] >= 0) {
@@ -4731,9 +4744,6 @@ jobs:
                       for (int n = 0; n < fn; n++) {
                           int i = fo[n];
                           int o = i * 8;
-                          if (fk[i] == 1) {
-                              decal(c, i, 11);
-                          }
                           path.reset();
                           path.moveTo(fq[o], fq[o + 1]);
                           path.lineTo(fq[o + 2], fq[o + 3]);
@@ -4755,14 +4765,48 @@ jobs:
                       }
                   }
 
+                  // Telinga / tanduk tudung hewan sebagai balok 3D
+                  private void addEars(int a, int main, int acc, float hx0, float hx1, float hy0, float hy1) {
+                      if (a == 0 || a == 1 || a == 2 || a == 3) {
+                          float w = a == 3 ? 11f : 9f;
+                          float h = a == 3 ? 9f : 7f;
+                          int ec = (a == 0 || a == 2) ? acc : main;
+                          addBox(hx0 - 3f, hy0 - h - 2f, hx0 - 3f + w, hy0 - 1f, -4.5f, 4.5f, ec, ec, ec, 0);
+                          addBox(hx1 + 3f - w, hy0 - h - 2f, hx1 + 3f, hy0 - 1f, -4.5f, 4.5f, ec, ec, ec, 0);
+                      } else if (a == 4) {
+                          addBox(hx0 + 2f, hy0 - 9f, hx0 + 13f, hy0 - 1f, -5f, 5f, main, main, main, 0);
+                          addBox(hx1 - 13f, hy0 - 9f, hx1 - 2f, hy0 - 1f, -5f, 5f, main, main, main, 0);
+                      } else if (a == 5 || a == 8) {
+                          addBox(hx0 - 1f, hy0 - 13f, hx0 + 7f, hy0 - 1f, -3f, 3f, main, main, main, 0);
+                          addBox(hx1 - 7f, hy0 - 13f, hx1 + 1f, hy0 - 1f, -3f, 3f, main, main, main, 0);
+                      } else if (a == 6) {
+                          addBox(hx0 + 5f, hy0 - 22f, hx0 + 12f, hy0 - 1f, -3f, 3f, main, main, main, 0);
+                          addBox(hx1 - 12f, hy0 - 22f, hx1 - 5f, hy0 - 1f, -3f, 3f, main, main, main, 0);
+                      } else if (a == 7) {
+                          addBox(hx0 - 7f, hy0 + 2f, hx0 - 1f, hy0 + 24f, -5f, 5f, acc, acc, acc, 0);
+                          addBox(hx1 + 1f, hy0 + 2f, hx1 + 7f, hy0 + 24f, -5f, 5f, acc, acc, acc, 0);
+                      } else if (a == 9) {
+                          int gold = col("#FFD54F");
+                          addBox(47f, hy0 - 15f, 53f, hy0 - 1f, -3f, 3f, gold, gold, gold, 0);
+                          addBox(hx0, hy0 - 8f, hx0 + 7f, hy0 - 1f, -3f, 3f, main, main, main, 0);
+                          addBox(hx1 - 7f, hy0 - 8f, hx1, hy0 - 1f, -3f, 3f, main, main, main, 0);
+                      } else if (a == 11) {
+                          int tuft = col("#6D4C41");
+                          addBox(hx0, hy0 - 11f, hx0 + 6f, hy0 - 1f, -3f, 3f, tuft, tuft, tuft, 0);
+                          addBox(hx1 - 6f, hy0 - 11f, hx1, hy0 - 1f, -3f, 3f, tuft, tuft, tuft, 0);
+                      }
+                  }
+
+                  // Avatar chibi anak SD: seragam putih-merah, putra / putri (kerudung), rambut dan tudung 3D.
                   private void drawChar3D(Canvas c) {
                       final int skin = col("#F2CFA5");
                       final boolean hood = animal >= 0 && animal < NO_HOOD;
+                      final boolean girl = gender == 1;
+                      final boolean hijab = girl && !hood && it[6] < 0;
                       curHood = hood;
                       curHt = hood ? 8f : 13.5f;
                       curHid = it[6];
-                      curHairC = curHid >= 0 ? col(itIcon(curHid)) : col("#5D4037");
-                      int cap = hood ? col(HOOD_MAIN[animal]) : curHairC;
+                      curHairC = curHid >= 0 ? col(itIcon(curHid)) : col("#4E342E");
 
                       float th = (float) Math.toRadians(avatarAngle);
                       float pitch = (float) Math.toRadians(-12f);
@@ -4779,31 +4823,86 @@ jobs:
                           emoji(c, itIcon(it[3]), 14f, 78f, 24f);
                       }
 
-                      int pants = col("#37474F");
-                      int shoe = col("#FAFAFA");
-                      int mainC = col("#4FC3F7");
-                      int slvC = mainC;
+                      int shirt = col("#F7F7F7");
+                      int slv = shirt;
                       boolean longSleeve = false;
                       int cl = it[5];
                       if (cl >= 0) {
                           String[] cs = itIcon(cl).split(",");
-                          mainC = col(cs[0]);
-                          slvC = col(cs[1]);
+                          shirt = col(cs[0]);
+                          slv = col(cs[1]);
                           longSleeve = true;
                       }
-                      float armEnd = longSleeve ? 61f : 53f;
+                      int red = col("#C62828");
+                      int shoe = col("#212121");
+                      final float hx0 = 31f;
+                      final float hx1 = 69f;
+                      final float hy0 = 8f;
+                      final float hy1 = 42f;
+                      final float hz = 17f;
+                      float armLen = longSleeve ? 16f : 8f;
 
                       fn = 0;
-                      addBox(38f, 66f, 49.6f, 83.5f, -5.8f, 5.8f, pants, pants, pants, 0);
-                      addBox(50.4f, 66f, 62f, 83.5f, -5.8f, 5.8f, pants, pants, pants, 0);
-                      addBox(36f, 83.5f, 49.6f, 89f, -6f, 9f, shoe, shoe, shoe, 0);
-                      addBox(50.4f, 83.5f, 64f, 89f, -6f, 9f, shoe, shoe, shoe, 0);
-                      addBox(24f, armEnd, 34f, 67f, -5f, 5f, skin, skin, skin, 0);
-                      addBox(66f, armEnd, 76f, 67f, -5f, 5f, skin, skin, skin, 0);
-                      addBox(24f, 45f, 34f, armEnd, -5f, 5f, slvC, slvC, slvC, 0);
-                      addBox(66f, 45f, 76f, armEnd, -5f, 5f, slvC, slvC, slvC, 3);
-                      addBox(34f, 44f, 66f, 68f, -8f, 8f, mainC, mainC, mainC, 2);
-                      addBox(33f, 14f, 67f, 46f, -16f, 16f, skin, cap, cap, 1);
+                      // kaki / rok + sepatu
+                      float shoeTop = girl ? 85f : 83f;
+                      if (girl) {
+                          addBox(35f, 62f, 65f, 85.5f, -8f, 8f, red, red, red, 0);
+                      } else {
+                          addBox(38f, 64f, 49.7f, 83f, -5.5f, 5.5f, red, red, red, 0);
+                          addBox(50.3f, 64f, 62f, 83f, -5.5f, 5.5f, red, red, red, 0);
+                      }
+                      addBox(37f, shoeTop, 49.7f, 89f, -5.5f, 9f, shoe, shoe, shoe, 0);
+                      addBox(50.3f, shoeTop, 63f, 89f, -5.5f, 9f, shoe, shoe, shoe, 0);
+                      // tangan: kulit bawah, lengan baju atas
+                      addBox(27f, 43f + armLen, 36f, 61f, -4.5f, 4.5f, skin, skin, skin, 0);
+                      addBox(64f, 43f + armLen, 73f, 61f, -4.5f, 4.5f, skin, skin, skin, 0);
+                      addBox(27f, 43f, 36f, 43f + armLen, -4.5f, 4.5f, slv, slv, slv, 0);
+                      srcRect(66f, 45f, 76f, longSleeve ? 61f : 53f);
+                      addBox(64f, 43f, 73f, 43f + armLen, -4.5f, 4.5f, slv, slv, slv, 3);
+                      // badan
+                      srcRect(34f, 44f, 66f, 68f);
+                      addBox(36f, 42f, 64f, 64f, -7f, 7f, shirt, shirt, shirt, 2);
+                      if (hijab) {
+                          int wh = col("#F7F7F7");
+                          addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
+                      }
+                      // kepala
+                      int hc = hood ? col(HOOD_MAIN[animal]) : (hijab ? col("#F7F7F7") : curHairC);
+                      srcRect(33f, 14f, 67f, 46f);
+                      addBox(hx0, hy0, hx1, hy1, -hz, hz, skin, hc, hc, 1);
+                      float m = (hood || hijab) ? 3f : 1.5f;
+                      // penutup atas + poni (stiker topi menempel di sisi depan balok ini)
+                      srcRect(33f, 14f, 67f, 46f);
+                      addBox(hx0 - m, hy0 - m - 1.5f, hx1 + m, hy0 + 7f, -hz - m, hz + m, hc, hc, hc, 4);
+                      // belakang kepala
+                      float backBottom = hood ? hy1 - 6f : hijab ? hy1 + 12f : (curHid == 42 ? hy1 + 8f : hy0 + 24f);
+                      addBox(hx0 - m, hy0 - m, hx1 + m, backBottom, -hz - m, -hz + 3f, hc, hc, hc, 0);
+                      // sisi kepala
+                      float sideBottom = hood ? hy1 - 10f : hijab ? hy1 + 6f : (curHid == 42 ? hy1 + 8f : hy0 + 14f);
+                      float sideZ1 = (hood || hijab) ? hz + m : 0f;
+                      addBox(hx0 - m, hy0 - m, hx0 + 3f, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
+                      addBox(hx1 - 3f, hy0 - m, hx1 + m, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
+                      if (hood) {
+                          // sedikit poni di dahi di bawah tudung
+                          addBox(hx0 + 3f, hy0 + 7f, hx1 - 3f, hy0 + 11f, hz - 0.5f, hz + 0.8f, curHairC, curHairC, curHairC, 0);
+                          addEars(animal, hc, col(HOOD_ACC[animal]), hx0, hx1, hy0, hy1);
+                      } else if (!hijab) {
+                          if (curHid == 40) {
+                              for (int k = 0; k < 3; k++) {
+                                  float cx = 38f + k * 12f;
+                                  addBox(cx - 4f, hy0 - 10f, cx + 4f, hy0 - 1.5f, -6f, 6f, hc, hc, hc, 0);
+                              }
+                          } else if (curHid == 41) {
+                              for (int k = 0; k < 4; k++) {
+                                  float cx = 36f + k * 10f;
+                                  addBox(cx - 3.5f, hy0 - 15f, cx + 3.5f, hy0 - 1.5f, -5f, 5f, hc, hc, hc, 0);
+                              }
+                          } else if (curHid == 43) {
+                              addBox(hx0 - m, hy0 + 7f, hx0 + 22f, hy0 + 14f, hz - 1f, hz + m, hc, hc, hc, 0);
+                          } else {
+                              addBox(hx0 - m, hy0 + 7f, hx1 + m, hy0 + 12f, hz - 1f, hz + m, hc, hc, hc, 0);
+                          }
+                      }
                       flushFaces(c);
                   }
 
@@ -4931,13 +5030,17 @@ jobs:
                           emoji(c, itIcon(it[3]), 14f, 78f, 24f);
                       }
 
-                      int pants = col("#37474F");
-                      rect(c, 38f, 66f, 49.6f, 87f, 2f, pants);
-                      rect(c, 50.4f, 66f, 62f, 87f, 2f, pants);
-                      rect(c, 36f, 83.5f, 49.6f, 89f, 2.5f, col("#FAFAFA"));
-                      rect(c, 50.4f, 83.5f, 64f, 89f, 2.5f, col("#FAFAFA"));
+                      int pants = col("#C62828");
+                      if (gender == 1) {
+                          rect(c, 35f, 64f, 65f, 86f, 3f, pants);
+                      } else {
+                          rect(c, 38f, 66f, 49.6f, 87f, 2f, pants);
+                          rect(c, 50.4f, 66f, 62f, 87f, 2f, pants);
+                      }
+                      rect(c, 36f, 83.5f, 49.6f, 89f, 2.5f, col("#212121"));
+                      rect(c, 50.4f, 83.5f, 64f, 89f, 2.5f, col("#212121"));
 
-                      int mainC = col("#4FC3F7");
+                      int mainC = col("#F7F7F7");
                       int slvC = mainC;
                       boolean longSleeve = false;
                       int cl = it[5];
@@ -4964,7 +5067,14 @@ jobs:
                           rect(c, 62f, 20f, 69f, 58f, 3f, hairC);
                       }
                       rect(c, 33f, 14f, 67f, 46f, 6f, skin);
-                      drawHair(c, hid, hairC, hood);
+                      boolean hijab2d = gender == 1 && !hood && hid < 0;
+                      if (hijab2d) {
+                          int wh = col("#F7F7F7");
+                          hoodRects(c, wh, 0f);
+                          rect(c, 36f, 45f, 64f, 53f, 3f, wh);
+                      } else {
+                          drawHair(c, hid, hairC, hood);
+                      }
                       if (hood) {
                           drawHood(c, animal);
                       }
@@ -5324,7 +5434,9 @@ jobs:
                       items[k] = (e >= 0 && e < ITEMS.length && itSlot(e) == k && owns(e)) ? e : -1;
                   }
                   int a = avatar[pl];
-                  return new AvatarView(this, a >= NO_HOOD ? -1 : a, items, mode, true);
+                  AvatarView av3 = new AvatarView(this, a >= NO_HOOD ? -1 : a, items, mode, true);
+                  av3.gender = genderOf[pl];
+                  return av3;
               }
 
               private AvatarView previewView(int animalIdx, int slot, int id, int mode) {
@@ -5436,6 +5548,22 @@ jobs:
                   LinearLayout pv = card();
                   pv.setGravity(Gravity.CENTER_HORIZONTAL);
                   pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(200), dp(200)));
+                  LinearLayout gr = new LinearLayout(this);
+                  gr.setOrientation(LinearLayout.HORIZONTAL);
+                  for (int g = 0; g < 2; g++) {
+                      final int gg = g;
+                      boolean gsel = genderOf[shopPl] == g;
+                      TextView gt = text(g == 0 ? "\uD83D\uDC66 Putra" : "\uD83D\uDC67 Putri", 14, gsel ? Color.WHITE : DARK, true);
+                      gt.setGravity(Gravity.CENTER);
+                      gt.setBackground(box(gsel ? (g == 0 ? BLUE : PINK) : GRAY, 16));
+                      gt.setOnClickListener(v -> {
+                          genderOf[shopPl] = gg;
+                          prefs.edit().putInt("gender" + shopPl, gg).apply();
+                          showToko();
+                      });
+                      gr.addView(gt, weight(g == 0 ? 0 : 4, 0));
+                  }
+                  pv.addView(gr, lp(dp(44), 8));
                   pv.addView(text(names[shopPl], 16, DARK, true), lp(WRAP, 8));
                   pv.addView(text("Ketuk barang untuk membeli, ketuk lagi untuk memakai atau melepas", 12, DARK, false),
                           lp(WRAP, 2));
