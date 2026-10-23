@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.0.4"
+                  versionName "6.0.5"
               }
 
               signingConfigs {
@@ -552,7 +552,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.0.4";
+              private static final String APP_VERSION = "6.0.5";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -1487,12 +1487,16 @@ jobs:
               // Latar belakang: gradasi hangat, lingkaran lembut, dan simbol belajar yang samar
               private class BgDrawable extends Drawable {
                   private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  // 13 simbol belajar pertama, sisanya hiasan alam (daun, bunga, awan, kupu-kupu)
+                  private final int mathSyms = 13;
                   private final String[] sym = {"+", "\u2212", "\u00D7", "\u00F7", "=", "?",
-                          "A", "B", "C", "1", "2", "3", "\u2605"};
+                          "A", "B", "C", "1", "2", "3", "\u2605",
+                          "\uD83C\uDF3F", "\uD83C\uDF43", "\uD83C\uDF31", "\uD83C\uDF3B", "\u2601\uFE0F",
+                          "\uD83E\uDD8B", "\uD83C\uDF33", "\uD83C\uDF43", "\uD83C\uDF3F", "\uD83C\uDF31"};
                   private final int[] pal = {
-                          Color.argb(46, 251, 140, 0), Color.argb(40, 0, 137, 123),
-                          Color.argb(40, 30, 136, 229), Color.argb(38, 142, 36, 170),
-                          Color.argb(40, 216, 27, 96)};
+                          Color.argb(46, 67, 160, 71), Color.argb(40, 0, 137, 123),
+                          Color.argb(40, 30, 136, 229), Color.argb(46, 124, 179, 66),
+                          Color.argb(40, 251, 140, 0)};
 
                   @Override
                   public void draw(Canvas cv) {
@@ -1503,16 +1507,16 @@ jobs:
                           return;
                       }
                       p.setStyle(Paint.Style.FILL);
-                      p.setShader(new LinearGradient(0, 0, 0, h, Color.parseColor("#F1F6FF"),
-                              Color.parseColor("#FFEFD6"), Shader.TileMode.CLAMP));
+                      p.setShader(new LinearGradient(0, 0, 0, h, Color.parseColor("#E3F2FD"),
+                              Color.parseColor("#E8F5E9"), Shader.TileMode.CLAMP));
                       cv.drawRect(r, p);
                       p.setShader(null);
 
-                      p.setColor(Color.argb(40, 255, 167, 38));
-                      cv.drawCircle(w * 0.92f, h * 0.06f, w * 0.38f, p);
-                      p.setColor(Color.argb(30, 0, 137, 123));
+                      p.setColor(Color.argb(46, 255, 213, 79));
+                      cv.drawCircle(w * 0.92f, h * 0.06f, w * 0.34f, p);
+                      p.setColor(Color.argb(36, 102, 187, 106));
                       cv.drawCircle(w * 0.02f, h * 0.45f, w * 0.30f, p);
-                      p.setColor(Color.argb(30, 30, 136, 229));
+                      p.setColor(Color.argb(40, 76, 175, 80));
                       cv.drawCircle(w * 0.98f, h * 0.92f, w * 0.42f, p);
 
                       p.setTypeface(Typeface.DEFAULT_BOLD);
@@ -1529,7 +1533,11 @@ jobs:
                               p.setTextSize(dp(18 + rr.nextInt(14)));
                               cv.save();
                               cv.rotate(rr.nextInt(50) - 25, x, y);
-                              cv.drawText(sym[rr.nextInt(sym.length)], x, y, p);
+                              int si = rr.nextInt(sym.length);
+                              if (si >= mathSyms) {
+                                  p.setAlpha(95);
+                              }
+                              cv.drawText(sym[si], x, y, p);
                               cv.restore();
                           }
                       }
@@ -1845,7 +1853,7 @@ jobs:
                   hero.setGravity(Gravity.CENTER_HORIZONTAL);
                   hero.setPadding(dp(16), dp(20), dp(16), dp(20));
                   GradientDrawable hg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                          new int[]{Color.parseColor("#7E57C2"), Color.parseColor("#FF7043")});
+                          new int[]{Color.parseColor("#2E7D32"), Color.parseColor("#29B6F6")});
                   hg.setCornerRadius(dp(32));
                   hero.setBackground(hg);
                   hero.setElevation(dp(6));
@@ -1857,9 +1865,15 @@ jobs:
                   logo.setElevation(dp(4));
                   hero.addView(logo, new LinearLayout.LayoutParams(dp(96), dp(96)));
                   hero.addView(text(APP_NAME, 26, Color.WHITE, true), lp(WRAP, 10));
-                  hero.addView(text("SD Alam Muhammadiyah Kandangan", 14, Color.WHITE, true), lp(WRAP, 4));
-                  hero.addView(text("Ayo belajar sambil bermain!", 14,
-                          Color.parseColor("#FFF3E0"), false), lp(WRAP, 4));
+                  TextView alam = text("\uD83C\uDF33 SD ALAM \uD83C\uDF3F", 20, Color.WHITE, true);
+                  alam.setBackground(box(Color.argb(70, 255, 255, 255), 20));
+                  alam.setPadding(dp(16), dp(4), dp(16), dp(4));
+                  hero.addView(alam, lpw(8));
+                  hero.addView(text("Muhammadiyah Kandangan", 14, Color.WHITE, true), lp(WRAP, 6));
+                  hero.addView(text("Ayo belajar bersama alam!", 14,
+                          Color.parseColor("#E8F5E9"), false), lp(WRAP, 4));
+                  hero.addView(text("\uD83C\uDF31 \uD83C\uDF3B \uD83E\uDD8B \uD83C\uDF33 \uD83C\uDF43", 20,
+                          Color.WHITE, false), lp(WRAP, 6));
                   c.addView(hero, lp(WRAP, 10));
 
                   // Tiga tombol pengaturan: kelas, pemain, waktu
