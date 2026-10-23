@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.2.5";
+    private static final String APP_VERSION = "6.6.4";
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -4063,6 +4063,13 @@ public class MainActivity extends Activity {
         // Sudut putar (derajat) mengelilingi sumbu Y. Mode 0 memakai renderer 3D balok (drawChar3D).
         private float avatarAngle = 0f;
         private float lastTouchX = 0f;
+        private final long animEpoch = System.currentTimeMillis();
+
+        private boolean isBlinking() {
+            if (mode != 0) return false;
+            long phase = (System.currentTimeMillis() - animEpoch) % 4100L;
+            return phase < 145L || (phase > 260L && phase < 330L);
+        }
 
         AvatarView(Context ctx, int animal, int[] items, int mode, boolean tile) {
             super(ctx);
@@ -4311,8 +4318,15 @@ public class MainActivity extends Activity {
                 path.lineTo(fq[o + 6], fq[o + 7]);
                 path.close();
                 p.setStyle(Paint.Style.FILL);
-                p.setColor(fc[i]);
+                // Gradasi lembut pada tiap sisi balok agar bentuk terasa seperti mainan 3D.
+                float minX = Math.min(Math.min(fq[o], fq[o + 2]), Math.min(fq[o + 4], fq[o + 6]));
+                float maxX = Math.max(Math.max(fq[o], fq[o + 2]), Math.max(fq[o + 4], fq[o + 6]));
+                float minY = Math.min(Math.min(fq[o + 1], fq[o + 3]), Math.min(fq[o + 5], fq[o + 7]));
+                float maxY = Math.max(Math.max(fq[o + 1], fq[o + 3]), Math.max(fq[o + 5], fq[o + 7]));
+                p.setShader(new LinearGradient(minX, minY, maxX + 1f, maxY + 1f,
+                        shade(fc[i], 1.13f), shade(fc[i], 0.88f), Shader.TileMode.CLAMP));
                 c.drawPath(path, p);
+                p.setShader(null);
                 p.setStyle(Paint.Style.STROKE);
                 p.setStrokeWidth(0.55f * u);
                 p.setStrokeJoin(Paint.Join.ROUND);
@@ -4403,10 +4417,24 @@ public class MainActivity extends Activity {
             float armLen = longSleeve ? 16f : 8f;
 
             fn = 0;
+            // Tas sekolah 3D di punggung. Kedalaman negatif membuatnya berada di belakang badan.
+            // Tali bahu digambar sebagai balok tipis di depan dada agar tetap terlihat saat diputar.
+            int bagMain = col("#2E7D32");
+            int bagTop = col("#43A047");
+            int bagDark = col("#1B5E20");
+            addBox(39f, 45f, 61f, 61f, -13.5f, -7.2f, bagMain, bagTop, bagDark, 0);
+            addBox(42f, 43.5f, 58f, 48f, -14.5f, -7.5f, bagTop, bagTop, bagMain, 0);
+            addBox(40f, 45f, 43.5f, 58f, 7.1f, 8.3f, bagDark, bagDark, bagDark, 0);
+            addBox(56.5f, 45f, 60f, 58f, 7.1f, 8.3f, bagDark, bagDark, bagDark, 0);
+            addBox(46f, 50f, 54f, 53f, 8.2f, 8.8f, col("#A5D6A7"), col("#A5D6A7"), col("#2E7D32"), 0);
             // kaki / rok + sepatu
             float shoeTop = girl ? 85f : 83f;
             if (girl) {
+                // Rok bertingkat sedikit melebar di bagian bawah agar siluet putri lebih jelas.
                 addBox(35f, 62f, 65f, 85.5f, -8f, 8f, red, red, red, 0);
+                addBox(33.5f, 72f, 66.5f, 85.5f, -8.4f, 8.4f, red, red, red, 0);
+                int hem = col("#7F1722");
+                addBox(34f, 83.8f, 66f, 85.6f, -8.6f, 8.6f, hem, hem, hem, 0);
             } else {
                 addBox(38f, 64f, 49.7f, 83f, -5.5f, 5.5f, red, red, red, 0);
                 addBox(50.3f, 64f, 62f, 83f, -5.5f, 5.5f, red, red, red, 0);
@@ -4644,16 +4672,22 @@ public class MainActivity extends Activity {
             int eyeDark = col("#3B2418");
             int iris = col("#8A5A3C");
             float[] ecx = {43.6f, 56.4f};
+            boolean blink = isBlinking();
             for (int k = 0; k < 2; k++) {
                 float cx = ecx[k];
-                rf.set(fx(cx - 2.5f), fy(29.2f), fx(cx + 2.5f), fy(35.6f));
-                p.setStyle(Paint.Style.FILL);
-                p.setColor(eyeDark);
-                c.drawOval(rf, p);
-                dot(c, cx, 33.2f, 1.8f, iris);
-                dot(c, cx, 33.2f, 1.0f, col("#1E120B"));
-                dot(c, cx - 0.8f, 31.4f, 0.95f, Color.WHITE);
-                dot(c, cx + 1.2f, 34.4f, 0.45f, Color.WHITE);
+                if (blink) {
+                    line(c, cx - 2.8f, 32.5f, cx + 2.8f, 32.5f, 1.7f, eyeDark);
+                    line(c, cx - 1.8f, 31.6f, cx + 1.8f, 31.6f, 0.8f, col("#B77B60"));
+                } else {
+                    rf.set(fx(cx - 2.5f), fy(29.2f), fx(cx + 2.5f), fy(35.6f));
+                    p.setStyle(Paint.Style.FILL);
+                    p.setColor(eyeDark);
+                    c.drawOval(rf, p);
+                    dot(c, cx, 33.2f, 1.8f, iris);
+                    dot(c, cx, 33.2f, 1.0f, col("#1E120B"));
+                    dot(c, cx - 0.8f, 31.4f, 0.95f, Color.WHITE);
+                    dot(c, cx + 1.2f, 34.4f, 0.45f, Color.WHITE);
+                }
             }
             line(c, 39.8f, 26.6f, 46.2f, 25.4f, 1.7f, col("#3E2723"));
             line(c, 60.2f, 26.6f, 53.8f, 25.4f, 1.7f, col("#3E2723"));
@@ -4747,10 +4781,18 @@ public class MainActivity extends Activity {
             c.scale(0.95f, 0.95f);
             c.translate(-fx(50f), -fy(90f));
             if (mode == 0) {
+                // Animasi idle ringan: napas halus dan kedipan mata berkala.
+                float t = (System.currentTimeMillis() - animEpoch) / 1000f;
+                float breath = (float) Math.sin(t * 2.0f) * 0.55f;
+                c.translate(0f, breath * u);
+                float pulse = 1f + (float) Math.sin(t * 2.0f) * 0.0025f;
+                c.scale(pulse, pulse, fx(50f), fy(54f));
                 drawChar3D(c);
+                if (isAttachedToWindow()) postInvalidateDelayed(40L);
             } else {
                 drawChar(c);
             }
+            p.setShader(null);
             c.restore();
             c.restore();
         }
@@ -5286,7 +5328,7 @@ public class MainActivity extends Activity {
 
         LinearLayout pv = card();
         pv.setGravity(Gravity.CENTER_HORIZONTAL);
-        pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(200), dp(200)));
+        pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(250), dp(250)));
         LinearLayout gr = new LinearLayout(this);
         gr.setOrientation(LinearLayout.HORIZONTAL);
         for (int g = 0; g < 2; g++) {
@@ -5308,32 +5350,32 @@ public class MainActivity extends Activity {
                 lp(WRAP, 2));
         c.addView(pv, lp(WRAP, 12));
 
-        // Menu kategori ringkas: dua baris agar kategori paling kanan selalu terlihat.
-        android.widget.GridLayout tabGrid = new android.widget.GridLayout(this);
-        tabGrid.setColumnCount(4);
-        tabGrid.setRowCount((SHOP_TAB_NAME.length + 3) / 4);
-        tabGrid.setUseDefaultMargins(false);
-        for (int t = 0; t < SHOP_TAB_NAME.length; t++) {
-            final int tab = t;
-            boolean sel = t == shopTab;
-            TextView chip = text(SHOP_TAB_ICON[t] + " " + ((t == 7 && genderOf[shopPl] == 1) ? "Jilbab" : SHOP_TAB_NAME[t]), 12, sel ? Color.WHITE : DARK, true);
-            chip.setGravity(Gravity.CENTER);
-            chip.setSingleLine(false);
-            chip.setBackground(box(sel ? ORANGE : GRAY, 14));
-            chip.setPadding(dp(5), dp(9), dp(5), dp(9));
-            chip.setOnClickListener(v -> {
-                shopTab = tab;
-                showToko();
-            });
-            android.widget.GridLayout.LayoutParams cl = new android.widget.GridLayout.LayoutParams();
-            cl.width = 0;
-            cl.height = WRAP;
-            cl.columnSpec = android.widget.GridLayout.spec(t % 4, 1f);
-            cl.rowSpec = android.widget.GridLayout.spec(t / 4);
-            cl.setMargins(dp(3), dp(3), dp(3), dp(3));
-            tabGrid.addView(chip, cl);
+        // Kategori ringkas: semua kategori terlihat tanpa geser horizontal.
+        LinearLayout tabGrid = new LinearLayout(this);
+        tabGrid.setOrientation(LinearLayout.VERTICAL);
+        for (int start = 0; start < SHOP_TAB_NAME.length; start += 4) {
+            LinearLayout tabRow = new LinearLayout(this);
+            tabRow.setOrientation(LinearLayout.HORIZONTAL);
+            for (int q = 0; q < 4; q++) {
+                final int tab = start + q;
+                if (tab >= SHOP_TAB_NAME.length) break;
+                boolean sel = tab == shopTab;
+                TextView chip = text(SHOP_TAB_ICON[tab] + "\n" + ((tab == 7 && genderOf[shopPl] == 1) ? "Jilbab" : SHOP_TAB_NAME[tab]), 12, sel ? Color.WHITE : DARK, true);
+                chip.setGravity(Gravity.CENTER);
+                chip.setMinHeight(dp(48));
+                chip.setPadding(dp(3), dp(5), dp(3), dp(5));
+                chip.setBackground(box(sel ? ORANGE : GRAY, 14));
+                chip.setOnClickListener(v -> {
+                    shopTab = tab;
+                    showToko();
+                });
+                LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(0, WRAP, 1f);
+                cl.setMargins(dp(3), dp(3), dp(3), dp(3));
+                tabRow.addView(chip, cl);
+            }
+            tabGrid.addView(tabRow, lp(WRAP, 0));
         }
-        c.addView(tabGrid, lp(MATCH, 10));
+        c.addView(tabGrid, lp(WRAP, 12));
 
         if (shopTab == 0) {
             c.addView(text("Pilih tudung hewan (gratis)", 13, DARK, true), lp(WRAP, 12));
