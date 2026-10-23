@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.0.2"
+                  versionName "6.0.3"
               }
 
               signingConfigs {
@@ -552,7 +552,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.0.2";
+              private static final String APP_VERSION = "6.0.3";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -691,6 +691,62 @@ jobs:
                       {"window", "jendela"},
                       {"eat", "makan"},
                       {"sleep", "tidur"}
+              };
+
+              // Pasangan bergambar (gambar ke kata), buatan Claude, perlu dicek guru.
+              // Dipakai bergantian dengan pasangan kata biasa di Cocokkan Pasangan (bukan di Peta Petualangan).
+              private static final String[][] M_ID_1G = {
+                      {"\uD83D\uDC31", "kucing"},
+                      {"\uD83D\uDC36", "anjing"},
+                      {"\uD83D\uDC26", "burung"},
+                      {"\uD83D\uDC1F", "ikan"},
+                      {"\uD83D\uDC14", "ayam"},
+                      {"\uD83D\uDC04", "sapi"},
+                      {"\uD83D\uDC38", "katak"},
+                      {"\uD83D\uDC30", "kelinci"},
+                      {"\uD83C\uDF4C", "pisang"},
+                      {"\uD83C\uDF4E", "apel"},
+                      {"\uD83C\uDF49", "semangka"},
+                      {"\uD83C\uDF47", "anggur"},
+                      {"\uD83C\uDF4A", "jeruk"},
+                      {"\uD83C\uDFE0", "rumah"},
+                      {"\uD83D\uDE97", "mobil"},
+                      {"\uD83D\uDCD6", "buku"},
+                      {"\u26BD", "bola"},
+                      {"\uD83C\uDF19", "bulan"},
+                      {"\uD83C\uDF33", "pohon"}
+              };
+              private static final String[][] M_EN_2G = {
+                      {"\uD83D\uDC40", "eyes"},
+                      {"\uD83D\uDC42", "ear"},
+                      {"\uD83D\uDC43", "nose"},
+                      {"\uD83D\uDC44", "mouth"},
+                      {"\u270B", "hand"},
+                      {"\uD83E\uDDB6", "foot"},
+                      {"\uD83E\uDDB7", "tooth"},
+                      {"\uD83C\uDF92", "bag"},
+                      {"\u270F\uFE0F", "pencil"},
+                      {"\u2702\uFE0F", "scissors"},
+                      {"\uD83D\uDCCF", "ruler"},
+                      {"\uD83D\uDCDA", "books"},
+                      {"\uD83D\uDD14", "bell"},
+                      {"\u23F0", "clock"}
+              };
+              private static final String[][] M_EN_3G = {
+                      {"\uD83C\uDF5E", "bread"},
+                      {"\uD83E\uDD5A", "egg"},
+                      {"\uD83C\uDF5A", "rice"},
+                      {"\uD83E\uDD5B", "milk"},
+                      {"\uD83D\uDE8C", "bus"},
+                      {"\uD83D\uDEB2", "bicycle"},
+                      {"\u26F5", "boat"},
+                      {"\u2708\uFE0F", "plane"},
+                      {"\u2600\uFE0F", "sun"},
+                      {"\uD83C\uDF08", "rainbow"},
+                      {"\uD83C\uDF3B", "flower"},
+                      {"\uD83D\uDC18", "elephant"},
+                      {"\uD83D\uDC12", "monkey"},
+                      {"\uD83D\uDC2F", "tiger"}
               };
 
               private static final String[] AVATARS = {
@@ -4010,6 +4066,21 @@ jobs:
                   return null;
               }
 
+              // Set pasangan bergambar untuk Indonesia Kelas 1 dan Inggris Kelas 2-3 (selain set kata biasa)
+              private String[][] picturePairs(int sj, int k) {
+                  if (sj == 1) {
+                      return k == 0 ? M_ID_1G : null;
+                  }
+                  if (sj == 2) {
+                      return k == 1 ? M_EN_2G : k == 2 ? M_EN_3G : null;
+                  }
+                  return null;
+              }
+
+              private String pictureHint(int sj, int k) {
+                  return sj == 1 ? "Cocokkan gambar dengan namanya" : "Cocokkan gambar dengan kata Inggrisnya";
+              }
+
               private String builtinHint(int sj, int k) {
                   if (sj == 1) {
                       return k == 2 ? "Cocokkan persamaan kata" : "Cocokkan lawan kata";
@@ -4053,8 +4124,13 @@ jobs:
                       return t;
                   }
                   String[][] bi = builtinPairs(sj, kelas);
+                  String[][] pic = picturePairs(sj, kelas);
                   ArrayList<String[]> out = new ArrayList<>();
-                  if (bi != null) {
+                  // Di Cocokkan Pasangan biasa, set bergambar dan set kata dipilih bergantian; di Peta tetap set kata
+                  if (pic != null && (bi == null || (advLevel < 0 && rnd.nextBoolean()))) {
+                      out.addAll(Arrays.asList(pic));
+                      matchHint = pictureHint(sj, kelas);
+                  } else if (bi != null) {
                       out.addAll(Arrays.asList(bi));
                       matchHint = builtinHint(sj, kelas);
                   }
