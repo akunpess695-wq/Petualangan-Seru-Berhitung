@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.1.0"
+                  versionName "6.1.1"
               }
 
               signingConfigs {
@@ -552,7 +552,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.1.0";
+              private static final String APP_VERSION = "6.1.1";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -589,7 +589,7 @@ jobs:
               };
               private static final String[] KELAS_DESC = {
                   "Sampai 10 \u2022 tambah dan kurang",
-                  "Sampai 20 \u2022 tambah dan kurang",
+                  "Sampai 10 \u2022 tambah dan kurang",
                   "Sampai 100\u2013500 \u2022 kali-bagi sampai 70",
                   "Sampai 500\u20131.000 \u2022 kali-bagi sampai 100",
                   "Sampai 1.000\u201310.000 \u2022 kali-bagi 2 angka",
@@ -598,11 +598,11 @@ jobs:
               private static final int[] KELAS_COLOR = {GREEN, TEAL, BLUE, PURPLE, ORANGE, RED};
               private static final int[] KELAS_LIVES = {5, 5, 5, 5, 5, 5};
               // Penjumlahan dan pengurangan: batas bilangan di soal 1 dan di soal 10
-              private static final int[] ADD_LO = {5, 10, 100, 500, 1000, 10000};
-              private static final int[] ADD_HI = {10, 20, 500, 1000, 10000, 100000};
+              private static final int[] ADD_LO = {5, 7, 100, 500, 1000, 10000};
+              private static final int[] ADD_HI = {10, 10, 500, 1000, 10000, 100000};
               // Isi Titik dan 3 Bilangan: batas bilangan di soal 1 dan soal 10 (Kelas 1-2 lebih ringan)
-              private static final int[] EASY_LO = {6, 10, 100, 500, 1000, 10000};
-              private static final int[] EASY_HI = {10, 20, 500, 1000, 10000, 100000};
+              private static final int[] EASY_LO = {6, 7, 100, 500, 1000, 10000};
+              private static final int[] EASY_HI = {10, 10, 500, 1000, 10000, 100000};
               // Perkalian dan pembagian: faktor a dan b; batas atas naik dari soal 1 ke soal 10
               private static final int[] MUL_A_LO = {1, 2, 2, 2, 11, 101};
               private static final int[] MUL_A_S = {2, 3, 4, 6, 20, 200};
@@ -4938,8 +4938,8 @@ jobs:
                           step = rnd.nextInt(3) == 0 ? 2 : 1;
                           start = range(1, 10 - 4 * step);
                       } else if (kelas == 1) {
-                          step = range(1, 4);
-                          start = range(1, 20 - 4 * step);
+                          step = range(1, 2);
+                          start = range(1, 10 - 4 * step);
                       } else {
                           int[] st = {2, 5, 10, 20, 25};
                           step = st[rnd.nextInt(st.length)];
@@ -5197,7 +5197,7 @@ jobs:
                       boolean bad;
                       int tries = 0;
                       // Kelas 1-2: pilihan berjauhan (selisih minimal 2) dan tidak melewati batas bilangan kelas
-                      int cap = (kelas == 0 && ans <= 10) ? 10 : (kelas == 1 && ans <= 20) ? 20 : Integer.MAX_VALUE;
+                      int cap = (kelas <= 1 && ans <= 10) ? 10 : Integer.MAX_VALUE;
                       do {
                           tries++;
                           if (tries < 200) {
@@ -6764,7 +6764,7 @@ jobs:
               private String alamQ(String text, int ans, String expl) {
                   // Kelas 1-2: pengecoh berjauhan dan tidak melewati batas bilangan kelas
                   boolean low = kelas <= 1;
-                  int cap = kelas == 0 ? 10 : kelas == 1 ? 20 : Integer.MAX_VALUE;
+                  int cap = kelas <= 1 ? 10 : Integer.MAX_VALUE;
                   ArrayList<Integer> ds = new ArrayList<>(low
                           ? Arrays.asList(3, -3, 5, -5, 7, -7, 10, -10)
                           : Arrays.asList(1, -1, 2, -2, 3, -3, 10, -10));
@@ -6831,7 +6831,7 @@ jobs:
                   "D|Nelayan membagi {t} kerang sama banyak untuk {n} anak. Berapa kerang tiap anak?"
               };
 
-              // Cerita Kelas 1 (sampai 10), Kelas 2 (sampai 20), Kelas 3 (ratusan, kali-bagi kecil)
+              // Cerita Kelas 1 (sampai 10), Kelas 2 (sampai 10), Kelas 3 (ratusan, kali-bagi kecil)
               private String alamStoryOne() {
                   String[] pool = kelas <= 1 ? ALAM_STORY_S : ALAM_STORY_L;
                   String tpl = pool[rnd.nextInt(pool.length)];
@@ -6846,8 +6846,8 @@ jobs:
                           a = range(2, 9);
                           b = range(1, 10 - a);
                       } else if (kelas == 1) {
-                          a = range(3, 17);
-                          b = range(2, 20 - a);
+                          a = range(3, 7);
+                          b = range(2, 10 - a);
                       } else {
                           a = range(120, 480);
                           b = range(100, 350);
@@ -6859,7 +6859,7 @@ jobs:
                           a = range(4, 10);
                           b = range(1, a - 1);
                       } else if (kelas == 1) {
-                          a = range(8, 20);
+                          a = range(6, 10);
                           b = range(2, a - 2);
                       } else {
                           a = range(500, 900);
