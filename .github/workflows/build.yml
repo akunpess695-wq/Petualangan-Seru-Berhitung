@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.2.5"
+                  versionName "6.3.0"
               }
 
               signingConfigs {
@@ -4486,6 +4486,12 @@ jobs:
               private static final String[] HOOD_ACC = {"#B5651D", "#212121", "#212121", "#DDE3E6", "#FFFFFF", "#FFFFFF",
                       "#F8BBD0", "#5D3A1E", "#C77B30", "#F06292", "#FFFFFF", "#E6D5B8"};
 
+              // ---------- Avatar 3D tahap 1: data mesh balok ----------
+              private static final int MAXF = 64;
+              // Sisi balok: depan, belakang, kanan, kiri, atas (indeks sudut: bit0=x, bit1=y, bit2=z)
+              private static final int[][] BOX_FACES = {{4, 5, 7, 6}, {1, 0, 2, 3}, {5, 1, 3, 7}, {0, 4, 6, 2}, {0, 1, 5, 4}};
+              private static final float[][] BOX_NORM = {{0f, 0f, 1f}, {0f, 0f, -1f}, {1f, 0f, 0f}, {-1f, 0f, 0f}, {0f, -1f, 0f}};
+
               private class AvatarView extends View {
                   private final int animal;
                   private final int[] it = new int[7];
@@ -4497,7 +4503,7 @@ jobs:
                   private float u = 1f;
                   private float ox = 0f;
                   private float oy = 0f;
-                  // Rotasi visual 2.5D pada Canvas; belum merupakan mesh 3D sungguhan.
+                  // Sudut putar (derajat) mengelilingi sumbu Y. Mode 0 memakai renderer 3D balok (drawChar3D).
                   private float avatarAngle = 0f;
                   private float lastTouchX = 0f;
 
@@ -4588,6 +4594,247 @@ jobs:
                       c.drawText(t, fx(cx), fy(cy) - (fm.ascent + fm.descent) / 2f, p);
                   }
 
+                  // ---------- Renderer 3D balok (tahap 1) ----------
+                  // Kepala, badan, tangan, kaki = balok sungguhan (8 titik sudut, putar sumbu Y,
+                  // sedikit miring ke bawah, proyeksi perspektif, buang sisi belakang, urut kedalaman).
+                  // Wajah, baju, rambut, tudung, topi, barang pegang masih "stiker" 2D yang menempel
+                  // di sisi depan balok. Tahap berikutnya mengubahnya menjadi balok 3D.
+                  private final float[] pxs = new float[8];
+                  private final float[] pys = new float[8];
+                  private final float[] pzs = new float[8];
+                  private final float[] fq = new float[MAXF * 8];
+                  private final float[] fsrc = new float[MAXF * 4];
+                  private final float[] fz = new float[MAXF];
+                  private final int[] fc = new int[MAXF];
+                  private final int[] fk = new int[MAXF];
+                  private final int[] fo = new int[MAXF];
+                  private final float[] srcPts = new float[8];
+                  private final android.graphics.Matrix decalM = new android.graphics.Matrix();
+                  private int fn = 0;
+                  private float c3t = 1f;
+                  private float s3t = 0f;
+                  private float c3p = 1f;
+                  private float s3p = 0f;
+                  private int curHid = -1;
+                  private int curHairC = 0;
+                  private boolean curHood = false;
+                  private float curHt = 13.5f;
+
+                  private int shade(int color, float k) {
+                      int r = Math.min(255, (int) (Color.red(color) * k));
+                      int g = Math.min(255, (int) (Color.green(color) * k));
+                      int b = Math.min(255, (int) (Color.blue(color) * k));
+                      return Color.rgb(r, g, b);
+                  }
+
+                  // kind: 0 polos, 1 kepala, 2 badan, 3 lengan kanan (barang pegang)
+                  private void addBox(float x0, float y0, float x1, float y1, float z0, float z1,
+                                      int colSide, int colTop, int colBack, int kind) {
+                      for (int i = 0; i < 8; i++) {
+                          float x = ((i & 1) != 0 ? x1 : x0) - 50f;
+                          float y = ((i & 2) != 0 ? y1 : y0) - 50f;
+                          float z = (i & 4) != 0 ? z1 : z0;
+                          float xr = x * c3t + z * s3t;
+                          float zr = -x * s3t + z * c3t;
+                          float y2 = y * c3p - zr * s3p;
+                          float z2 = y * s3p + zr * c3p;
+                          float sc = 260f / (260f - z2);
+                          pxs[i] = fx(50f + xr * sc);
+                          pys[i] = fy(50f + y2 * sc);
+                          pzs[i] = z2;
+                      }
+                      for (int f = 0; f < 5 && fn < MAXF; f++) {
+                          int[] q = BOX_FACES[f];
+                          float area = 0f;
+                          for (int k = 0; k < 4; k++) {
+                              int a = q[k];
+                              int b = q[(k + 1) & 3];
+                              area += pxs[a] * pys[b] - pxs[b] * pys[a];
+                          }
+                          if (area <= 0f) {
+                              continue;
+                          }
+                          float nx = BOX_NORM[f][0];
+                          float ny = BOX_NORM[f][1];
+                          float nz = BOX_NORM[f][2];
+                          float nxr = nx * c3t + nz * s3t;
+                          float nzr = -nx * s3t + nz * c3t;
+                          float ny2 = ny * c3p - nzr * s3p;
+                          float nz2 = ny * s3p + nzr * c3p;
+                          float lit = Math.max(0f, nxr * -0.35f + ny2 * -0.5f + nz2 * 0.79f);
+                          int base = f == 4 ? colTop : (f == 1 ? colBack : colSide);
+                          int i = fn++;
+                          fc[i] = shade(base, 0.62f + 0.43f * lit);
+                          fk[i] = f == 0 ? kind : 0;
+                          fz[i] = (pzs[q[0]] + pzs[q[1]] + pzs[q[2]] + pzs[q[3]]) / 4f;
+                          for (int k = 0; k < 4; k++) {
+                              fq[i * 8 + k * 2] = pxs[q[k]];
+                              fq[i * 8 + k * 2 + 1] = pys[q[k]];
+                          }
+                          fsrc[i * 4] = x0;
+                          fsrc[i * 4 + 1] = y0;
+                          fsrc[i * 4 + 2] = x1;
+                          fsrc[i * 4 + 3] = y1;
+                      }
+                  }
+
+                  // Gambar stiker 2D di sisi depan sebuah balok, ikut miring dan menyempit mengikuti perspektif.
+                  private void decal(Canvas c, int i, int kind) {
+                      srcPts[0] = fx(fsrc[i * 4]);
+                      srcPts[1] = fy(fsrc[i * 4 + 1]);
+                      srcPts[2] = fx(fsrc[i * 4 + 2]);
+                      srcPts[3] = fy(fsrc[i * 4 + 1]);
+                      srcPts[4] = fx(fsrc[i * 4 + 2]);
+                      srcPts[5] = fy(fsrc[i * 4 + 3]);
+                      srcPts[6] = fx(fsrc[i * 4]);
+                      srcPts[7] = fy(fsrc[i * 4 + 3]);
+                      if (!decalM.setPolyToPoly(srcPts, 0, fq, i * 8, 4)) {
+                          return;
+                      }
+                      c.save();
+                      c.concat(decalM);
+                      if (kind == 11) {
+                          if (curHid == 42) {
+                              rect(c, 31f, 20f, 38f, 58f, 3f, curHairC);
+                              rect(c, 62f, 20f, 69f, 58f, 3f, curHairC);
+                          }
+                      } else if (kind == 1) {
+                          drawHair(c, curHid, curHairC, curHood);
+                          if (curHood) {
+                              drawHood(c, animal);
+                          }
+                          drawFaceAll(c);
+                          drawHat(c, it[0], curHt);
+                      } else if (kind == 2) {
+                          if (it[5] >= 0) {
+                              drawClothes(c, it[5]);
+                          }
+                      } else if (kind == 3) {
+                          drawHeld(c, it[2]);
+                      }
+                      c.restore();
+                  }
+
+                  private void flushFaces(Canvas c) {
+                      for (int i = 0; i < fn; i++) {
+                          fo[i] = i;
+                      }
+                      for (int i = 1; i < fn; i++) {
+                          int key = fo[i];
+                          int j = i - 1;
+                          while (j >= 0 && fz[fo[j]] > fz[key]) {
+                              fo[j + 1] = fo[j];
+                              j--;
+                          }
+                          fo[j + 1] = key;
+                      }
+                      for (int n = 0; n < fn; n++) {
+                          int i = fo[n];
+                          int o = i * 8;
+                          if (fk[i] == 1) {
+                              decal(c, i, 11);
+                          }
+                          path.reset();
+                          path.moveTo(fq[o], fq[o + 1]);
+                          path.lineTo(fq[o + 2], fq[o + 3]);
+                          path.lineTo(fq[o + 4], fq[o + 5]);
+                          path.lineTo(fq[o + 6], fq[o + 7]);
+                          path.close();
+                          p.setStyle(Paint.Style.FILL);
+                          p.setColor(fc[i]);
+                          c.drawPath(path, p);
+                          p.setStyle(Paint.Style.STROKE);
+                          p.setStrokeWidth(0.7f * u);
+                          p.setStrokeJoin(Paint.Join.ROUND);
+                          p.setColor(0x55000000);
+                          c.drawPath(path, p);
+                          p.setStyle(Paint.Style.FILL);
+                          if (fk[i] != 0) {
+                              decal(c, i, fk[i]);
+                          }
+                      }
+                  }
+
+                  private void drawChar3D(Canvas c) {
+                      final int skin = col("#F2CFA5");
+                      final boolean hood = animal >= 0 && animal < NO_HOOD;
+                      curHood = hood;
+                      curHt = hood ? 8f : 13.5f;
+                      curHid = it[6];
+                      curHairC = curHid >= 0 ? col(itIcon(curHid)) : col("#5D4037");
+                      int cap = hood ? col(HOOD_MAIN[animal]) : curHairC;
+
+                      float th = (float) Math.toRadians(avatarAngle);
+                      float pitch = (float) Math.toRadians(-12f);
+                      c3t = (float) Math.cos(th);
+                      s3t = (float) Math.sin(th);
+                      c3p = (float) Math.cos(pitch);
+                      s3p = (float) Math.sin(pitch);
+
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(0x33000000);
+                      rf.set(fx(20f), fy(86.5f), fx(80f), fy(96f));
+                      c.drawOval(rf, p);
+                      if (it[3] >= 0) {
+                          emoji(c, itIcon(it[3]), 14f, 78f, 24f);
+                      }
+
+                      int pants = col("#37474F");
+                      int shoe = col("#FAFAFA");
+                      int mainC = col("#4FC3F7");
+                      int slvC = mainC;
+                      boolean longSleeve = false;
+                      int cl = it[5];
+                      if (cl >= 0) {
+                          String[] cs = itIcon(cl).split(",");
+                          mainC = col(cs[0]);
+                          slvC = col(cs[1]);
+                          longSleeve = true;
+                      }
+                      float armEnd = longSleeve ? 61f : 53f;
+
+                      fn = 0;
+                      addBox(38f, 66f, 49.6f, 83.5f, -5.8f, 5.8f, pants, pants, pants, 0);
+                      addBox(50.4f, 66f, 62f, 83.5f, -5.8f, 5.8f, pants, pants, pants, 0);
+                      addBox(36f, 83.5f, 49.6f, 89f, -6f, 9f, shoe, shoe, shoe, 0);
+                      addBox(50.4f, 83.5f, 64f, 89f, -6f, 9f, shoe, shoe, shoe, 0);
+                      addBox(24f, armEnd, 34f, 67f, -5f, 5f, skin, skin, skin, 0);
+                      addBox(66f, armEnd, 76f, 67f, -5f, 5f, skin, skin, skin, 0);
+                      addBox(24f, 45f, 34f, armEnd, -5f, 5f, slvC, slvC, slvC, 0);
+                      addBox(66f, 45f, 76f, armEnd, -5f, 5f, slvC, slvC, slvC, 3);
+                      addBox(34f, 44f, 66f, 68f, -8f, 8f, mainC, mainC, mainC, 2);
+                      addBox(33f, 14f, 67f, 46f, -16f, 16f, skin, cap, cap, 1);
+                      flushFaces(c);
+                  }
+
+                  private void drawFaceAll(Canvas c) {
+                      if (it[1] == 11) {
+                          drawMask(c);
+                          dot(c, 43.6f, 32.7f, 3.4f, Color.WHITE);
+                          dot(c, 56.4f, 32.7f, 3.4f, Color.WHITE);
+                      }
+                      rf.set(fx(41.8f), fy(30f), fx(45.4f), fy(35.4f));
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(col("#263238"));
+                      c.drawOval(rf, p);
+                      rf.set(fx(54.6f), fy(30f), fx(58.2f), fy(35.4f));
+                      c.drawOval(rf, p);
+                      dot(c, 43.3f, 31.6f, 0.9f, Color.WHITE);
+                      dot(c, 56.1f, 31.6f, 0.9f, Color.WHITE);
+                      rf.set(fx(45.5f), fy(35f), fx(54.5f), fy(41f));
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(1.3f * u);
+                      p.setStrokeCap(Paint.Cap.ROUND);
+                      p.setColor(col("#8D4B3B"));
+                      c.drawArc(rf, 20f, 140f, false, p);
+                      p.setStyle(Paint.Style.FILL);
+                      if (it[1] != 9) {
+                          dot(c, 39f, 38.5f, 2.4f, 0x66FF7F7F);
+                          dot(c, 61f, 38.5f, 2.4f, 0x66FF7F7F);
+                      }
+                      drawFace(c, it[1]);
+                  }
+
                   @Override
                   public boolean onTouchEvent(android.view.MotionEvent event) {
                       if (mode != 0) return super.onTouchEvent(event);
@@ -4661,22 +4908,10 @@ jobs:
                       c.translate(fx(50f), fy(90f));
                       c.scale(0.95f, 0.95f);
                       c.translate(-fx(50f), -fy(90f));
-                      // Efek putar visual: mengecilkan lebar karakter saat dilihat dari samping.
-                      // Ini menjaga kompatibilitas Canvas tanpa menambah engine 3D eksternal.
-                      float facing = (float) Math.cos(Math.toRadians(avatarAngle));
-                      float widthScale = Math.max(0.28f, Math.abs(facing));
-                      c.save();
-                      c.translate(fx(50f), fy(50f));
-                      c.scale(widthScale, 1f);
-                      c.translate(-fx(50f), -fy(50f));
-                      drawChar(c);
-                      c.restore();
-                      if (Math.abs(facing) < 0.72f) {
-                          int side = facing >= 0f ? col("#8D9AA0") : col("#667780");
-                          p.setStyle(Paint.Style.FILL);
-                          p.setColor(side);
-                          float edge = facing >= 0f ? 50f + 17f * widthScale : 50f - 17f * widthScale - 3f;
-                          c.drawRect(fx(edge), fy(45f), fx(edge + 3f), fy(67f), p);
+                      if (mode == 0) {
+                          drawChar3D(c);
+                      } else {
+                          drawChar(c);
                       }
                       c.restore();
                       c.restore();
@@ -4734,31 +4969,7 @@ jobs:
                           drawHood(c, animal);
                       }
 
-                      if (it[1] == 11) {
-                          drawMask(c);
-                          dot(c, 43.6f, 32.7f, 3.4f, Color.WHITE);
-                          dot(c, 56.4f, 32.7f, 3.4f, Color.WHITE);
-                      }
-                      rf.set(fx(41.8f), fy(30f), fx(45.4f), fy(35.4f));
-                      p.setStyle(Paint.Style.FILL);
-                      p.setColor(col("#263238"));
-                      c.drawOval(rf, p);
-                      rf.set(fx(54.6f), fy(30f), fx(58.2f), fy(35.4f));
-                      c.drawOval(rf, p);
-                      dot(c, 43.3f, 31.6f, 0.9f, Color.WHITE);
-                      dot(c, 56.1f, 31.6f, 0.9f, Color.WHITE);
-                      rf.set(fx(45.5f), fy(35f), fx(54.5f), fy(41f));
-                      p.setStyle(Paint.Style.STROKE);
-                      p.setStrokeWidth(1.3f * u);
-                      p.setStrokeCap(Paint.Cap.ROUND);
-                      p.setColor(col("#8D4B3B"));
-                      c.drawArc(rf, 20f, 140f, false, p);
-                      p.setStyle(Paint.Style.FILL);
-                      if (it[1] != 9) {
-                          dot(c, 39f, 38.5f, 2.4f, 0x66FF7F7F);
-                          dot(c, 61f, 38.5f, 2.4f, 0x66FF7F7F);
-                      }
-                      drawFace(c, it[1]);
+                      drawFaceAll(c);
                       drawHat(c, it[0], ht);
                       drawHeld(c, it[2]);
                   }
