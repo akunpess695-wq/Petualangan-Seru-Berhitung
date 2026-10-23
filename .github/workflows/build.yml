@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.6.2"
+                  versionName "6.6.3"
               }
 
               signingConfigs {
@@ -4413,7 +4413,7 @@ jobs:
                       {4, "#311B92,#7E57C2", "Galaksi", 300},
                       {4, "#E53935,#FB8C00,#FDD835,#43A047,#1E88E5,#8E24AA", "Pelangi", 500},
                       {4, "#FFD54F,#FF8F00", "Emas Sultan", 1000},
-                      {5, "#1E88E5,#1E88E5", "Hoodie Biru", 60},
+                      {5, "#1E88E5,#1E88E5,#212121", "Hoodie Biru", 60},
                       {5, "#E53935,#E53935", "Jaket Merah", 90},
                       {5, "#43A047,#43A047", "Jaket Hijau", 90},
                       {5, "#FAFAFA,#212121", "Hoodie Panda", 150},
@@ -4434,13 +4434,17 @@ jobs:
             {6, "#90CAF9", "Jilbab Biru Muda", 40},
             {6, "#A5D6A7", "Jilbab Hijau Muda", 50},
             {6, "#CE93D8", "Jilbab Ungu", 50},
-            {6, "#BCAAA4", "Jilbab Cokelat", 60}
+            {6, "#BCAAA4", "Jilbab Cokelat", 60},
+            {5, "#F3E6EC,#F3E6EC,#A11F2B", "Seragam Sekolah", 50},
+            {5, "#212121,#212121,#212121", "Hoodie Hitam", 60},
+            {5, "#FAFAFA,#FAFAFA,#212121", "Kaos Polos Putih", 50},
+            {5, "#FB8C00,#FB8C00,#212121", "Hoodie Oranye", 60}
               };
               private static final int ITEM_GALAKSI = 31;
               // Gender tiap barang, urut sama dengan ITEMS: u = semua, b = putra, g = putri.
               // Untuk memindah barang ke gender lain, cukup ubah hurufnya di sini.
               private static final String ITEM_GENDER =
-            "bggubbub" + "ugbu" + "bugubbu" + "uuuuuuuu" + "uuuuuuu" + "bbbbb" + "bbbbb" + "ggggg" + "bb" + "ggggg";
+            "bggubbub" + "ugbu" + "bugubbu" + "uuuuuuuu" + "uuuuuuu" + "bbbbb" + "bbbbb" + "ggggg" + "bb" + "ggggg" + "bbbb";
 
               private static int itGender(int i) {
                   if (i < 0 || i >= ITEM_GENDER.length()) {
@@ -4448,6 +4452,15 @@ jobs:
                   }
                   char ch = ITEM_GENDER.charAt(i);
                   return ch == 'b' ? 0 : (ch == 'g' ? 1 : -1);
+              }
+
+              // Pakaian lengan pendek (seragam sekolah, kaos polos) dan pakaian berkerudung (hoodie).
+              private static boolean itShort(int i) {
+                  return i == 56 || i == 58;
+              }
+
+              private static boolean itHoodie(int i) {
+                  return i == 34 || i == 57 || i == 59;
               }
 
               private static boolean itFits(int i, int g) {
@@ -4863,7 +4876,7 @@ jobs:
                           String[] cs = itIcon(cl).split(",");
                           shirt = col(cs[0]);
                           slv = col(cs[1]);
-                          longSleeve = true;
+                          longSleeve = !itShort(cl);
                       }
                       int red = col("#A11F2B"); if (cl >= 0) { String[] cs3 = itIcon(cl).split(","); if (cs3.length > 2) { red = col(cs3[2]); } }
                       int shoe = col("#212121");
@@ -4897,6 +4910,18 @@ jobs:
                       if (girl) {
                           int wh = (curHid >= 0) ? curHairC : col("#F7F7F7");
                           addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
+                      }
+                      if (cl == 56) {
+                          int bag = col("#37323A");
+                          int strap = col("#2B2B2B");
+                          addBox(39f, 45f, 61f, 72f, -13.5f, -7f, bag, bag, bag, 0);
+                          addBox(42f, 58f, 58f, 66f, -15f, -13.5f, strap, strap, strap, 0);
+                          zBias = 6f;
+                          addBox(37f, 42f, 41.5f, 62f, 6.8f, 8f, strap, strap, strap, 0);
+                          addBox(58.5f, 42f, 63f, 62f, 6.8f, 8f, strap, strap, strap, 0);
+                          zBias = 0f;
+                      } else if (itHoodie(cl)) {
+                          addBox(38f, 38f, 62f, 50f, -11f, -6.5f, shirt, shirt, shirt, 0);
                       }
                       // kepala
                       int hc = hood ? col(HOOD_MAIN[animal]) : (hijab ? ((curHid >= 0) ? curHairC : col("#F7F7F7")) : curHairC);
@@ -5259,7 +5284,7 @@ jobs:
                           String[] cs = itIcon(cl).split(",");
                           mainC = col(cs[0]);
                           slvC = col(cs[1]);
-                          longSleeve = true;
+                          longSleeve = !itShort(cl);
                       }
                       float armEnd = longSleeve ? 61f : 53f;
                       rect(c, 24f, 45f, 34f, 67f, 2.5f, skin);
@@ -5296,7 +5321,15 @@ jobs:
                   }
 
                   private void drawClothes(Canvas c, int id) {
-                      if (id == 34) {
+                      if (id == 56) {
+                          drawBadge(c);
+                      } else if (id == 57 || id == 59) {
+                          line(c, 47f, 45f, 47f, 52f, 1f, Color.WHITE);
+                          line(c, 53f, 45f, 53f, 52f, 1f, Color.WHITE);
+                          flat(c, 41f, 57f, 59f, 65f, 2f, id == 57 ? col("#111111") : col("#E67300"));
+                      } else if (id == 58) {
+                          flat(c, 40f, 49f, 47f, 56f, 1f, col("#C62828"));
+                      } else if (id == 34) {
                           flat(c, 42f, 57f, 58f, 66f, 2f, col("#1565C0"));
                           line(c, 47f, 45f, 47f, 52f, 1f, Color.WHITE);
                           line(c, 53f, 45f, 53f, 52f, 1f, Color.WHITE);
