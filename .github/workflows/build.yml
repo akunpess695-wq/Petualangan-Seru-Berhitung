@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.0.3"
+                  versionName "6.0.4"
               }
 
               signingConfigs {
@@ -552,7 +552,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.0.3";
+              private static final String APP_VERSION = "6.0.4";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -1910,6 +1910,11 @@ jobs:
                           boolean pr = matchAvailable(sj);
                           sub = n > 0 ? n + " soal" + (pr ? " + Cocokkan Pasangan" : "")
                                   : (pr ? "Cocokkan Pasangan" : "Belum ada soal");
+                          if (s == 1) {
+                              sub = "Kuis" + (pr ? " \u2022 Cocokkan Pasangan" : "")
+                                      + (susunAvailable(0) ? " \u2022 Susun Kata" : "")
+                                      + (susunAvailable(1) ? " \u2022 Susun Kalimat" : "");
+                          }
                       }
                       LinearLayout t = subjectTile(SUBJ_ICON[s], SUBJ_NAMES[s], sub, SUBJ_COLOR[s]);
                       t.setOnClickListener(v -> openSubject(sj));
@@ -2487,31 +2492,45 @@ jobs:
                   return t;
               }
 
+              private boolean quizAvailable(int s) {
+                  return countBank(s, kelas) > 0 || s == 1;
+              }
+
               private void openSubject(int s) {
                   if (s == 0) {
                       showMath();
                       return;
                   }
-                  int nq = countBank(s, kelas);
-                  boolean pr = matchAvailable(s);
-                  if (nq == 0 && !pr) {
+                  boolean q = quizAvailable(s);
+                  boolean m = matchAvailable(s);
+                  boolean sk = s == 1 && susunAvailable(0);
+                  boolean sl = s == 1 && susunAvailable(1);
+                  int n = (q ? 1 : 0) + (m ? 1 : 0) + (sk ? 1 : 0) + (sl ? 1 : 0);
+                  if (n == 0) {
                       Toast.makeText(this, "Belum ada soal " + SUBJ_NAMES[s] + " untuk " + KELAS_NAMES[kelas]
                               + ". Guru bisa menambahkannya lewat tombol Soal dari Guru.", Toast.LENGTH_LONG).show();
-                  } else if (!pr) {
-                      startBank(s);
-                  } else if (nq == 0) {
-                      startMatch(s);
+                  } else if (n == 1) {
+                      if (q) {
+                          startBank(s);
+                      } else if (m) {
+                          startMatch(s);
+                      } else if (sk) {
+                          startSusun(0);
+                      } else {
+                          startSusun(1);
+                      }
                   } else {
                       dialogMode(s);
                   }
               }
 
               private void startBank(int s) {
-                  if (countBank(s, kelas) == 0) {
+                  if (countBank(s, kelas) == 0 && s != 1) {
                       showMenu();
                       return;
                   }
                   subj = s;
+                  advPart = -1;
                   startGame(7);
               }
 
@@ -2937,6 +2956,12 @@ jobs:
 
               private void buildBank() {
                   if (advLevel >= 0) {
+                      buildBuiltin();
+                      return;
+                  }
+                  if (subj == 1 && countBank(1, kelas) == 0) {
+                      // Belum ada soal guru: pakai soal bawaan Bahasa Indonesia untuk kelas ini
+                      advPart = -1;
                       buildBuiltin();
                       return;
                   }
@@ -4141,27 +4166,40 @@ jobs:
                   return matchPool(sj).size() >= 4;
               }
 
+              private void addModeButton(LinearLayout c, String label, int color, final AlertDialog[] dh,
+                                         final Runnable go) {
+                  Button b = button(label, color, 18);
+                  flat(b);
+                  c.addView(b, lp(dp(60), 12));
+                  b.setOnClickListener(v -> {
+                      if (dh[0] != null) {
+                          dh[0].dismiss();
+                      }
+                      go.run();
+                  });
+              }
+
               private void dialogMode(final int sj) {
                   LinearLayout c = new LinearLayout(this);
                   c.setOrientation(LinearLayout.VERTICAL);
                   c.setPadding(dp(18), dp(16), dp(18), dp(16));
                   c.addView(text("Main apa?", 22, ORANGE_DARK, true), lp(WRAP, 0));
-                  Button kz = button("\uD83D\uDCDD  Kuis soal", BLUE, 18);
-                  flat(kz);
-                  c.addView(kz, lp(dp(60), 14));
-                  Button cp = button("\uD83E\uDDE9  Cocokkan Pasangan", PURPLE, 18);
-                  flat(cp);
-                  c.addView(cp, lp(dp(60), 10));
+                  final AlertDialog[] dh = new AlertDialog[1];
+                  if (quizAvailable(sj)) {
+                      addModeButton(c, "\uD83D\uDCDD  Kuis soal", BLUE, dh, () -> startBank(sj));
+                  }
+                  if (matchAvailable(sj)) {
+                      addModeButton(c, "\uD83E\uDDE9  Cocokkan Pasangan", PURPLE, dh, () -> startMatch(sj));
+                  }
+                  if (sj == 1 && susunAvailable(0)) {
+                      addModeButton(c, "\uD83D\uDD24  Susun Kata", TEAL, dh, () -> startSusun(0));
+                  }
+                  if (sj == 1 && susunAvailable(1)) {
+                      addModeButton(c, "\uD83D\uDCCB  Susun Kalimat", ORANGE, dh, () -> startSusun(1));
+                  }
                   final AlertDialog d = new AlertDialog.Builder(this).setView(c).create();
+                  dh[0] = d;
                   pickDialog = d;
-                  kz.setOnClickListener(v -> {
-                      d.dismiss();
-                      startBank(sj);
-                  });
-                  cp.setOnClickListener(v -> {
-                      d.dismiss();
-                      startMatch(sj);
-                  });
                   d.show();
                   if (d.getWindow() != null) {
                       d.getWindow().setBackgroundDrawable(box(Color.WHITE, 24));
@@ -4383,6 +4421,345 @@ jobs:
                       c.addView(menu, lp(dp(60), 12));
                       menu.setOnClickListener(v -> showMenu());
                   }
+                  wrap(c);
+                  sfx(stars >= 2 ? SFX_WIN : SFX_OK);
+                  if (stars >= 2) {
+                      launchConfetti(stars == 3 ? 130 : 80);
+                  }
+              }
+
+              // =====================================================================
+              // Susun Kata dan Susun Kalimat (versi 6.0.4), Bahasa Indonesia
+              // Soal buatan Claude, perlu dicek guru kelas.
+              // =====================================================================
+
+              private static final String[][] SUSUN_W = {
+                      {"kucing", "buku", "meja", "sapi", "ikan", "bola", "rumah", "kursi", "pintu", "baju"},
+                      {"sekolah", "sepeda", "jendela", "kertas", "pensil", "burung", "guru", "tangan"},
+                      {"tetangga", "gembira", "pelajaran", "halaman", "lapangan", "makanan", "minuman", "kebun"},
+                      {}, {}, {}
+              };
+              private static final String[][] SUSUN_S = {
+                      {"Ani makan nasi.", "Ibu memasak sayur.", "Adik bermain bola.", "Ayah membaca koran.",
+                              "Kakak menulis surat.", "Aku suka buku.", "Kucing minum susu.", "Burung terbang tinggi."},
+                      {"Ibu pergi ke pasar.", "Adik membaca buku cerita.", "Kami belajar di sekolah.",
+                              "Budi menyiram bunga di taman.", "Kucing tidur di bawah meja.", "Ayah membeli ikan segar.",
+                              "Ani menolong ibunya memasak.", "Murid-murid berbaris di lapangan."},
+                      {"Kami bermain bola di lapangan sekolah.", "Ibu membeli sayur dan buah di pasar.",
+                              "Pak guru menjelaskan pelajaran dengan sabar.", "Setiap pagi ayah berangkat bekerja.",
+                              "Adik dan kakak membersihkan halaman rumah.", "Hujan turun deras sejak tadi malam.",
+                              "Kita harus menjaga kebersihan lingkungan.", "Anak yang rajin pasti disayang guru."},
+                      {"Petani menanam padi di sawah yang luas.", "Kita wajib menghormati orang yang lebih tua.",
+                              "Ibu menyiapkan sarapan sebelum kami berangkat sekolah.",
+                              "Perpustakaan sekolah buka setiap hari Senin sampai Jumat.",
+                              "Para siswa mengerjakan tugas kelompok dengan kompak.",
+                              "Sungai itu mengalir jernih menuju laut.",
+                              "Dengan rajin membaca kita akan memperoleh pengetahuan.",
+                              "Ayah menanam pohon mangga di depan rumah."},
+                      {"Menjaga kelestarian alam adalah tanggung jawab kita semua.",
+                              "Setelah makan malam, keluarga kami berkumpul di ruang tengah.",
+                              "Para nelayan berangkat melaut sebelum matahari terbit.",
+                              "Pemerintah membangun jembatan baru untuk memudahkan warga.",
+                              "Membuang sampah pada tempatnya menjadikan lingkungan bersih.",
+                              "Kerja sama yang baik membuat pekerjaan cepat selesai.",
+                              "Siswa teladan selalu datang tepat waktu.",
+                              "Hasil panen petani meningkat karena cuaca bersahabat."},
+                      {"Persatuan dan kesatuan bangsa harus kita jaga bersama.",
+                              "Membaca buku setiap hari dapat menambah wawasan kita.",
+                              "Keberhasilan diperoleh melalui kerja keras dan doa.",
+                              "Para pahlawan telah berjuang demi kemerdekaan bangsa Indonesia.",
+                              "Kita perlu menghemat air agar tidak kekurangan di masa depan.",
+                              "Kejujuran adalah kunci kepercayaan antarteman.",
+                              "Peserta lomba menyiapkan diri dengan latihan yang teratur.",
+                              "Teknologi membantu manusia menyelesaikan pekerjaan lebih cepat."}
+              };
+
+              private int susunKind;
+              private String[] susunPool;
+              private int susunN;
+              private int susunIdx;
+              private int susunWrong;
+              private String susunTarget = "";
+              private String[] susunTok;
+              private boolean[] susunUsed;
+              private final ArrayList<Integer> susunSeq = new ArrayList<>();
+              private boolean susunBusy;
+              private Button[] susunBtn;
+              private TextView tvSusunAns;
+              private LinearLayout susunAnsBox;
+
+              private boolean susunAvailable(int kind) {
+                  String[] src = kind == 0 ? SUSUN_W[kelas] : SUSUN_S[kelas];
+                  return src.length >= 4;
+              }
+
+              private void startSusun(int kind) {
+                  saveNames();
+                  nameFields = null;
+                  susunKind = kind;
+                  String[] src = kind == 0 ? SUSUN_W[kelas] : SUSUN_S[kelas];
+                  if (src.length < 4) {
+                      Toast.makeText(this, "Belum ada soal susun untuk kelas ini.", Toast.LENGTH_LONG).show();
+                      showMenu();
+                      return;
+                  }
+                  ArrayList<String> pool = new ArrayList<>(Arrays.asList(src));
+                  Collections.shuffle(pool, rnd);
+                  susunN = Math.min(5, pool.size());
+                  susunPool = new String[susunN];
+                  for (int i = 0; i < susunN; i++) {
+                      susunPool[i] = pool.get(i);
+                  }
+                  susunIdx = 0;
+                  susunWrong = 0;
+                  showSusun();
+              }
+
+              private String[] susunTokens(String target, int kind) {
+                  String[] t;
+                  if (kind == 0) {
+                      t = new String[target.length()];
+                      for (int i = 0; i < t.length; i++) {
+                          t[i] = String.valueOf(target.charAt(i));
+                      }
+                  } else {
+                      t = target.split(" ");
+                  }
+                  String[] o = t.clone();
+                  for (int tries = 0; tries < 12; tries++) {
+                      for (int i = o.length - 1; i > 0; i--) {
+                          int j = rnd.nextInt(i + 1);
+                          String x = o[i];
+                          o[i] = o[j];
+                          o[j] = x;
+                      }
+                      if (!Arrays.equals(o, t)) {
+                          break;
+                      }
+                  }
+                  return o;
+              }
+
+              private String susunBuilt() {
+                  StringBuilder sb = new StringBuilder();
+                  for (int n = 0; n < susunSeq.size(); n++) {
+                      if (n > 0 && susunKind == 1) {
+                          sb.append(' ');
+                      }
+                      sb.append(susunTok[susunSeq.get(n)]);
+                  }
+                  return sb.toString();
+              }
+
+              private void susunRefresh() {
+                  String built = susunBuilt();
+                  tvSusunAns.setText(built.isEmpty() ? "…" : built);
+                  for (int i = 0; i < susunBtn.length; i++) {
+                      boolean u = susunUsed[i];
+                      susunBtn[i].setAlpha(u ? 0.3f : 1f);
+                      susunBtn[i].setEnabled(!u);
+                  }
+              }
+
+              private void showSusun() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 12;
+                  susunBusy = false;
+                  susunSeq.clear();
+                  susunTarget = susunPool[susunIdx];
+                  susunTok = susunTokens(susunTarget, susunKind);
+                  susunUsed = new boolean[susunTok.length];
+                  susunBtn = new Button[susunTok.length];
+
+                  LinearLayout c = column();
+                  LinearLayout top = new LinearLayout(this);
+                  top.setOrientation(LinearLayout.HORIZONTAL);
+                  top.setGravity(Gravity.CENTER_VERTICAL);
+                  top.addView(pill(av(0) + " " + (susunKind == 0 ? "Susun Kata" : "Susun Kalimat"), SUBJ_COLOR[1]),
+                          new LinearLayout.LayoutParams(WRAP, WRAP));
+                  top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+                  top.addView(text((susunIdx + 1) + "/" + susunN, 20, DARK, true),
+                          new LinearLayout.LayoutParams(WRAP, WRAP));
+                  c.addView(top, lp(WRAP, 0));
+                  c.addView(text(susunKind == 0 ? "Susun huruf-huruf ini menjadi kata"
+                          : "Susun kata-kata ini menjadi kalimat", 16, DARK, true), lp(WRAP, 14));
+
+                  susunAnsBox = new LinearLayout(this);
+                  susunAnsBox.setOrientation(LinearLayout.VERTICAL);
+                  susunAnsBox.setGravity(Gravity.CENTER);
+                  susunAnsBox.setBackground(outline(PURPLE, 18));
+                  susunAnsBox.setPadding(dp(12), dp(16), dp(12), dp(16));
+                  tvSusunAns = text("", susunKind == 0 ? 34 : 20, PURPLE, true);
+                  tvSusunAns.setMinHeight(dp(44));
+                  susunAnsBox.addView(tvSusunAns, new LinearLayout.LayoutParams(MATCH, WRAP));
+                  c.addView(susunAnsBox, lp(WRAP, 14));
+
+                  int per = susunKind == 0 ? 5 : 2;
+                  LinearLayout row = null;
+                  for (int i = 0; i < susunTok.length; i++) {
+                      if (i % per == 0) {
+                          row = new LinearLayout(this);
+                          row.setOrientation(LinearLayout.HORIZONTAL);
+                          c.addView(row, lp(dp(susunKind == 0 ? 62 : 58), i == 0 ? 16 : 8));
+                      }
+                      final int idx = i;
+                      String tk = susunTok[i];
+                      int sp = susunKind == 0 ? 26 : (tk.length() > 12 ? 13 : 16);
+                      Button b = button(tk, OPT_COLORS[i % 4], sp);
+                      flat(b);
+                      b.setOnClickListener(v -> susunTap(idx));
+                      row.addView(b, weight(3, 3));
+                      susunBtn[i] = b;
+                  }
+                  int rem = susunTok.length % per;
+                  if (rem != 0 && row != null) {
+                      for (int k = rem; k < per; k++) {
+                          row.addView(new View(this), weight(3, 3));
+                      }
+                  }
+
+                  LinearLayout ctl = new LinearLayout(this);
+                  ctl.setOrientation(LinearLayout.HORIZONTAL);
+                  Button del = button("Hapus", GRAY, 15);
+                  del.setTextColor(DARK);
+                  flat(del);
+                  del.setOnClickListener(v -> susunUndo());
+                  ctl.addView(del, weight(0, 4));
+                  Button rs = button("Ulang", GRAY, 15);
+                  rs.setTextColor(DARK);
+                  flat(rs);
+                  rs.setOnClickListener(v -> susunReset());
+                  ctl.addView(rs, weight(4, 0));
+                  c.addView(ctl, lp(dp(48), 18));
+
+                  Button cancel = button("Kembali", GRAY, 14);
+                  cancel.setTextColor(DARK);
+                  c.addView(cancel, lp(dp(46), 14));
+                  cancel.setOnClickListener(v -> showMenu());
+
+                  susunRefresh();
+                  wrap(c);
+              }
+
+              private void susunTap(int idx) {
+                  if (susunBusy || susunUsed[idx]) {
+                      return;
+                  }
+                  susunUsed[idx] = true;
+                  susunSeq.add(idx);
+                  susunRefresh();
+                  if (susunSeq.size() == susunTok.length) {
+                      susunCheck();
+                  }
+              }
+
+              private void susunUndo() {
+                  if (susunBusy || susunSeq.isEmpty()) {
+                      return;
+                  }
+                  int last = susunSeq.remove(susunSeq.size() - 1);
+                  susunUsed[last] = false;
+                  susunRefresh();
+              }
+
+              private void susunReset() {
+                  if (susunBusy) {
+                      return;
+                  }
+                  susunSeq.clear();
+                  Arrays.fill(susunUsed, false);
+                  susunRefresh();
+              }
+
+              private void susunCheck() {
+                  boolean ok = susunBuilt().equals(susunTarget);
+                  susunBusy = true;
+                  recordSusun(ok);
+                  if (ok) {
+                      tvSusunAns.setTextColor(GREEN);
+                      susunAnsBox.setBackground(outline(GREEN, 18));
+                      sfx(SFX_CORRECT);
+                      buzz(25);
+                      pop(susunAnsBox, 1.06f);
+                      handler.postDelayed(() -> {
+                          susunIdx++;
+                          if (susunIdx >= susunN) {
+                              showSusunResult();
+                          } else {
+                              showSusun();
+                          }
+                      }, 900);
+                  } else {
+                      susunWrong++;
+                      tvSusunAns.setTextColor(RED);
+                      susunAnsBox.setBackground(outline(RED, 18));
+                      sfx(SFX_WRONG);
+                      buzz(80);
+                      shake(susunAnsBox);
+                      handler.postDelayed(() -> {
+                          tvSusunAns.setTextColor(PURPLE);
+                          susunAnsBox.setBackground(outline(PURPLE, 18));
+                          susunSeq.clear();
+                          Arrays.fill(susunUsed, false);
+                          susunBusy = false;
+                          susunRefresh();
+                      }, 700);
+                  }
+              }
+
+              private void recordSusun(boolean ok) {
+                  try {
+                      String topic = susunKind == 0 ? "Susun Kata" : "Susun Kalimat";
+                      bumpStat(stTopic, "1|" + kelas + "|" + topic, ok);
+                      String gk = "1|" + kelas + "|s:" + cutText(susunTarget, 60);
+                      bumpStat(stItem, gk, ok);
+                      if (!stText.containsKey(gk)) {
+                          stText.put(gk, cutText(susunTarget, 80));
+                      }
+                      touchStats();
+                  } catch (Exception e) {
+                      // Pencatatan laporan tidak boleh mengganggu permainan
+                  }
+              }
+
+              private void showSusunResult() {
+                  handler.removeCallbacksAndMessages(null);
+                  screen = 9;
+                  saveStats();
+                  int stars = susunWrong == 0 ? 3 : susunWrong <= 2 ? 2 : 1;
+                  freshBadges = awardBadges(3, stars, false, false);
+                  LinearLayout c = column();
+                  c.setGravity(Gravity.CENTER);
+                  c.addView(text(av(0), 48, Color.WHITE, false), lp(WRAP, 0));
+                  c.addView(text(stars == 3 ? "Hebat sekali!" : "Selesai!", 32, ORANGE_DARK, true), lp(WRAP, 4));
+                  c.addView(pill(KELAS_NAMES[kelas] + " • " + (susunKind == 0 ? "Susun Kata" : "Susun Kalimat"),
+                          SUBJ_COLOR[1]), lpw(10));
+
+                  LinearLayout card = card();
+                  card.setGravity(Gravity.CENTER_HORIZONTAL);
+                  LinearLayout starRow = new LinearLayout(this);
+                  starRow.setOrientation(LinearLayout.HORIZONTAL);
+                  starRow.setGravity(Gravity.CENTER);
+                  for (int i = 0; i < 3; i++) {
+                      starRow.addView(text(i < stars ? "⭐" : "☆", 44, ORANGE, false),
+                              new LinearLayout.LayoutParams(WRAP, WRAP));
+                  }
+                  card.addView(starRow, lp(WRAP, 0));
+                  card.addView(text(susunWrong == 0 ? "Semua benar, tanpa salah!"
+                          : "Salah menyusun " + susunWrong + " kali", 16, DARK, false), lp(WRAP, 10));
+                  card.addView(text("🌟 Total bintang: " + totalStars(), 14, DARK, false), lp(WRAP, 8));
+                  c.addView(card, lp(WRAP, 18));
+                  addFreshBadges(c);
+
+                  Button again = button("Main Lagi", GREEN, 22);
+                  again.setElevation(dp(4));
+                  c.addView(again, lp(dp(64), 26));
+                  again.setOnClickListener(v -> startSusun(susunKind));
+
+                  Button menu = button("Menu Utama", ORANGE, 20);
+                  menu.setElevation(dp(4));
+                  c.addView(menu, lp(dp(60), 12));
+                  menu.setOnClickListener(v -> showMenu());
                   wrap(c);
                   sfx(stars >= 2 ? SFX_WIN : SFX_OK);
                   if (stars >= 2) {
@@ -5405,7 +5782,15 @@ jobs:
                       "Kita mendengar dengan ...|telinga|mata|tangan|gigi|Telinga adalah alat untuk mendengar.",
                       "Kalimat yang benar adalah ...|Ani membaca buku.|Buku membaca Ani makan.|Ani buku membaca ke.|Membaca Ani di.|Kalimat yang baik punya susunan kata yang jelas.",
                       "Pagi hari kita mengucapkan ...|selamat pagi|selamat malam|selamat tidur|sampai jumpa|Salam yang tepat untuk pagi hari adalah selamat pagi.",
-                      "Hewan yang hidup di air adalah ...|ikan|ayam|kucing|kambing|Ikan hidup di dalam air."
+                      "Hewan yang hidup di air adalah ...|ikan|ayam|kucing|kambing|Ikan hidup di dalam air.",
+                      "Lengkapi kata: ku_ing (hewan peliharaan).|c|k|s|t|Kata yang benar: kucing.",
+                      "Lengkapi kata: bu_u (untuk dibaca).|k|t|s|m|Kata yang benar: buku.",
+                      "Lengkapi kata: me_a (tempat menaruh buku).|j|k|n|s|Kata yang benar: meja.",
+                      "Lengkapi kata: i_an (hidup di air).|k|b|m|t|Kata yang benar: ikan.",
+                      "Lengkapi kata: sa_un (untuk mencuci tangan).|b|d|g|r|Kata yang benar: sabun.",
+                      "Tulisan yang benar adalah ...|rumah|rmah|ruamh|rumha|Tulisan yang benar: rumah.",
+                      "Tulisan yang benar adalah ...|pensil|pesil|pensl|pnsil|Tulisan yang benar: pensil.",
+                      "Kalimat yang benar adalah ...|Aku makan nasi.|Nasi aku makan di.|Makan nasi ke aku.|Aku nasi makan ke.|Kalimat yang baik punya susunan kata yang jelas."
                   },
                   {
                       "Persamaan kata (sinonim) 'pandai' adalah ...|pintar|malas|nakal|lambat|Pandai dan pintar artinya sama.",
@@ -5423,7 +5808,15 @@ jobs:
                       "Saat lewat di depan orang, kita mengucapkan ...|permisi|terima kasih|selamat ulang tahun|sampai jumpa",
                       "Pasangan kata yang berlawanan adalah ...|tinggi - rendah|besar - luas|cepat - kilat|senang - gembira|Tinggi lawan katanya rendah.",
                       "Ibu membeli sayur di ...|pasar|bengkel|bandara|stasiun|Sayur dijual di pasar.",
-                      "Lawan kata 'bersih' adalah ...|kotor|rapi|indah|wangi"
+                      "Lawan kata 'bersih' adalah ...|kotor|rapi|indah|wangi",
+                      "Lengkapi kata: ker_as (untuk menulis).|t|s|n|m|Kata yang benar: kertas.",
+                      "Lengkapi kata: gu_u (mengajar di sekolah).|r|n|l|t|Kata yang benar: guru.",
+                      "Kalimat tanya diakhiri tanda tanya. Kalimat yang benar adalah ...|Siapa namamu?|Siapa namamu.|Siapa namamu!|Siapa namamu,|Kalimat tanya diakhiri tanda tanya (?).",
+                      "Kalimat berita diakhiri tanda titik. Kalimat yang benar adalah ...|Ibu pergi ke pasar.|Ibu pergi ke pasar?|Ibu pergi ke pasar,|Ibu pergi ke pasar:|Kalimat berita diakhiri tanda titik (.).",
+                      "Kalimat seru memakai tanda seru. Kalimat yang benar adalah ...|Wah, bunganya cantik!|Wah, bunganya cantik.|Wah, bunganya cantik?|Wah, bunganya cantik,|Tanda seru (!) dipakai untuk menyatakan kekaguman.",
+                      "Tulisan yang benar adalah ...|sepeda|sepdea|seeda|sepeta|Tulisan yang benar: sepeda.",
+                      "Tulisan yang benar adalah ...|jendela|jedela|jandela|jendala|Tulisan yang benar: jendela.",
+                      "Susunan kata yang benar adalah ...|Adik bermain bola.|Bola adik bermain di.|Bermain bola adik ke.|Bola bermain adik.|Kalimat harus punya susunan kata yang jelas."
                   },
                   {
                       "Kata baku yang benar adalah ...|apotek|apotik|appotek|apoteek",
@@ -5441,7 +5834,15 @@ jobs:
                       "Kata 'dimakan' memakai awalan ...|di-|ber-|me-|se-|Dimakan = di- + makan.",
                       "Cerita tentang binatang yang bisa berbicara disebut ...|fabel|legenda|biografi|puisi|Fabel adalah cerita dengan tokoh binatang.",
                       "Karangan tentang kehidupan seseorang disebut ...|biografi|fabel|pantun|dongeng|Biografi menceritakan riwayat hidup seseorang.",
-                      "Satu bait pantun umumnya terdiri dari ... baris.|4|2|3|6|Pantun biasanya terdiri dari empat baris."
+                      "Satu bait pantun umumnya terdiri dari ... baris.|4|2|3|6|Pantun biasanya terdiri dari empat baris.",
+                      "Kata baku yang benar adalah ...|ijazah|ijasah|ijaza|izajah|Kata baku: ijazah.",
+                      "Kata baku yang benar adalah ...|khusus|husus|khusuz|kusus|Kata baku: khusus.",
+                      "Kata baku yang benar adalah ...|rapi|rappi|rafi|rapih|Kata baku: rapi.",
+                      "Kata 'ubah' diberi awalan meng- menjadi ...|mengubah|merubah|menguba|mengubak|Awalan meng- ditambahkan pada kata dasar ubah.",
+                      "Kalimat yang memakai tanda koma dengan benar adalah ...|Ibu membeli apel, jeruk, dan mangga.|Ibu membeli apel jeruk dan, mangga.|Ibu, membeli apel jeruk dan mangga.|Ibu membeli, apel jeruk dan mangga.|Koma memisahkan unsur-unsur yang disebutkan satu per satu.",
+                      "Kata 'baca' diberi awalan me- menjadi ...|membaca|mebaca|menbaca|mengbaca|Sebelum huruf b, awalan me- berubah menjadi mem-.",
+                      "Kata 'sapu' diberi awalan me- menjadi ...|menyapu|mesapu|mensapu|mengsapu|Huruf s pada awal kata luluh menjadi ny: menyapu.",
+                      "Kalimat yang memakai huruf kapital dengan benar adalah ...|Aku tinggal di Kandangan.|aku tinggal di kandangan.|Aku tinggal di kandangan.|aku tinggal di Kandangan.|Awal kalimat dan nama tempat memakai huruf kapital."
                   },
                   {
                       "Kalimat yang penulisannya benar adalah ...|Dia pergi ke Bandung kemarin.|dia pergi ke bandung kemarin.|Dia pergi ke bandung Kemarin.|Dia Pergi ke Bandung kemarin.|Awal kalimat dan nama kota memakai huruf kapital.",
@@ -5459,7 +5860,15 @@ jobs:
                       "Tempat dan waktu terjadinya cerita disebut ...|latar|tema|amanat|tokoh|Latar adalah tempat, waktu, dan suasana cerita.",
                       "Pesan yang ingin disampaikan penulis dalam cerita disebut ...|amanat|latar|judul|tokoh|Amanat adalah pesan moral cerita.",
                       "Dua baris pertama pantun disebut ...|sampiran|isi|judul|amanat|Sampiran ada di dua baris awal, isi di dua baris akhir.",
-                      "Tanda koma (,) dipakai untuk ...|memisahkan unsur pemerincian|mengakhiri kalimat berita|menulis judul buku|membuka kalimat|Contoh: Ibu membeli apel, jeruk, dan pisang."
+                      "Tanda koma (,) dipakai untuk ...|memisahkan unsur pemerincian|mengakhiri kalimat berita|menulis judul buku|membuka kalimat|Contoh: Ibu membeli apel, jeruk, dan pisang.",
+                      "Kata baku yang benar adalah ...|atlet|atlit|atlett|athlet|Kata baku: atlet.",
+                      "Kata baku yang benar adalah ...|teknologi|tehnologi|tekhnologi|teknolozi|Kata baku: teknologi.",
+                      "Kata baku yang benar adalah ...|Februari|Pebruari|Februarie|Febuari|Kata baku: Februari.",
+                      "Kata baku yang benar adalah ...|andal|handal|andall|anndal|Kata baku: andal.",
+                      "Tanda titik dua (:) dipakai sebelum ...|daftar pemerincian|akhir kalimat tanya|judul buku|nama kota|Contoh: Bahan yang diperlukan: telur, tepung, dan gula.",
+                      "Tanda petik dua dipakai untuk mengapit ...|kalimat langsung (ucapan)|nama hari|angka|tanda tanya|Tanda petik mengapit ucapan yang dikutip langsung.",
+                      "Kata 'tanam' diberi awalan me- menjadi ...|menanam|menganam|mentanam|metanam|Huruf t pada awal kata luluh menjadi n: menanam.",
+                      "Kata 'pukul' diberi awalan me- menjadi ...|memukul|mempukul|mengpukul|mepukul|Huruf p pada awal kata luluh menjadi m: memukul."
                   },
                   {
                       "Kata baku yang benar adalah ...|nasihat|nasehat|nasihaat|nasiahat",
@@ -5477,7 +5886,15 @@ jobs:
                       "Ungkapan 'besar kepala' berarti ...|sombong|kepalanya besar|pandai|marah|Besar kepala adalah ungkapan untuk orang sombong.",
                       "Kalimat efektif adalah kalimat yang ...|jelas dan tidak berbelit-belit|panjang dan rumit|tanpa subjek|tanpa tanda baca",
                       "Surat untuk teman atau keluarga disebut surat ...|pribadi|dinas|kuasa|undangan|Surat pribadi ditulis untuk keperluan pribadi.",
-                      "Penutup surat pribadi yang cocok adalah ...|Salam hangat,|Dengan hormat,|Perihal:|Lampiran:|Salam hangat cocok untuk menutup surat pribadi."
+                      "Penutup surat pribadi yang cocok adalah ...|Salam hangat,|Dengan hormat,|Perihal:|Lampiran:|Salam hangat cocok untuk menutup surat pribadi.",
+                      "Kata baku yang benar adalah ...|zaman|jaman|zamman|saman|Kata baku: zaman.",
+                      "Kata baku yang benar adalah ...|napas|nafas|napaz|nappas|Kata baku: napas.",
+                      "Kata baku yang benar adalah ...|sekadar|sekedar|sekadarr|sekeddar|Kata baku: sekadar.",
+                      "Kata baku yang benar adalah ...|hakikat|hakekat|hakikad|hakiqat|Kata baku: hakikat.",
+                      "Kata hubung 'meskipun' menyatakan ...|pertentangan|sebab|syarat|waktu|Contoh: Meskipun hujan, dia tetap berangkat.",
+                      "Kata hubung 'jika' menyatakan ...|syarat|pertentangan|sebab|tempat|Contoh: Jika hujan, kami tinggal di rumah.",
+                      "Kalimat tanya yang benar adalah ...|Kapan kamu pulang?|Kapan kamu pulang.|Kapan kamu pulang!|Kapan, kamu pulang|Kalimat tanya diakhiri tanda tanya (?).",
+                      "Awalan pe- pada kata 'tulis' menghasilkan ...|penulis|pentulis|pemulis|pengtulis|Pe- + tulis = penulis (orang yang menulis)."
                   },
                   {
                       "Kata baku yang benar adalah ...|aktivitas|aktifitas|aktivitaz|aktipitas",
@@ -5495,7 +5912,15 @@ jobs:
                       "Teks yang mengajak orang membeli suatu produk disebut ...|iklan|biografi|berita|puisi|Iklan bertujuan menawarkan barang atau jasa.",
                       "Dalam berita 5W+1H, 'what' berarti ...|apa|siapa|kapan|di mana|What = apa.",
                       "Unsur 'siapa' dalam 5W+1H adalah ...|who|when|why|how|Who = siapa.",
-                      "Bentuk serapan dari kata 'computer' adalah ...|komputer|kompoter|kumputer|komputar|Serapan baku: komputer."
+                      "Bentuk serapan dari kata 'computer' adalah ...|komputer|kompoter|kumputer|komputar|Serapan baku: komputer.",
+                      "Kata baku yang benar adalah ...|lembap|lembab|lembapp|lemmbap|Kata baku: lembap.",
+                      "Kata baku yang benar adalah ...|kuantitas|kwantitas|kuantitaz|quantitas|Kata baku: kuantitas.",
+                      "Kata baku yang benar adalah ...|kuitansi|kwitansi|kuitanci|kwitansy|Kata baku: kuitansi.",
+                      "Kata baku yang benar adalah ...|azan|adzan|azzan|asan|Kata baku: azan.",
+                      "'Dialah bintang kelas kami' adalah majas ...|metafora|simile|hiperbola|litotes|Metafora membandingkan langsung tanpa kata seperti atau bagai.",
+                      "'Hatinya bagai disayat sembilu' adalah majas ...|simile|metafora|ironi|litotes|Kata bagai menandakan perumpamaan (simile).",
+                      "Kalimat majemuk adalah kalimat yang ...|punya dua pola kalimat atau lebih|hanya satu subjek|tanpa predikat|terdiri atas satu kata|Contoh: Ibu memasak dan ayah membaca koran.",
+                      "Kalimat yang menjelaskan ide pokok dalam paragraf disebut ...|kalimat penjelas|judul|amanat|tokoh|Kalimat penjelas menguatkan ide pokok."
                   }
               };
 
@@ -6053,8 +6478,8 @@ jobs:
               private void buildBuiltin() {
                   String[] src = (subj == 1 ? BI_ID : BI_EN)[kelas];
                   int half = src.length / 2;
-                  int from = advPart == 0 ? 0 : half;
-                  int to = advPart == 0 ? half : src.length;
+                  int from = advPart <= 0 ? 0 : half;
+                  int to = advPart < 0 ? src.length : (advPart == 0 ? half : src.length);
                   ArrayList<String> pool = new ArrayList<>();
                   for (int i = from; i < to; i++) {
                       pool.add(src[i]);
