@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.2.1"
+                  versionName "6.2.2"
               }
 
               signingConfigs {
@@ -553,7 +553,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.2.1";
+              private static final String APP_VERSION = "6.2.2";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -757,7 +757,8 @@ jobs:
 
               private static final String[] AVATARS = {
                       "\uD83E\uDD81", "\uD83D\uDC2F", "\uD83D\uDC3C", "\uD83D\uDC28", "\uD83D\uDC38", "\uD83E\uDD8A",
-                      "\uD83D\uDC30", "\uD83D\uDC36", "\uD83D\uDC31", "\uD83E\uDD84", "\uD83D\uDC27", "\uD83E\uDD89"
+                      "\uD83D\uDC30", "\uD83D\uDC36", "\uD83D\uDC31", "\uD83E\uDD84", "\uD83D\uDC27", "\uD83E\uDD89",
+                      "\uD83D\uDE42"
               };
               private final int[] avatar = new int[MAX_PLAYERS];
 
@@ -1846,7 +1847,7 @@ jobs:
                   dspLp.leftMargin = dp(10);
                   bar.addView(dsp, dspLp);
                   bar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
-                  AvatarView avb = avatarView(0);
+                  AvatarView avb = avatarView(0, 1);
                   avb.setElevation(dp(3));
                   avb.setOnClickListener(v -> showToko());
                   bar.addView(avb, new LinearLayout.LayoutParams(dp(52), dp(52)));
@@ -4340,7 +4341,7 @@ jobs:
                                   ed.remove("own" + i);
                               }
                               for (int pl = 0; pl < MAX_PLAYERS; pl++) {
-                                  for (int sl = 0; sl < 5; sl++) {
+                                  for (int sl = 0; sl < 7; sl++) {
                                       ed.remove("eq" + pl + "_" + sl);
                                   }
                               }
@@ -4372,8 +4373,8 @@ jobs:
               // Koin didapat dari bintang tiap permainan. Barang dan koin disimpan di HP ini
               // (ikut tercadangkan). Nomor urut barang = id yang tersimpan, jadi barang baru
               // hanya boleh DITAMBAH di akhir daftar, jangan disisipkan atau diurutkan ulang.
-              // Kolom: slot (0 topi, 1 wajah, 2 pegang, 3 teman, 4 latar), ikon, nama, harga.
-              // Untuk latar, "ikon" berisi daftar warna gradasi.
+              // Kolom: slot (0 topi, 1 wajah, 2 pegang, 3 teman, 4 latar, 5 pakaian, 6 rambut), ikon, nama, harga.
+              // Untuk latar, "ikon" berisi daftar warna gradasi. Untuk pakaian: warna badan,warna lengan. Untuk rambut: warna.
               private static final Object[][] ITEMS = {
                       {0, "\uD83D\uDC52", "Topi Jerami", 35},
                       {0, "\uD83C\uDF80", "Pita Cantik", 40},
@@ -4408,14 +4409,25 @@ jobs:
                       {4, "#FF7043,#FFCA28", "Senja Jingga", 100},
                       {4, "#311B92,#7E57C2", "Galaksi", 300},
                       {4, "#E53935,#FB8C00,#FDD835,#43A047,#1E88E5,#8E24AA", "Pelangi", 500},
-                      {4, "#FFD54F,#FF8F00", "Emas Sultan", 1000}
+                      {4, "#FFD54F,#FF8F00", "Emas Sultan", 1000},
+                      {5, "#1E88E5,#1E88E5", "Hoodie Biru", 60},
+                      {5, "#E53935,#E53935", "Jaket Merah", 90},
+                      {5, "#43A047,#43A047", "Jaket Hijau", 90},
+                      {5, "#FAFAFA,#212121", "Hoodie Panda", 150},
+                      {5, "#C9A06B,#C9A06B", "Seragam Pramuka", 120},
+                      {6, "#212121", "Rambut Hitam Pendek", 30},
+                      {6, "#6D4C41", "Rambut Acak-acakan", 40},
+                      {6, "#F9C74F", "Rambut Pirang Jabrik", 60},
+                      {6, "#F06292", "Rambut Pink Panjang", 100},
+                      {6, "#B0BEC5", "Rambut Perak Keren", 150}
               };
               private static final int ITEM_GALAKSI = 31;
               private static final String[] RAR_NAME = {"Biasa", "Keren", "Epik", "Legendaris"};
               private static final int[] RAR_COLOR = {SILVER, BLUE, PURPLE, GOLD};
               private static final String[] SHOP_TAB_ICON = {
-                      "\uD83D\uDC3E", "\uD83C\uDFA9", "\uD83D\uDD76\uFE0F", "\u26BD", "\uD83D\uDC23", "\uD83C\uDFA8"};
-              private static final String[] SHOP_TAB_NAME = {"Hewan", "Topi", "Wajah", "Pegang", "Teman", "Latar"};
+                      "\uD83D\uDC3E", "\uD83C\uDFA9", "\uD83D\uDD76\uFE0F", "\u26BD", "\uD83D\uDC23", "\uD83C\uDFA8",
+                      "\uD83D\uDC55", "\uD83D\uDC87"};
+              private static final String[] SHOP_TAB_NAME = {"Hewan", "Topi", "Wajah", "Pegang", "Teman", "Latar", "Pakaian", "Rambut"};
 
               private int lastCoinGain = 0;
               private int shopPl = 0;
@@ -4465,25 +4477,112 @@ jobs:
                   return g;
               }
 
-              // Avatar gabungan: hewan + topi + wajah + barang pegang + teman + latar
-              private class AvatarView extends View {
-                  private final String animal;
-                  private final int[] it = new int[5];
-                  private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+              // Avatar balok (gaya blocky): tudung hewan + rambut + pakaian + topi + wajah + barang pegang + teman + latar
+              // Semua digambar dengan kode (tanpa file gambar). Gambar dibuat di kotak 100 x 100 satuan.
+              // mode 0 = seluruh badan, 1 = zoom kepala, 2 = zoom badan dan tangan kanan (untuk pratinjau barang).
+              private static final int NO_HOOD = 12;
+              private static final String[] HOOD_MAIN = {"#F2B24C", "#F28C28", "#FFFFFF", "#9AA5AD", "#5DBB4A", "#E8631C",
+                      "#F6EEF3", "#A8744A", "#F2A65A", "#F3EAF7", "#37474F", "#8D6E4B"};
+              private static final String[] HOOD_ACC = {"#B5651D", "#212121", "#212121", "#DDE3E6", "#FFFFFF", "#FFFFFF",
+                      "#F8BBD0", "#5D3A1E", "#C77B30", "#F06292", "#FFFFFF", "#E6D5B8"};
 
-                  AvatarView(Context ctx, String animal, int[] items) {
+              private class AvatarView extends View {
+                  private final int animal;
+                  private final int[] it = new int[7];
+                  private final int mode;
+                  private final boolean tile;
+                  private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final RectF rf = new RectF();
+                  private final Path path = new Path();
+                  private float u = 1f;
+                  private float ox = 0f;
+                  private float oy = 0f;
+
+                  AvatarView(Context ctx, int animal, int[] items, int mode, boolean tile) {
                       super(ctx);
                       this.animal = animal;
-                      for (int k = 0; k < 5; k++) {
+                      for (int k = 0; k < 7; k++) {
                           it[k] = items[k];
                       }
+                      this.mode = mode;
+                      this.tile = tile;
                       p.setTextAlign(Paint.Align.CENTER);
                   }
 
-                  private void emoji(Canvas c, String s, float cx, float cy, float size) {
-                      p.setTextSize(size);
+                  private int col(String hex) {
+                      return Color.parseColor(hex);
+                  }
+
+                  private float fx(float v) {
+                      return ox + v * u;
+                  }
+
+                  private float fy(float v) {
+                      return oy + v * u;
+                  }
+
+                  private void outline(Canvas c) {
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(0.9f * u);
+                      p.setColor(0x44000000);
+                  }
+
+                  private void rect(Canvas c, float l, float t, float r, float b, float rad, int fill) {
+                      rf.set(fx(l), fy(t), fx(r), fy(b));
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(fill);
+                      c.drawRoundRect(rf, rad * u, rad * u, p);
+                      outline(c);
+                      c.drawRoundRect(rf, rad * u, rad * u, p);
+                      p.setStyle(Paint.Style.FILL);
+                  }
+
+                  private void flat(Canvas c, float l, float t, float r, float b, float rad, int fill) {
+                      rf.set(fx(l), fy(t), fx(r), fy(b));
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(fill);
+                      c.drawRoundRect(rf, rad * u, rad * u, p);
+                  }
+
+                  private void dot(Canvas c, float cx, float cy, float r, int fill) {
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(fill);
+                      c.drawCircle(fx(cx), fy(cy), r * u, p);
+                  }
+
+                  private void ball(Canvas c, float cx, float cy, float r, int fill) {
+                      dot(c, cx, cy, r, fill);
+                      outline(c);
+                      c.drawCircle(fx(cx), fy(cy), r * u, p);
+                      p.setStyle(Paint.Style.FILL);
+                  }
+
+                  private void tri(Canvas c, float x1, float y1, float x2, float y2, float x3, float y3, int fill) {
+                      path.reset();
+                      path.moveTo(fx(x1), fy(y1));
+                      path.lineTo(fx(x2), fy(y2));
+                      path.lineTo(fx(x3), fy(y3));
+                      path.close();
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(fill);
+                      c.drawPath(path, p);
+                  }
+
+                  private void line(Canvas c, float x1, float y1, float x2, float y2, float w, int color) {
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(w * u);
+                      p.setStrokeCap(Paint.Cap.ROUND);
+                      p.setColor(color);
+                      c.drawLine(fx(x1), fy(y1), fx(x2), fy(y2), p);
+                      p.setStyle(Paint.Style.FILL);
+                  }
+
+                  private void emoji(Canvas c, String t, float cx, float cy, float size) {
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(Color.BLACK);
+                      p.setTextSize(size * u);
                       Paint.FontMetrics fm = p.getFontMetrics();
-                      c.drawText(s, cx, cy - (fm.ascent + fm.descent) / 2f, p);
+                      c.drawText(t, fx(cx), fy(cy) - (fm.ascent + fm.descent) / 2f, p);
                   }
 
                   @Override
@@ -4491,52 +4590,491 @@ jobs:
                       float w = getWidth();
                       float h = getHeight();
                       float s = Math.min(w, h);
-                      float cx = w / 2f;
-                      float cy = h / 2f;
-                      float left = cx - s / 2f;
-                      float top = cy - s / 2f;
+                      float left = (w - s) / 2f;
+                      float top = (h - s) / 2f;
+                      u = s / 100f;
+                      ox = left;
+                      oy = top;
                       p.setStyle(Paint.Style.FILL);
-                      if (it[4] >= 0) {
-                          GradientDrawable g = bgDrawable(it[4], s * 0.24f);
-                          g.setBounds((int) left, (int) top, (int) (left + s), (int) (top + s));
-                          g.draw(c);
-                          if (it[4] == ITEM_GALAKSI) {
-                              p.setColor(Color.WHITE);
-                              float[][] st = {{0.15f, 0.2f}, {0.82f, 0.15f}, {0.3f, 0.86f}, {0.9f, 0.62f},
-                                      {0.08f, 0.55f}, {0.6f, 0.1f}, {0.74f, 0.9f}};
-                              for (int k = 0; k < st.length; k++) {
-                                  c.drawCircle(left + st[k][0] * s, top + st[k][1] * s,
-                                          s * (k % 2 == 0 ? 0.016f : 0.011f), p);
+                      if (tile) {
+                          if (it[4] >= 0) {
+                              GradientDrawable g = bgDrawable(it[4], s * 0.24f);
+                              g.setBounds((int) left, (int) top, (int) (left + s), (int) (top + s));
+                              g.draw(c);
+                              if (it[4] == ITEM_GALAKSI) {
+                                  p.setColor(Color.WHITE);
+                                  float[][] st = {{0.15f, 0.2f}, {0.82f, 0.15f}, {0.3f, 0.86f}, {0.9f, 0.62f},
+                                          {0.08f, 0.55f}, {0.6f, 0.1f}, {0.74f, 0.9f}};
+                                  for (int k = 0; k < st.length; k++) {
+                                      c.drawCircle(left + st[k][0] * s, top + st[k][1] * s,
+                                              s * (k % 2 == 0 ? 0.016f : 0.011f), p);
+                                  }
+                              }
+                          } else {
+                              p.setColor(col("#E3F2FD"));
+                              rf.set(left, top, left + s, top + s);
+                              c.drawRoundRect(rf, s * 0.24f, s * 0.24f, p);
+                          }
+                      }
+                      c.save();
+                      if (mode == 1) {
+                          c.translate(w / 2f, h / 2f);
+                          c.scale(1.7f, 1.7f);
+                          c.translate(-fx(50f), -fy(33f));
+                      } else if (mode == 2) {
+                          c.translate(w / 2f, h / 2f);
+                          c.scale(1.5f, 1.5f);
+                          c.translate(-fx(60f), -fy(58f));
+                      }
+                      c.save();
+                      c.translate(fx(50f), fy(90f));
+                      c.scale(0.95f, 0.95f);
+                      c.translate(-fx(50f), -fy(90f));
+                      drawChar(c);
+                      c.restore();
+                      c.restore();
+                  }
+
+                  private void drawChar(Canvas c) {
+                      final int skin = col("#F2CFA5");
+                      final boolean hood = animal >= 0 && animal < NO_HOOD;
+                      final float ht = hood ? 8f : 13.5f;
+
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(0x33000000);
+                      rf.set(fx(20f), fy(86.5f), fx(80f), fy(96f));
+                      c.drawOval(rf, p);
+
+                      if (it[3] >= 0) {
+                          emoji(c, itIcon(it[3]), 14f, 78f, 24f);
+                      }
+
+                      int pants = col("#37474F");
+                      rect(c, 38f, 66f, 49.6f, 87f, 2f, pants);
+                      rect(c, 50.4f, 66f, 62f, 87f, 2f, pants);
+                      rect(c, 36f, 83.5f, 49.6f, 89f, 2.5f, col("#FAFAFA"));
+                      rect(c, 50.4f, 83.5f, 64f, 89f, 2.5f, col("#FAFAFA"));
+
+                      int mainC = col("#4FC3F7");
+                      int slvC = mainC;
+                      boolean longSleeve = false;
+                      int cl = it[5];
+                      if (cl >= 0) {
+                          String[] cs = itIcon(cl).split(",");
+                          mainC = col(cs[0]);
+                          slvC = col(cs[1]);
+                          longSleeve = true;
+                      }
+                      float armEnd = longSleeve ? 61f : 53f;
+                      rect(c, 24f, 45f, 34f, 67f, 2.5f, skin);
+                      rect(c, 66f, 45f, 76f, 67f, 2.5f, skin);
+                      rect(c, 24f, 45f, 34f, armEnd, 2.5f, slvC);
+                      rect(c, 66f, 45f, 76f, armEnd, 2.5f, slvC);
+                      rect(c, 34f, 44f, 66f, 68f, 3f, mainC);
+                      if (cl >= 0) {
+                          drawClothes(c, cl);
+                      }
+
+                      int hid = it[6];
+                      int hairC = hid >= 0 ? col(itIcon(hid)) : col("#5D4037");
+                      if (hid == 42) {
+                          rect(c, 31f, 20f, 38f, 58f, 3f, hairC);
+                          rect(c, 62f, 20f, 69f, 58f, 3f, hairC);
+                      }
+                      rect(c, 33f, 14f, 67f, 46f, 6f, skin);
+                      drawHair(c, hid, hairC, hood);
+                      if (hood) {
+                          drawHood(c, animal);
+                      }
+
+                      if (it[1] == 11) {
+                          drawMask(c);
+                          dot(c, 43.6f, 32.7f, 3.4f, Color.WHITE);
+                          dot(c, 56.4f, 32.7f, 3.4f, Color.WHITE);
+                      }
+                      rf.set(fx(41.8f), fy(30f), fx(45.4f), fy(35.4f));
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(col("#263238"));
+                      c.drawOval(rf, p);
+                      rf.set(fx(54.6f), fy(30f), fx(58.2f), fy(35.4f));
+                      c.drawOval(rf, p);
+                      dot(c, 43.3f, 31.6f, 0.9f, Color.WHITE);
+                      dot(c, 56.1f, 31.6f, 0.9f, Color.WHITE);
+                      rf.set(fx(45.5f), fy(35f), fx(54.5f), fy(41f));
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(1.3f * u);
+                      p.setStrokeCap(Paint.Cap.ROUND);
+                      p.setColor(col("#8D4B3B"));
+                      c.drawArc(rf, 20f, 140f, false, p);
+                      p.setStyle(Paint.Style.FILL);
+                      if (it[1] != 9) {
+                          dot(c, 39f, 38.5f, 2.4f, 0x66FF7F7F);
+                          dot(c, 61f, 38.5f, 2.4f, 0x66FF7F7F);
+                      }
+                      drawFace(c, it[1]);
+                      drawHat(c, it[0], ht);
+                      drawHeld(c, it[2]);
+                  }
+
+                  private void drawClothes(Canvas c, int id) {
+                      if (id == 34) {
+                          flat(c, 42f, 57f, 58f, 66f, 2f, col("#1565C0"));
+                          line(c, 47f, 45f, 47f, 52f, 1f, Color.WHITE);
+                          line(c, 53f, 45f, 53f, 52f, 1f, Color.WHITE);
+                      } else if (id == 35 || id == 36) {
+                          line(c, 50f, 45f, 50f, 67f, 1.2f, col("#FFF9C4"));
+                          flat(c, 37f, 58f, 44f, 62f, 1f, 0x22000000);
+                      } else if (id == 37) {
+                          ball(c, 45.5f, 50.8f, 2.4f, col("#212121"));
+                          ball(c, 54.5f, 50.8f, 2.4f, col("#212121"));
+                          ball(c, 50f, 57f, 6.6f, Color.WHITE);
+                          dot(c, 47.4f, 56.4f, 1.9f, col("#212121"));
+                          dot(c, 52.6f, 56.4f, 1.9f, col("#212121"));
+                          dot(c, 50f, 59.2f, 1f, col("#212121"));
+                      } else if (id == 38) {
+                          tri(c, 42f, 44f, 58f, 44f, 50f, 56f, col("#D32F2F"));
+                          tri(c, 46f, 44f, 54f, 44f, 50f, 50f, Color.WHITE);
+                          flat(c, 38f, 58f, 45f, 66f, 1.2f, col("#B58B58"));
+                      }
+                  }
+
+                  private void drawHair(Canvas c, int hid, int hairC, boolean hood) {
+                      if (hood) {
+                          rect(c, 36f, 20f, 64f, 26f, 2f, hairC);
+                          tri(c, 38f, 25f, 45f, 25f, 41.5f, 30f, hairC);
+                          tri(c, 47f, 25f, 53f, 25f, 50f, 29f, hairC);
+                          tri(c, 55f, 25f, 62f, 25f, 58.5f, 30f, hairC);
+                          return;
+                      }
+                      rect(c, 33f, 13f, 67f, 23f, 5f, hairC);
+                      rect(c, 33f, 13f, 37.5f, 30f, 2f, hairC);
+                      rect(c, 62.5f, 13f, 67f, 30f, 2f, hairC);
+                      if (hid == 40) {
+                          tri(c, 36f, 15f, 40f, 6f, 44f, 15f, hairC);
+                          tri(c, 45f, 15f, 50f, 5f, 55f, 15f, hairC);
+                          tri(c, 56f, 15f, 61f, 7f, 64f, 15f, hairC);
+                      } else if (hid == 41) {
+                          tri(c, 35f, 15f, 39f, 3f, 43f, 15f, hairC);
+                          tri(c, 42f, 15f, 46f, 1f, 50f, 15f, hairC);
+                          tri(c, 49f, 15f, 53f, 2f, 57f, 15f, hairC);
+                          tri(c, 56f, 15f, 61f, 4f, 65f, 15f, hairC);
+                      } else if (hid == 42) {
+                          rect(c, 33f, 13f, 39f, 40f, 2f, hairC);
+                          rect(c, 61f, 13f, 67f, 40f, 2f, hairC);
+                      } else if (hid == 43) {
+                          path.reset();
+                          path.moveTo(fx(33f), fy(13f));
+                          path.lineTo(fx(67f), fy(13f));
+                          path.lineTo(fx(67f), fy(21f));
+                          path.lineTo(fx(53f), fy(27f));
+                          path.lineTo(fx(41f), fy(23f));
+                          path.lineTo(fx(33f), fy(31f));
+                          path.close();
+                          p.setStyle(Paint.Style.FILL);
+                          p.setColor(hairC);
+                          c.drawPath(path, p);
+                      } else {
+                          rect(c, 36f, 22f, 64f, 26f, 1.5f, hairC);
+                      }
+                  }
+
+                  private void hoodRects(Canvas c, int color, float g) {
+                      flat(c, 30f - g, 8f - g, 70f + g, 23f + g, 6f + g, color);
+                      flat(c, 30f - g, 14f - g, 36.5f + g, 44f + g, 3f + g, color);
+                      flat(c, 63.5f - g, 14f - g, 70f + g, 44f + g, 3f + g, color);
+                  }
+
+                  private void drawHood(Canvas c, int a) {
+                      int main = col(HOOD_MAIN[a]);
+                      int acc = col(HOOD_ACC[a]);
+                      int inner = col("#FFE0B2");
+                      if (a == 0) {
+                          ball(c, 33f, 10f, 5f, acc);
+                          ball(c, 67f, 10f, 5f, acc);
+                          ball(c, 28f, 22f, 4.5f, acc);
+                          ball(c, 28f, 32f, 4.5f, acc);
+                          ball(c, 72f, 22f, 4.5f, acc);
+                          ball(c, 72f, 32f, 4.5f, acc);
+                      } else if (a == 1) {
+                          ball(c, 32f, 10f, 5f, main);
+                          ball(c, 68f, 10f, 5f, main);
+                          dot(c, 32f, 10f, 2.3f, inner);
+                          dot(c, 68f, 10f, 2.3f, inner);
+                      } else if (a == 2) {
+                          ball(c, 32f, 9f, 5.5f, acc);
+                          ball(c, 68f, 9f, 5.5f, acc);
+                      } else if (a == 3) {
+                          ball(c, 29f, 13f, 7f, main);
+                          ball(c, 71f, 13f, 7f, main);
+                          dot(c, 29f, 13f, 4f, acc);
+                          dot(c, 71f, 13f, 4f, acc);
+                      } else if (a == 4) {
+                          ball(c, 37f, 8f, 5.5f, main);
+                          ball(c, 63f, 8f, 5.5f, main);
+                      } else if (a == 5 || a == 8) {
+                          tri(c, 31f, 15f, 33f, -1f, 43f, 9f, main);
+                          tri(c, 69f, 15f, 67f, -1f, 57f, 9f, main);
+                          tri(c, 34f, 12f, 35f, 3f, 40f, 9f, a == 5 ? inner : acc);
+                          tri(c, 66f, 12f, 65f, 3f, 60f, 9f, a == 5 ? inner : acc);
+                      } else if (a == 6) {
+                          rect(c, 35f, -4f, 43f, 12f, 4f, main);
+                          rect(c, 57f, -4f, 65f, 12f, 4f, main);
+                          flat(c, 37f, -1f, 41f, 10f, 2f, acc);
+                          flat(c, 59f, -1f, 63f, 10f, 2f, acc);
+                      } else if (a == 7) {
+                          rect(c, 23f, 14f, 33f, 38f, 4f, acc);
+                          rect(c, 67f, 14f, 77f, 38f, 4f, acc);
+                      } else if (a == 9) {
+                          tri(c, 33f, 12f, 35f, 3f, 41f, 9f, main);
+                          tri(c, 67f, 12f, 65f, 3f, 59f, 9f, main);
+                          tri(c, 46f, 9f, 50f, -5f, 54f, 9f, col("#FFD54F"));
+                      } else if (a == 11) {
+                          tri(c, 31f, 15f, 32f, 1f, 42f, 9f, col("#6D4C41"));
+                          tri(c, 69f, 15f, 68f, 1f, 58f, 9f, col("#6D4C41"));
+                      }
+
+                      hoodRects(c, 0x55000000, 0.5f);
+                      hoodRects(c, main, 0f);
+
+                      if (a == 1 || a == 8) {
+                          int sc = a == 1 ? acc : col("#C77B30");
+                          flat(c, 44f, 9f, 46f, 15f, 0.8f, sc);
+                          flat(c, 49f, 9f, 51f, 16f, 0.8f, sc);
+                          flat(c, 54f, 9f, 56f, 15f, 0.8f, sc);
+                          if (a == 1) {
+                              flat(c, 30.5f, 26f, 36f, 28f, 0.6f, acc);
+                              flat(c, 30.5f, 33f, 36f, 35f, 0.6f, acc);
+                              flat(c, 64f, 26f, 69.5f, 28f, 0.6f, acc);
+                              flat(c, 64f, 33f, 69.5f, 35f, 0.6f, acc);
+                          }
+                      } else if (a == 2) {
+                          dot(c, 33.2f, 30f, 2.6f, acc);
+                          dot(c, 66.8f, 30f, 2.6f, acc);
+                      } else if (a == 3) {
+                          flat(c, 46f, 10f, 54f, 15f, 2.5f, col("#455A64"));
+                      } else if (a == 4) {
+                          dot(c, 37f, 8f, 3.8f, Color.WHITE);
+                          dot(c, 63f, 8f, 3.8f, Color.WHITE);
+                          dot(c, 37.5f, 8.3f, 1.8f, Color.BLACK);
+                          dot(c, 62.5f, 8.3f, 1.8f, Color.BLACK);
+                      } else if (a == 5) {
+                          tri(c, 30f, 44f, 30f, 34f, 36.5f, 44f, Color.WHITE);
+                          tri(c, 70f, 44f, 70f, 34f, 63.5f, 44f, Color.WHITE);
+                      } else if (a == 9) {
+                          rect(c, 65.5f, 10f, 72f, 38f, 3f, acc);
+                      } else if (a == 10) {
+                          tri(c, 46f, 10f, 54f, 10f, 50f, 16f, col("#FFB300"));
+                          flat(c, 31f, 27f, 36.2f, 41f, 2f, Color.WHITE);
+                          flat(c, 63.8f, 27f, 69f, 41f, 2f, Color.WHITE);
+                      } else if (a == 11) {
+                          dot(c, 42.5f, 14f, 4.8f, Color.WHITE);
+                          dot(c, 57.5f, 14f, 4.8f, Color.WHITE);
+                          dot(c, 42.5f, 14f, 2.2f, col("#5D4037"));
+                          dot(c, 57.5f, 14f, 2.2f, col("#5D4037"));
+                          tri(c, 48.5f, 17f, 51.5f, 17f, 50f, 21f, col("#FFB300"));
+                      }
+                  }
+
+                  private void drawMask(Canvas c) {
+                      path.reset();
+                      path.moveTo(fx(35f), fy(28f));
+                      path.lineTo(fx(65f), fy(28f));
+                      path.lineTo(fx(63f), fy(36f));
+                      path.lineTo(fx(55f), fy(34f));
+                      path.lineTo(fx(50f), fy(36f));
+                      path.lineTo(fx(45f), fy(34f));
+                      path.lineTo(fx(37f), fy(36f));
+                      path.close();
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(col("#7E57C2"));
+                      c.drawPath(path, p);
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(1f * u);
+                      p.setColor(col("#FFC107"));
+                      c.drawPath(path, p);
+                      p.setStyle(Paint.Style.FILL);
+                  }
+
+                  private void heart(Canvas c, float cx, float cy, float r, int color) {
+                      dot(c, cx - r * 0.5f, cy - r * 0.3f, r * 0.58f, color);
+                      dot(c, cx + r * 0.5f, cy - r * 0.3f, r * 0.58f, color);
+                      tri(c, cx - r * 1.04f, cy - r * 0.05f, cx + r * 1.04f, cy - r * 0.05f, cx, cy + r * 1.1f, color);
+                  }
+
+                  private void drawFace(Canvas c, int id) {
+                      if (id == 8) {
+                          int fr = col("#263238");
+                          for (int k = 0; k < 2; k++) {
+                              float ex = k == 0 ? 43.6f : 56.4f;
+                              dot(c, ex, 32.7f, 5.2f, 0x33BBDEFB);
+                              p.setStyle(Paint.Style.STROKE);
+                              p.setStrokeWidth(1f * u);
+                              p.setColor(fr);
+                              c.drawCircle(fx(ex), fy(32.7f), 5.2f * u, p);
+                              p.setStyle(Paint.Style.FILL);
+                          }
+                          line(c, 48.8f, 32.2f, 51.2f, 32.2f, 1f, fr);
+                          line(c, 38.4f, 32f, 33.5f, 31.5f, 1f, fr);
+                          line(c, 61.6f, 32f, 66.5f, 31.5f, 1f, fr);
+                      } else if (id == 9) {
+                          heart(c, 38.5f, 38f, 3.2f, col("#F06292"));
+                          heart(c, 61.5f, 38f, 3.2f, col("#F06292"));
+                      } else if (id == 10) {
+                          rect(c, 37f, 29f, 48.6f, 36f, 2f, col("#111111"));
+                          rect(c, 51.4f, 29f, 63f, 36f, 2f, col("#111111"));
+                          flat(c, 48.6f, 31f, 51.4f, 32.6f, 0.5f, col("#111111"));
+                          flat(c, 38.5f, 30f, 41.5f, 31.4f, 0.6f, 0x88FFFFFF);
+                          flat(c, 52.9f, 30f, 55.9f, 31.4f, 0.6f, 0x88FFFFFF);
+                      }
+                  }
+
+                  private void drawHat(Canvas c, int id, float ht) {
+                      if (id == 0) {
+                          rect(c, 40f, ht - 9f, 60f, ht, 4f, col("#F6D77A"));
+                          flat(c, 40.5f, ht - 4f, 59.5f, ht, 0f, col("#E53935"));
+                          rect(c, 33f, ht - 1f, 67f, ht + 3f, 2f, col("#F6D77A"));
+                      } else if (id == 1) {
+                          tri(c, 60f, ht + 1f, 51f, ht - 5f, 51f, ht + 7f, col("#F06292"));
+                          tri(c, 60f, ht + 1f, 69f, ht - 5f, 69f, ht + 7f, col("#F06292"));
+                          ball(c, 60f, ht + 1f, 2.8f, col("#C2185B"));
+                      } else if (id == 2) {
+                          for (int k = 0; k < 5; k++) {
+                              double a = -Math.PI / 2 + k * 2 * Math.PI / 5;
+                              dot(c, 58f + (float) Math.cos(a) * 3.2f, ht + 1f + (float) Math.sin(a) * 3.2f, 2.8f, col("#F8BBD0"));
+                          }
+                          dot(c, 58f, ht + 1f, 1.7f, col("#FFC107"));
+                      } else if (id == 3) {
+                          rect(c, 40f, ht - 4f, 60f, ht + 2f, 2f, col("#212121"));
+                          path.reset();
+                          path.moveTo(fx(30f), fy(ht - 4f));
+                          path.lineTo(fx(50f), fy(ht - 10f));
+                          path.lineTo(fx(70f), fy(ht - 4f));
+                          path.lineTo(fx(50f), fy(ht + 0.5f));
+                          path.close();
+                          p.setStyle(Paint.Style.FILL);
+                          p.setColor(col("#263238"));
+                          c.drawPath(path, p);
+                          line(c, 50f, ht - 4.5f, 66f, ht - 3f, 1.1f, col("#FFC107"));
+                          line(c, 66f, ht - 3f, 66f, ht + 5f, 1.1f, col("#FFC107"));
+                          dot(c, 66f, ht + 5.5f, 1.6f, col("#FFC107"));
+                      } else if (id == 4) {
+                          rect(c, 36f, ht - 8f, 64f, ht + 2f, 7f, col("#E53935"));
+                          rect(c, 33.5f, ht, 66.5f, ht + 3.2f, 1.5f, col("#C62828"));
+                          flat(c, 48.4f, ht - 6f, 51.6f, ht - 0.5f, 0.4f, Color.WHITE);
+                          flat(c, 46f, ht - 4.3f, 54f, ht - 2.7f, 0.4f, Color.WHITE);
+                      } else if (id == 5) {
+                          rect(c, 40f, ht - 12f, 60f, ht, 2f, col("#212121"));
+                          flat(c, 40.5f, ht - 5f, 59.5f, ht - 1.5f, 0f, col("#C62828"));
+                          rect(c, 35f, ht - 1f, 65f, ht + 3f, 1.5f, col("#212121"));
+                      } else if (id == 6) {
+                          path.reset();
+                          for (int k = 0; k < 10; k++) {
+                              double a = -Math.PI / 2 + k * Math.PI / 5;
+                              float r = k % 2 == 0 ? 8.5f : 3.6f;
+                              float px = fx(50f) + (float) Math.cos(a) * r * u;
+                              float py = fy(ht - 5f) + (float) Math.sin(a) * r * u;
+                              if (k == 0) {
+                                  path.moveTo(px, py);
+                              } else {
+                                  path.lineTo(px, py);
                               }
                           }
-                      } else {
-                          p.setColor(Color.parseColor("#ECEFF1"));
-                          c.drawRoundRect(new RectF(left, top, left + s, top + s), s * 0.24f, s * 0.24f, p);
+                          path.close();
+                          p.setStyle(Paint.Style.FILL);
+                          p.setColor(col("#FFC107"));
+                          c.drawPath(path, p);
+                          outline(c);
+                          c.drawPath(path, p);
+                          p.setStyle(Paint.Style.FILL);
+                      } else if (id == 7) {
+                          path.reset();
+                          path.moveTo(fx(38f), fy(ht + 2.5f));
+                          path.lineTo(fx(38f), fy(ht - 8f));
+                          path.lineTo(fx(44f), fy(ht - 3f));
+                          path.lineTo(fx(50f), fy(ht - 10f));
+                          path.lineTo(fx(56f), fy(ht - 3f));
+                          path.lineTo(fx(62f), fy(ht - 8f));
+                          path.lineTo(fx(62f), fy(ht + 2.5f));
+                          path.close();
+                          p.setStyle(Paint.Style.FILL);
+                          p.setColor(col("#FFC107"));
+                          c.drawPath(path, p);
+                          outline(c);
+                          c.drawPath(path, p);
+                          p.setStyle(Paint.Style.FILL);
+                          dot(c, 50f, ht - 1f, 1.7f, col("#D32F2F"));
                       }
-                      p.setColor(Color.BLACK);
-                      emoji(c, animal, cx, cy + 0.04f * s, 0.56f * s);
-                      if (it[3] >= 0) {
-                          emoji(c, itIcon(it[3]), cx + 0.30f * s, cy + 0.34f * s, 0.26f * s);
-                      }
-                      if (it[2] >= 0) {
-                          emoji(c, itIcon(it[2]), cx - 0.30f * s, cy + 0.34f * s, 0.26f * s);
-                      }
-                      if (it[1] >= 0) {
-                          emoji(c, itIcon(it[1]), cx, cy - 0.03f * s, 0.34f * s);
-                      }
-                      if (it[0] >= 0) {
-                          emoji(c, itIcon(it[0]), cx, cy - 0.27f * s, 0.30f * s);
+                  }
+
+                  private void drawHeld(Canvas c, int id) {
+                      if (id == 12) {
+                          ball(c, 80f, 60f, 6f, Color.WHITE);
+                          dot(c, 80f, 60f, 2.2f, Color.BLACK);
+                          dot(c, 76.6f, 56.8f, 1.1f, Color.BLACK);
+                          dot(c, 83.4f, 56.8f, 1.1f, Color.BLACK);
+                          dot(c, 77f, 63.8f, 1.1f, Color.BLACK);
+                          dot(c, 83f, 63.8f, 1.1f, Color.BLACK);
+                      } else if (id == 13) {
+                          ball(c, 80f, 60f, 6.2f, col("#FF8F00"));
+                          line(c, 73.8f, 60f, 86.2f, 60f, 0.8f, col("#5D2E00"));
+                          line(c, 80f, 53.8f, 80f, 66.2f, 0.8f, col("#5D2E00"));
+                      } else if (id == 14) {
+                          rf.set(fx(73f), fy(53f), fx(89f), fy(66f));
+                          p.setStyle(Paint.Style.FILL);
+                          p.setColor(col("#D7A86E"));
+                          c.drawOval(rf, p);
+                          outline(c);
+                          c.drawOval(rf, p);
+                          p.setStyle(Paint.Style.FILL);
+                          dot(c, 78f, 58f, 1.6f, col("#E53935"));
+                          dot(c, 82.5f, 56.5f, 1.6f, col("#1E88E5"));
+                          dot(c, 85.5f, 60.5f, 1.6f, col("#43A047"));
+                          dot(c, 80f, 62f, 1.6f, col("#FDD835"));
+                      } else if (id == 15) {
+                          line(c, 72f, 66f, 85f, 53f, 4.6f, col("#37474F"));
+                          line(c, 76f, 69f, 89f, 56f, 4.6f, col("#37474F"));
+                          dot(c, 85.8f, 52.4f, 2.5f, col("#90CAF9"));
+                          dot(c, 89.8f, 55.4f, 2.5f, col("#90CAF9"));
+                      } else if (id == 16) {
+                          rect(c, 77.6f, 43f, 80.4f, 61f, 0.8f, col("#5D4037"));
+                          rect(c, 76.8f, 40f, 81.2f, 45f, 1f, col("#3E2723"));
+                          ball(c, 79f, 66f, 6.2f, col("#A1572B"));
+                          dot(c, 79f, 66f, 1.9f, col("#3E2723"));
+                      } else if (id == 17) {
+                          rect(c, 74.8f, 34f, 78.4f, 61f, 0.8f, col("#CFD8DC"));
+                          rect(c, 71.6f, 60.6f, 81.6f, 63.4f, 1f, col("#FFC107"));
+                          rect(c, 75.3f, 63f, 77.9f, 70f, 1f, col("#6D4C41"));
+                      } else if (id == 18) {
+                          tri(c, 83.5f, 60f, 83.5f, 69f, 88.5f, 69f, col("#D32F2F"));
+                          tri(c, 75.5f, 60f, 75.5f, 69f, 70.5f, 69f, col("#D32F2F"));
+                          tri(c, 77f, 66f, 82f, 66f, 79.5f, 74f, col("#FFB300"));
+                          rect(c, 75.5f, 44f, 83.5f, 67f, 4f, col("#ECEFF1"));
+                          tri(c, 75.5f, 48f, 83.5f, 48f, 79.5f, 38f, col("#E53935"));
+                          dot(c, 79.5f, 55f, 2.4f, col("#4FC3F7"));
                       }
                   }
               }
 
               private AvatarView avatarView(int pl) {
-                  int[] items = new int[5];
-                  for (int k = 0; k < 5; k++) {
+                  return avatarView(pl, 0);
+              }
+
+              private AvatarView avatarView(int pl, int mode) {
+                  int[] items = new int[7];
+                  for (int k = 0; k < 7; k++) {
                       int e = eq(pl, k);
                       items[k] = (e >= 0 && e < ITEMS.length && itSlot(e) == k && owns(e)) ? e : -1;
                   }
-                  return new AvatarView(this, av(pl), items);
+                  int a = avatar[pl];
+                  return new AvatarView(this, a >= NO_HOOD ? -1 : a, items, mode, true);
+              }
+
+              private AvatarView previewView(int animalIdx, int slot, int id, int mode) {
+                  int[] items = {-1, -1, -1, -1, -1, -1, -1};
+                  if (slot >= 0) {
+                      items[slot] = id;
+                  }
+                  return new AvatarView(this, animalIdx, items, mode, false);
               }
 
               private View shopCell(final int id) {
@@ -4556,8 +5094,13 @@ jobs:
                       View sw = new View(this);
                       sw.setBackground(bgDrawable(id, dp(12)));
                       cell.addView(sw, new LinearLayout.LayoutParams(dp(40), dp(40)));
-                  } else {
+                  } else if (itSlot(id) == 3) {
                       cell.addView(text(itIcon(id), 30, DARK, false), new LinearLayout.LayoutParams(WRAP, WRAP));
+                  } else {
+                      int sl = itSlot(id);
+                      AvatarView pvw = previewView(-1, sl, id, (sl == 2 || sl == 5) ? 2 : 1);
+                      pvw.setBackground(box(Color.parseColor("#ECEFF1"), 12));
+                      cell.addView(pvw, new LinearLayout.LayoutParams(dp(56), dp(56)));
                   }
                   cell.addView(text(itName(id), 11, DARK, true), lp(WRAP, 4));
                   cell.addView(text(RAR_NAME[rar], 10, rc, true), lp(WRAP, 0));
@@ -4634,7 +5177,7 @@ jobs:
 
                   LinearLayout pv = card();
                   pv.setGravity(Gravity.CENTER_HORIZONTAL);
-                  pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(170), dp(170)));
+                  pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(200), dp(200)));
                   pv.addView(text(names[shopPl], 16, DARK, true), lp(WRAP, 8));
                   pv.addView(text("Ketuk barang untuk membeli, ketuk lagi untuk memakai atau melepas", 12, DARK, false),
                           lp(WRAP, 2));
@@ -4662,18 +5205,22 @@ jobs:
                   c.addView(hs, lp(WRAP, 14));
 
                   if (shopTab == 0) {
-                      c.addView(text("Pilih hewan (gratis)", 13, DARK, true), lp(WRAP, 12));
-                      for (int r = 0; r < 3; r++) {
+                      c.addView(text("Pilih tudung hewan (gratis)", 13, DARK, true), lp(WRAP, 12));
+                      for (int r = 0; r < 4; r++) {
                           LinearLayout row = new LinearLayout(this);
                           row.setOrientation(LinearLayout.HORIZONTAL);
                           for (int q = 0; q < 4; q++) {
                               final int k = r * 4 + q;
+                              if (k >= AVATARS.length) {
+                                  row.addView(new View(this), weight(q == 0 ? 0 : 4, q == 3 ? 0 : 4));
+                                  continue;
+                              }
                               boolean on = avatar[shopPl] == k;
-                              TextView t = text(AVATARS[k], 28, Color.WHITE, false);
+                              AvatarView t = previewView(k >= NO_HOOD ? -1 : k, -1, -1, 1);
                               t.setBackground(on ? box(PLAYER_COLORS[shopPl], 16) : box(GRAY, 16));
                               t.setOnClickListener(v -> {
                                   for (int j = 0; j < np; j++) {
-                                      if (j != shopPl && avatar[j] == k) {
+                                      if (k < NO_HOOD && j != shopPl && avatar[j] == k) {
                                           avatar[j] = avatar[shopPl];
                                           prefs.edit().putInt("avatar" + j, avatar[j]).apply();
                                       }
@@ -4684,8 +5231,10 @@ jobs:
                               });
                               row.addView(t, weight(q == 0 ? 0 : 4, q == 3 ? 0 : 4));
                           }
-                          c.addView(row, lp(dp(56), 8));
+                          c.addView(row, lp(dp(64), 8));
                       }
+                      c.addView(text("Kotak terakhir: tanpa tudung, supaya rambutmu terlihat penuh", 12, DARK, false),
+                              lp(WRAP, 6));
                   } else {
                       int slot = shopTab - 1;
                       ArrayList<Integer> ids = new ArrayList<>();
