@@ -85,7 +85,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.2.2"
+                  versionName "6.2.3"
               }
 
               signingConfigs {
@@ -553,7 +553,7 @@ jobs:
               private static final int REQ_IMPORT = 41;
               private static final int REQ_BACKUP_SAVE = 42;
               private static final int REQ_BACKUP_OPEN = 43;
-              private static final String APP_VERSION = "6.2.2";
+              private static final String APP_VERSION = "6.2.3";
               private static final String STATS_KEY = "laporan_v1";
               private static final int STATS_MAX_ITEMS = 500;
               private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -889,6 +889,34 @@ jobs:
                       vrot = new float[n];
                       color = new int[n];
                       density = ctx.getResources().getDisplayMetrics().density;
+                  }
+
+                  @Override
+                  public boolean onTouchEvent(android.view.MotionEvent event) {
+                      if (mode != 0) return super.onTouchEvent(event);
+                      switch (event.getActionMasked()) {
+                          case android.view.MotionEvent.ACTION_DOWN:
+                              lastTouchX = event.getX();
+                              getParent().requestDisallowInterceptTouchEvent(true);
+                              return true;
+                          case android.view.MotionEvent.ACTION_MOVE:
+                              float dx = event.getX() - lastTouchX;
+                              lastTouchX = event.getX();
+                              avatarAngle = (avatarAngle + dx * 1.2f) % 360f;
+                              invalidate();
+                              return true;
+                          case android.view.MotionEvent.ACTION_UP:
+                          case android.view.MotionEvent.ACTION_CANCEL:
+                              performClick();
+                              return true;
+                      }
+                      return true;
+                  }
+
+                  @Override
+                  public boolean performClick() {
+                      super.performClick();
+                      return true;
                   }
 
                   @Override
@@ -4497,6 +4525,9 @@ jobs:
                   private float u = 1f;
                   private float ox = 0f;
                   private float oy = 0f;
+                  // Rotasi visual 2.5D pada Canvas; belum merupakan mesh 3D sungguhan.
+                  private float avatarAngle = 0f;
+                  private float lastTouchX = 0f;
 
                   AvatarView(Context ctx, int animal, int[] items, int mode, boolean tile) {
                       super(ctx);
@@ -4630,7 +4661,23 @@ jobs:
                       c.translate(fx(50f), fy(90f));
                       c.scale(0.95f, 0.95f);
                       c.translate(-fx(50f), -fy(90f));
+                      // Efek putar visual: mengecilkan lebar karakter saat dilihat dari samping.
+                      // Ini menjaga kompatibilitas Canvas tanpa menambah engine 3D eksternal.
+                      float facing = (float) Math.cos(Math.toRadians(avatarAngle));
+                      float widthScale = Math.max(0.28f, Math.abs(facing));
+                      c.save();
+                      c.translate(fx(50f), fy(50f));
+                      c.scale(widthScale, 1f);
+                      c.translate(-fx(50f), -fy(50f));
                       drawChar(c);
+                      c.restore();
+                      if (Math.abs(facing) < 0.72f) {
+                          int side = facing >= 0f ? col("#8D9AA0") : col("#667780");
+                          p.setStyle(Paint.Style.FILL);
+                          p.setColor(side);
+                          float edge = facing >= 0f ? 50f + 17f * widthScale : 50f - 17f * widthScale - 3f;
+                          c.drawRect(fx(edge), fy(45f), fx(edge + 3f), fy(67f), p);
+                      }
                       c.restore();
                       c.restore();
                   }
