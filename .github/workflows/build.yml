@@ -4706,10 +4706,10 @@ jobs:
                           float nzr = -nx * s3t + nz * c3t;
                           float ny2 = ny * c3p - nzr * s3p;
                           float nz2 = ny * s3p + nzr * c3p;
-                          float lit = Math.max(0f, nxr * -0.35f + ny2 * -0.5f + nz2 * 0.79f);
+                          float lit = Math.max(0f, nxr * -0.45f + ny2 * -0.7f + nz2 * 0.62f);
                           int base = f == 4 ? colTop : (f == 1 ? colBack : colSide);
                           int i = fn++;
-                          fc[i] = shade(base, 0.62f + 0.43f * lit);
+                          fc[i] = shade(base, 0.64f + 0.52f * lit);
                           fk[i] = f == 0 ? kind : 0;
                           fz[i] = (pzs[q[0]] + pzs[q[1]] + pzs[q[2]] + pzs[q[3]]) / 4f + zBias;
                           for (int k = 0; k < 4; k++) {
@@ -4784,9 +4784,9 @@ jobs:
                           p.setColor(fc[i]);
                           c.drawPath(path, p);
                           p.setStyle(Paint.Style.STROKE);
-                          p.setStrokeWidth(0.7f * u);
+                          p.setStrokeWidth(0.55f * u);
                           p.setStrokeJoin(Paint.Join.ROUND);
-                          p.setColor(0x55000000);
+                          p.setColor(shade(fc[i], 0.72f));
                           c.drawPath(path, p);
                           p.setStyle(Paint.Style.FILL);
                           if (fk[i] != 0) {
@@ -4839,7 +4839,7 @@ jobs:
                       curHairC = curHid >= 0 ? col(itIcon(curHid)) : col("#4E342E");
 
                       float th = (float) Math.toRadians(avatarAngle);
-                      float pitch = (float) Math.toRadians(-12f);
+                      float pitch = (float) Math.toRadians(-16f);
                       c3t = (float) Math.cos(th);
                       s3t = (float) Math.sin(th);
                       c3p = (float) Math.cos(pitch);
@@ -4881,8 +4881,8 @@ jobs:
                           addBox(38f, 64f, 49.7f, 83f, -5.5f, 5.5f, red, red, red, 0);
                           addBox(50.3f, 64f, 62f, 83f, -5.5f, 5.5f, red, red, red, 0);
                       }
-                      addBox(37f, shoeTop, 49.7f, 89f, -5.5f, 9f, shoe, shoe, shoe, 0);
-                      addBox(50.3f, shoeTop, 63f, 89f, -5.5f, 9f, shoe, shoe, shoe, 0);
+                      addBox(37f, shoeTop, 49.7f, 86.6f, -5.5f, 9f, shoe, shoe, shoe, 0); addBox(36.6f, 86.6f, 50.1f, 89f, -5.9f, 9.4f, col("#F5F5F5"), col("#F5F5F5"), col("#F5F5F5"), 0);
+                      addBox(50.3f, shoeTop, 63f, 86.6f, -5.5f, 9f, shoe, shoe, shoe, 0); addBox(49.9f, 86.6f, 63.4f, 89f, -5.9f, 9.4f, col("#F5F5F5"), col("#F5F5F5"), col("#F5F5F5"), 0);
                       // tangan: kulit bawah, lengan baju atas
                       addBox(27f, 43f + armLen, 36f, 61f, -4.5f, 4.5f, skin, skin, skin, 0);
                       addBox(64f, 43f + armLen, 73f, 61f, -4.5f, 4.5f, skin, skin, skin, 0);
@@ -4891,7 +4891,7 @@ jobs:
                       addBox(64f, 43f, 73f, 43f + armLen, -4.5f, 4.5f, slv, slv, slv, 3);
                       // badan
                       srcRect(34f, 44f, 66f, 68f);
-                      addBox(36f, 42f, 64f, 64f, -7f, 7f, shirt, shirt, shirt, 2);
+                      addBox(36f, 42f, 64f, 64f, -7f, 7f, shirt, shirt, shirt, 2); if (!girl) { zBias = 6f; addBox(35.5f, 60.6f, 64.5f, 64.6f, -7.5f, 7.5f, col("#2B2B2B"), col("#2B2B2B"), col("#2B2B2B"), 0); zBias = 0f; }
                       if (girl) {
                           int wh = (curHid >= 0) ? curHairC : col("#F7F7F7");
                           addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
@@ -4933,9 +4933,23 @@ jobs:
                               addBox(hx0 - m, hy0 + 7f, hx1 + m, hy0 + 12f, hz - 1f, hz + m, hc, hc, hc, 0);
                           }
                       }
+                      float hairLift = 0f;
+                      if (!hood && !hijab && (curHid < 0 || curHid == 39)) {
+                          float yT = hy0 - m - 1.5f;
+                          int hl = shade(hc, 1.18f);
+                          int hd = shade(hc, 0.8f);
+                          addBox(32f, yT - 4f, 49f, yT + 0.5f, 3f, hz + m - 0.5f, hl, hl, hl, 0);
+                          addBox(49f, yT - 2.5f, 67f, yT + 0.5f, -4f, hz + m - 3f, hc, hc, hc, 0);
+                          addBox(35f, yT - 4.5f, 63f, yT + 0.5f, -12f, 6f, hd, hd, hd, 0);
+                          addBox(52f, yT - 4f, 68f, yT + 0.5f, 5f, hz + m - 5f, hl, hl, hl, 0);
+                          addBox(38f, yT - 3f, 66f, yT + 0.5f, -hz - m + 1f, -9f, hl, hl, hl, 0);
+                          addBox(hx0 - m, hy0 + 7f, hx0 + 4f, hy0 + 16f, 2f, hz + m - 1f, hd, hd, hd, 0);
+                          addBox(hx1 - 4f, hy0 + 7f, hx1 + m, hy0 + 16f, 2f, hz + m - 1f, hd, hd, hd, 0);
+                          hairLift = 4.5f;
+                      }
                       curSkipFace = it[1] == 8 || it[1] == 10;
                       if (it[0] >= 0) {
-                          addHat3D(it[0], hy0 - m - 1.5f);
+                          addHat3D(it[0], hy0 - m - 1.5f - hairLift);
                       }
                       if (curSkipFace) {
                           boolean cover = hood || hijab; zBias = c3t > 0.2f ? 40f : 0f; addGlasses3D(it[1], hx0, hx1, hz, cover ? m + 0.9f : 0.9f, cover ? -4f : 0f, cover ? hz + m + 0.5f : hz + 1.2f); zBias = 0f;
