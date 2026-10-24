@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.8.3";
+    private static final String APP_VERSION = "6.8.5";
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -4671,9 +4671,11 @@ public class MainActivity extends Activity {
             addBox(42f, 43.5f, 58f, 48f, -14.5f, -7.5f, bagTop, bagTop, bagMain, 0);
             // Tali bahu + tali dada menempel di depan badan (induk: badan, permukaan depan).
             attach(36f, 42f, 64f, 64f, -7f, 7f, 0);
+            if (!(girl && !hood)) {
             addBox(38f, 42.5f, 41.5f, 59f, 7.05f, 7.9f, bagDark, bagDark, bagDark, 0);
             addBox(58.5f, 42.5f, 62f, 59f, 7.05f, 7.9f, bagDark, bagDark, bagDark, 0);
             addBox(41.5f, 55.3f, 58.5f, 57.3f, 7.05f, 7.6f, col("#A5D6A7"), col("#A5D6A7"), col("#2E7D32"), 0);
+            }
             detach();
             // kaki / rok + sepatu
             float shoeTop = girl ? 85f : 83f;
@@ -4705,8 +4707,9 @@ public class MainActivity extends Activity {
                 int wh = (curHid >= 0) ? curHairC : col("#F7F7F7");
                 if (hijab) {
                     // Drape jilbab di dada: balok bulat yang menyatu dengan cangkang kepala
-                    addRBox(29f, 39f, 71f, 50f, -9f, 10.5f, 6f, 2.5f, 3f, 2f, 3f, wh, wh, wh, 0);
-                    addRBox(34f, 48f, 66f, 60f, -8f, 10f, 5f, 2f, 3f, 2.5f, 2.5f, wh, wh, wh, 0);
+                    addRBox(28f, 44f, 72f, 54f, -9f, 11f, 7f, 2f, 3f, 2f, 3f, wh, wh, wh, 0);
+                    addRBox(35f, 52f, 65f, 62f, -8f, 10f, 5f, 2f, 3f, 2f, 2.5f, wh, wh, wh, 0);
+                    addRBox(31f, 40f, 69f, 48f, -13f, 14f, 8f, 2f, 3f, 2f, 3f, wh, wh, wh, 0);
                 } else {
                     addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
                 }
@@ -4718,7 +4721,8 @@ public class MainActivity extends Activity {
             if (hijab) {
                 // Jilbab = satu cangkang bulat yang membungkus kepala; wajah dilukis sebagai bukaan (stiker)
                 srcRect(30.76f, 9.765f, 69.24f, 47.88f);
-                addRBox(hx0 - 2.5f, hy0 - 4.5f, hx1 + 2.5f, hy1 + 2f, -hz - 2.5f, hz, 9f, 4f, 4f, 3f, 3f, hc, hc, hc, 1);
+                addRBox(hx0 - 2.5f, hy0 - 2f, hx1 + 2.5f, hy1 + 2f, -hz - 2.5f, hz + 2.5f, 7f, 3f, 4f, 2f, 3f, hc, hc, hc, 1);
+                addRBox(hx0 + 1f, hy0 - 6f, hx1 - 1f, hy0 + 6f, -hz, hz - 2f, 9f, 3f, 4f, 2f, 3f, hc, hc, hc, 0);
             } else {
                 srcRect(33f, 14f, 67f, 46f);
                 addRBox(hx0, hy0, hx1, hy1, -hz, hz, 6f, 3f, 3f, 2.5f, 3f, skin, hc, hc, 1);
@@ -4948,7 +4952,7 @@ public class MainActivity extends Activity {
             c.drawRoundRect(rf, 11f * u, 11f * u, p);
             p.setStyle(Paint.Style.STROKE);
             p.setStrokeWidth(1.1f * u);
-            p.setColor(shade(curHairC, 0.8f));
+            p.setColor(shade(skinCol, 0.82f));
             c.drawRoundRect(rf, 11f * u, 11f * u, p);
             p.setStyle(Paint.Style.FILL);
         }
