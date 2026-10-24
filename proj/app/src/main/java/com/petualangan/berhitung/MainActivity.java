@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.7.1";
+    private static final String APP_VERSION = "6.8.0";
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -4181,6 +4181,13 @@ public class MainActivity extends Activity {
         private final int[] fc = new int[MAXF];
         private final int[] fk = new int[MAXF];
         private final int[] fo = new int[MAXF];
+        private final boolean[] fsm = new boolean[MAXF];
+        private final float[][] rpx = new float[4][16];
+        private final float[][] rpy = new float[4][16];
+        private final float[][] rpz = new float[4][16];
+        private final float[][] rox = new float[4][16];
+        private final float[][] roz = new float[4][16];
+        private final float[] roy = new float[4];
         private final float[] srcPts = new float[8];
         private final android.graphics.Matrix decalM = new android.graphics.Matrix();
         private int fn = 0;
@@ -4278,6 +4285,7 @@ public class MainActivity extends Activity {
                 int i = fn++;
                 fc[i] = shade(base, 0.64f + 0.52f * lit);
                 fk[i] = f == 0 ? kind : 0;
+                fsm[i] = false;
                 fz[i] = (pzs[q[0]] + pzs[q[1]] + pzs[q[2]] + pzs[q[3]]) / 4f + zBias;
                 if (parOn) {
                     boolean outer = f == 0 ? z1 >= par[5] - 0.001f
@@ -4307,6 +4315,160 @@ public class MainActivity extends Activity {
             srcOn = false;
         }
 
+        // Balok bersudut bulat (kepala L3): penampang kotak membulat (sudut 3 segmen) dengan bevel atas dan bawah.
+        // Stiker wajah (kind 1) dipetakan per sisi depan sehingga ikut melengkung mengikuti kepala.
+        private void addRBox(float x0, float y0, float x1, float y1, float z0, float z1,
+                             float r, float tT, float hT, float tB, float hB,
+                             int colSide, int colTop, int colBack, int kind) {
+            final int ns = 3;
+            final int n = 4 * (ns + 1);
+            roy[0] = y0;
+            roy[1] = y0 + hT;
+            roy[2] = y1 - hB;
+            roy[3] = y1;
+            for (int k = 0; k < 4; k++) {
+                float inset = k == 0 ? tT : (k == 3 ? tB : 0f);
+                float rr = Math.max(r - inset, 0.3f);
+                for (int cn = 0; cn < 4; cn++) {
+                    float ccx = (cn == 0 || cn == 1) ? x1 - r : x0 + r;
+                    float ccz = (cn == 0 || cn == 3) ? z1 - r : z0 + r;
+                    float a0 = cn == 0 ? 90f : (cn == 1 ? 0f : (cn == 2 ? -90f : 180f));
+                    float a1 = a0 - 90f;
+                    for (int sg = 0; sg <= ns; sg++) {
+                        double ang = Math.toRadians(a0 + (a1 - a0) * sg / ns);
+                        int idx = cn * (ns + 1) + sg;
+                        float ox2 = ccx + rr * (float) Math.cos(ang);
+                        float oz2 = ccz + rr * (float) Math.sin(ang);
+                        rox[k][idx] = ox2;
+                        roz[k][idx] = oz2;
+                        float x = ox2 - 50f;
+                        float y = roy[k] - 50f + yShift;
+                        float z = oz2 + zShift;
+                        float xr = x * c3t + z * s3t;
+                        float zr = -x * s3t + z * c3t;
+                        float y2 = y * c3p - zr * s3p;
+                        float z2 = y * s3p + zr * c3p;
+                        float sc = 260f / (260f - z2);
+                        rpx[k][idx] = fx(50f + xr * sc);
+                        rpy[k][idx] = fy(50f + y2 * sc);
+                        rpz[k][idx] = z2;
+                    }
+                }
+            }
+            for (int b = 0; b < 3; b++) {
+                for (int a = 0; a < n && fn < MAXF; a++) {
+                    int j = (a + 1) % n;
+                    float area = 0f;
+                    area += rpx[b][a] * rpy[b][j] - rpx[b][j] * rpy[b][a];
+                    area += rpx[b][j] * rpy[b + 1][j] - rpx[b + 1][j] * rpy[b][j];
+                    area += rpx[b + 1][j] * rpy[b + 1][a] - rpx[b + 1][a] * rpy[b + 1][j];
+                    area += rpx[b + 1][a] * rpy[b][a] - rpx[b][a] * rpy[b + 1][a];
+                    if (area <= 0f) {
+                        continue;
+                    }
+                    float ex = rox[b][j] - rox[b][a];
+                    float ez = roz[b][j] - roz[b][a];
+                    float len = (float) Math.sqrt(ex * ex + ez * ez);
+                    if (len < 0.0001f) {
+                        len = 1f;
+                    }
+                    float hnx = -ez / len;
+                    float hnz = ex / len;
+                    float nx = hnx;
+                    float ny = 0f;
+                    float nz = hnz;
+                    if (b == 0) {
+                        nx = hnx * hT;
+                        nz = hnz * hT;
+                        ny = -tT;
+                    } else if (b == 2) {
+                        nx = hnx * hB;
+                        nz = hnz * hB;
+                        ny = tB;
+                    }
+                    float nl = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+                    if (nl < 0.0001f) {
+                        nl = 1f;
+                    }
+                    nx /= nl;
+                    ny /= nl;
+                    nz /= nl;
+                    float nxr = nx * c3t + nz * s3t;
+                    float nzr = -nx * s3t + nz * c3t;
+                    float ny2 = ny * c3p - nzr * s3p;
+                    float nz2 = ny * s3p + nzr * c3p;
+                    float lit = Math.max(0f, nxr * -0.45f + ny2 * -0.7f + nz2 * 0.62f);
+                    int base = b == 0 ? colTop : (hnz < -0.5f ? colBack : colSide);
+                    int i = fn++;
+                    fc[i] = shade(base, 0.64f + 0.52f * lit);
+                    fz[i] = (rpz[b][a] + rpz[b][j] + rpz[b + 1][j] + rpz[b + 1][a]) / 4f + zBias;
+                    fsm[i] = true;
+                    fq[i * 8] = rpx[b][a];
+                    fq[i * 8 + 1] = rpy[b][a];
+                    fq[i * 8 + 2] = rpx[b][j];
+                    fq[i * 8 + 3] = rpy[b][j];
+                    fq[i * 8 + 4] = rpx[b + 1][j];
+                    fq[i * 8 + 5] = rpy[b + 1][j];
+                    fq[i * 8 + 6] = rpx[b + 1][a];
+                    fq[i * 8 + 7] = rpy[b + 1][a];
+                    boolean decalFace = kind != 0 && b == 1 && hnz > 0.2f && srcOn;
+                    fk[i] = decalFace ? kind : 0;
+                    float bw = x1 - x0;
+                    float bh = y1 - y0;
+                    if (decalFace && bw > 0f && bh > 0f) {
+                        fsrc[i * 4] = ovr[0] + (rox[1][a] - x0) / bw * (ovr[2] - ovr[0]);
+                        fsrc[i * 4 + 1] = ovr[1] + (roy[1] - y0) / bh * (ovr[3] - ovr[1]);
+                        fsrc[i * 4 + 2] = ovr[0] + (rox[1][j] - x0) / bw * (ovr[2] - ovr[0]);
+                        fsrc[i * 4 + 3] = ovr[1] + (roy[2] - y0) / bh * (ovr[3] - ovr[1]);
+                    } else {
+                        fsrc[i * 4] = x0;
+                        fsrc[i * 4 + 1] = y0;
+                        fsrc[i * 4 + 2] = x1;
+                        fsrc[i * 4 + 3] = y1;
+                    }
+                }
+            }
+            // tutup atas (kipas segitiga dari tengah)
+            float ccx2 = (x0 + x1) / 2f - 50f;
+            float ccz2 = (z0 + z1) / 2f + zShift;
+            float cy = y0 - 50f + yShift;
+            float cxr = ccx2 * c3t + ccz2 * s3t;
+            float czr = -ccx2 * s3t + ccz2 * c3t;
+            float cy2 = cy * c3p - czr * s3p;
+            float cz2 = cy * s3p + czr * c3p;
+            float csc = 260f / (260f - cz2);
+            float cpx = fx(50f + cxr * csc);
+            float cpy = fy(50f + cy2 * csc);
+            float capLit = Math.max(0f, (-1f * c3p + 0f) * -0.7f + (-1f * s3p) * 0.62f);
+            for (int a = 0; a < n && fn < MAXF; a++) {
+                int j = (a + 1) % n;
+                float area = cpx * rpy[0][j] - rpx[0][j] * cpy
+                        + rpx[0][j] * rpy[0][a] - rpx[0][a] * rpy[0][j]
+                        + rpx[0][a] * cpy - cpx * rpy[0][a];
+                if (area <= 0f) {
+                    continue;
+                }
+                int i = fn++;
+                fc[i] = shade(colTop, 0.64f + 0.52f * capLit);
+                fz[i] = (cz2 + rpz[0][j] + rpz[0][a]) / 3f + zBias;
+                fsm[i] = true;
+                fk[i] = 0;
+                fq[i * 8] = cpx;
+                fq[i * 8 + 1] = cpy;
+                fq[i * 8 + 2] = rpx[0][j];
+                fq[i * 8 + 3] = rpy[0][j];
+                fq[i * 8 + 4] = rpx[0][a];
+                fq[i * 8 + 5] = rpy[0][a];
+                fq[i * 8 + 6] = rpx[0][a];
+                fq[i * 8 + 7] = rpy[0][a];
+                fsrc[i * 4] = x0;
+                fsrc[i * 4 + 1] = y0;
+                fsrc[i * 4 + 2] = x1;
+                fsrc[i * 4 + 3] = y1;
+            }
+            srcOn = false;
+        }
+
         // Gambar stiker 2D di sisi depan sebuah balok, ikut miring dan menyempit mengikuti perspektif.
         private void decal(Canvas c, int i, int kind) {
             srcPts[0] = fx(fsrc[i * 4]);
@@ -4322,6 +4484,9 @@ public class MainActivity extends Activity {
             }
             c.save();
             c.concat(decalM);
+            if (fsm[i] && kind == 1) {
+                c.clipRect(srcPts[0] - 0.5f, srcPts[1], srcPts[4] + 0.5f, srcPts[5]);
+            }
             if (kind == 11) {
                 if (curHid == 42) {
                     rect(c, 31f, 20f, 38f, 58f, 3f, curHairC);
@@ -4372,13 +4537,13 @@ public class MainActivity extends Activity {
                 float minY = Math.min(Math.min(fq[o + 1], fq[o + 3]), Math.min(fq[o + 5], fq[o + 7]));
                 float maxY = Math.max(Math.max(fq[o + 1], fq[o + 3]), Math.max(fq[o + 5], fq[o + 7]));
                 p.setShader(new LinearGradient(minX, minY, maxX + 1f, maxY + 1f,
-                        shade(fc[i], 1.17f), shade(fc[i], 0.86f), Shader.TileMode.CLAMP));
+                        shade(fc[i], fsm[i] ? 1.04f : 1.17f), shade(fc[i], fsm[i] ? 0.96f : 0.86f), Shader.TileMode.CLAMP));
                 c.drawPath(path, p);
                 p.setShader(null);
                 p.setStyle(Paint.Style.STROKE);
                 p.setStrokeWidth(0.45f * u);
                 p.setStrokeJoin(Paint.Join.ROUND);
-                p.setColor(shade(fc[i], 0.78f));
+                p.setColor(fsm[i] ? fc[i] : shade(fc[i], 0.78f));
                 c.drawPath(path, p);
                 p.setStyle(Paint.Style.FILL);
                 if (fk[i] != 0) {
@@ -4530,7 +4695,7 @@ public class MainActivity extends Activity {
             yShift = headBob;
             int hc = hood ? col(HOOD_MAIN[animal]) : (hijab ? ((curHid >= 0) ? curHairC : col("#F7F7F7")) : curHairC);
             srcRect(33f, 14f, 67f, 46f);
-            addBox(hx0, hy0, hx1, hy1, -hz, hz, skin, hc, hc, 1);
+            addRBox(hx0, hy0, hx1, hy1, -hz, hz, 6f, 3f, 3f, 2.5f, 3f, skin, hc, hc, 1);
             attach(hx0, hy0, hx1, hy1, -hz, hz, -1);
             float m = (hood || hijab) ? 3f : 1.5f;
             // penutup atas + poni (stiker topi menempel di sisi depan balok ini)
