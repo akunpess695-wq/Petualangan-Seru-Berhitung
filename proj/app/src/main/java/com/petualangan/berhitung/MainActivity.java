@@ -4498,7 +4498,7 @@ public class MainActivity extends Activity {
             addBox(hx0 - m, hy0 - m, hx1 + m, backBottom, -hz - m, -hz + 3f, hc, hc, hc, 0);
             // sisi kepala
             float sideBottom = hood ? hy1 - 10f : hijab ? hy1 + 6f : (curHid == 42 ? hy1 + 8f : hy0 + 14f);
-            float sideZ1 = (hood || hijab) ? hz + m : 0f;
+            float sideZ1 = (hood || hijab) ? hz + m : hz - 7f;
             addBox(hx0 - m, hy0 - m, hx0 + 3f, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
             addBox(hx1 - 3f, hy0 - m, hx1 + m, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
             if (hood) {
