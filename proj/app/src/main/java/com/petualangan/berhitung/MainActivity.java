@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.9.0";
+    private static final String APP_VERSION = "6.10.0";
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -1277,7 +1277,7 @@ public class MainActivity extends Activity {
     }
 
     private String bestKey() {
-        return "best_k" + kelas + (mode == 7 ? "_b" + subj + (alamOn() ? "a" : "") : "") + (timed ? "_t" : "");
+        return "best_k" + kelas + (mode == 7 ? "_b" + subj + (alamOn() ? "a" : "") + (tebakOn() ? "g" : "") : "") + (timed ? "_t" : "");
     }
 
     private String timeLabel() {
@@ -1288,7 +1288,7 @@ public class MainActivity extends Activity {
         if (advLevel >= 0) {
             return "Petualangan \u2022 " + timeLabel();
         }
-        String base = mode == 7 ? (alamOn() ? "Kuis Alam \u2022 " : "") + SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
+        String base = mode == 7 ? (alamOn() ? "Kuis Alam \u2022 " : tebakOn() ? "Tebak Gambar \u2022 " : "") + SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
         return (relaxed && mode != 7) ? base + " \u2022 Santai" : base;
     }
 
@@ -2120,6 +2120,7 @@ public class MainActivity extends Activity {
         subj = s;
         advPart = -1;
         alam = false;
+        tebak = false;
         startGame(7);
     }
 
@@ -2561,6 +2562,10 @@ public class MainActivity extends Activity {
             buildAlam();
             return;
         }
+        if (tebakOn()) {
+            buildTebak();
+            return;
+        }
         if ((subj == 1 || subj == 2) && countBank(subj, kelas) == 0) {
             // Belum ada soal guru: pakai soal bawaan Bahasa Indonesia atau Inggris untuk kelas ini
             advPart = -1;
@@ -2888,7 +2893,7 @@ public class MainActivity extends Activity {
             return "Tabel " + tableN;
         }
         if (mode == 7) {
-            return alamOn() ? "Kuis Alam" : "Kuis soal";
+            return alamOn() ? "Kuis Alam" : tebakOn() ? "Tebak Gambar" : "Kuis soal";
         }
         if (mode == 5) {
             return "3 Bilangan";
@@ -4966,8 +4971,8 @@ public class MainActivity extends Activity {
             Path cp = new Path();
             cp.addRoundRect(rf, rr, rr, Path.Direction.CW);
             c.clipPath(cp);
-            p.setColor(col("#5B3A29"));
-            c.drawRect(fx(36f), fy(17f), fx(64f), fy(23.5f), p);
+            p.setColor(shade(skinCol, 0.9f));
+            c.drawRect(fx(36f), fy(17f), fx(64f), fy(21f), p);
             p.setStyle(Paint.Style.STROKE);
             p.setStrokeWidth(3.4f * u);
             p.setColor(shade(skinCol, 0.78f));
@@ -5913,6 +5918,9 @@ public class MainActivity extends Activity {
         }
         if (sj == 1 && susunAvailable(1)) {
             addModeButton(c, "\uD83D\uDCCB  Susun Kalimat", ORANGE, dh, () -> startSusun(1));
+        }
+        if (tebakAvailable(sj)) {
+            addModeButton(c, "\uD83D\uDDBC\uFE0F  Tebak Gambar", ORANGE, dh, () -> startTebak(sj));
         }
         addModeButton(c, "\uD83C\uDF3F  Kuis Alam", GREEN, dh, () -> startAlam(sj));
         ScrollView dsv = new ScrollView(this);
@@ -8414,7 +8422,66 @@ public class MainActivity extends Activity {
         subj = s;
         advPart = -1;
         alam = true;
+        tebak = false;
         startGame(7);
+    }
+
+    // ---------- Tebak Gambar (versi 6.10.0): "Ini gambar apa?", memakai set pasangan bergambar ----------
+    private boolean tebak;
+
+    private boolean tebakOn() {
+        return tebak && mode == 7 && advLevel < 0;
+    }
+
+    private boolean tebakAvailable(int s) {
+        String[][] pp = picturePairs(s, kelas);
+        return pp != null && pp.length >= 4;
+    }
+
+    private void startTebak(int s) {
+        subj = s;
+        advPart = -1;
+        alam = false;
+        tebak = true;
+        startGame(7);
+    }
+
+    private void buildTebak() {
+        String[][] pp = picturePairs(subj, kelas);
+        ArrayList<String[]> pool = new ArrayList<>();
+        if (pp != null) {
+            pool.addAll(distinctPairs(new ArrayList<>(Arrays.asList(pp))));
+        }
+        Collections.shuffle(pool, rnd);
+        total = Math.min(qCount(), pool.size());
+        for (int i = 0; i < total; i++) {
+            String[] it0 = pool.get(i);
+            ArrayList<String> wrong = new ArrayList<>();
+            for (String[] o : pool) {
+                if (o != it0) {
+                    wrong.add(o[1]);
+                }
+            }
+            Collections.shuffle(wrong, rnd);
+            ArrayList<String> opts = new ArrayList<>();
+            opts.add(it0[1]);
+            for (int j = 0; j < 3 && j < wrong.size(); j++) {
+                opts.add(wrong.get(j));
+            }
+            Collections.shuffle(opts, rnd);
+            Q q = new Q();
+            q.text = it0[0] + "\n" + (subj == 2 ? "What is this?" : "Ini gambar apa?");
+            q.full = q.text;
+            q.sopts = new String[4];
+            for (int j = 0; j < 4; j++) {
+                q.sopts[j] = opts.get(j % opts.size());
+                if (q.sopts[j].equals(it0[1])) {
+                    q.correctIdx = j;
+                }
+            }
+            q.expl = it0[0] + " = " + it0[1];
+            qs[i] = q;
+        }
     }
 
     private static final String[] ALAM_NAMA = {"Ani", "Budi", "Siti", "Dimas", "Rina", "Udin", "Dewi"};
