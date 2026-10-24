@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.8.0";
+    private static final String APP_VERSION = "6.8.1";
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -4531,6 +4531,7 @@ public class MainActivity extends Activity {
                 path.lineTo(fq[o + 6], fq[o + 7]);
                 path.close();
                 p.setStyle(Paint.Style.FILL);
+                p.setAlpha(255);
                 // Gradasi lembut pada tiap sisi balok agar bentuk terasa seperti mainan 3D.
                 float minX = Math.min(Math.min(fq[o], fq[o + 2]), Math.min(fq[o + 4], fq[o + 6]));
                 float maxX = Math.max(Math.max(fq[o], fq[o + 2]), Math.max(fq[o + 4], fq[o + 6]));
@@ -4548,6 +4549,10 @@ public class MainActivity extends Activity {
                 p.setStyle(Paint.Style.FILL);
                 if (fk[i] != 0) {
                     decal(c, i, fk[i]);
+                    // Stiker (mis. pipi 0x77) meninggalkan alpha di cat; kembalikan agar sisi berikutnya tidak tembus.
+                    p.setAlpha(255);
+                    p.setStyle(Paint.Style.FILL);
+                    p.setShader(null);
                 }
             }
         }
