@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.8.5";
+    private static final String APP_VERSION = "6.9.0";
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -4212,6 +4212,7 @@ public class MainActivity extends Activity {
         private float s3p = 0f;
         private int curHid = -1;
         private int curHairC = 0;
+        private int curHijabC = 0;
         private boolean curHood = false;
         private boolean curSkipFace = false; private float zBias = 0f; private boolean skipTop = false;
         // Penempelan: balok hiasan (rambut, tali tas) tidak boleh digambar sebelum permukaan induknya.
@@ -4707,9 +4708,10 @@ public class MainActivity extends Activity {
                 int wh = (curHid >= 0) ? curHairC : col("#F7F7F7");
                 if (hijab) {
                     // Drape jilbab di dada: balok bulat yang menyatu dengan cangkang kepala
-                    addRBox(28f, 44f, 72f, 54f, -9f, 11f, 7f, 2f, 3f, 2f, 3f, wh, wh, wh, 0);
-                    addRBox(35f, 52f, 65f, 62f, -8f, 10f, 5f, 2f, 3f, 2f, 2.5f, wh, wh, wh, 0);
-                    addRBox(31f, 40f, 69f, 48f, -13f, 14f, 8f, 2f, 3f, 2f, 3f, wh, wh, wh, 0);
+                    addRBox(36f, 56f, 64f, 65f, -7.5f, 10f, 5f, 2f, 3f, 2f, 2.5f, wh, wh, wh, 0);
+                    addRBox(30f, 49f, 70f, 59f, -8.5f, 11f, 6f, 2f, 3f, 2f, 3f, wh, wh, wh, 0);
+                    addRBox(25.5f, 42.5f, 74.5f, 53f, -9f, 11.5f, 7f, 2f, 3f, 2f, 3f, wh, wh, wh, 0);
+                    addRBox(30f, 38f, 70f, 47f, -14f, 15f, 8f, 2f, 3f, 2f, 3f, wh, wh, wh, 0);
                 } else {
                     addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
                 }
@@ -4717,12 +4719,13 @@ public class MainActivity extends Activity {
             // kepala (ikut bergerak halus naik-turun mengikuti napas)
             yShift = headBob;
             int hc = hood ? col(HOOD_MAIN[animal]) : (hijab ? ((curHid >= 0) ? curHairC : col("#F7F7F7")) : curHairC);
+            curHijabC = hc;
             float m = (hood || hijab) ? 3f : 1.5f;
             if (hijab) {
                 // Jilbab = satu cangkang bulat yang membungkus kepala; wajah dilukis sebagai bukaan (stiker)
                 srcRect(30.76f, 9.765f, 69.24f, 47.88f);
-                addRBox(hx0 - 2.5f, hy0 - 2f, hx1 + 2.5f, hy1 + 2f, -hz - 2.5f, hz + 2.5f, 7f, 3f, 4f, 2f, 3f, hc, hc, hc, 1);
-                addRBox(hx0 + 1f, hy0 - 6f, hx1 - 1f, hy0 + 6f, -hz, hz - 2f, 9f, 3f, 4f, 2f, 3f, hc, hc, hc, 0);
+                addRBox(hx0 - 2.5f, hy0 - 2f, hx1 + 2.5f, hy1 + 2f, -hz - 7f, hz + 3f, 7f, 3f, 5f, 2f, 4f, hc, hc, hc, 1);
+                addRBox(hx0 + 0.5f, hy0 - 7f, hx1 - 0.5f, hy0 + 7f, -hz - 4f, hz - 1f, 10f, 4f, 5f, 2f, 3f, hc, hc, hc, 0);
             } else {
                 srcRect(33f, 14f, 67f, 46f);
                 addRBox(hx0, hy0, hx1, hy1, -hz, hz, 6f, 3f, 3f, 2.5f, 3f, skin, hc, hc, 1);
@@ -4762,7 +4765,7 @@ public class MainActivity extends Activity {
                     addBox(hx0 - m, hy0 + 7f, hx1 + m, hy0 + 12f, hz - 1f, hz + m, hc, hc, hc, 0);
                 }
             }
-            float hairLift = 0f;
+            float hairLift = hijab ? 3f : 0f;
             if (!hood && !hijab && (curHid < 0 || curHid == 39)) {
                 addCurlyHair(hx0, hx1, hy0, hy1, hz, m, hc);
                 hairLift = 5f;
@@ -4946,14 +4949,30 @@ public class MainActivity extends Activity {
 
         // Bukaan wajah jilbab: kulit berbentuk persegi membulat dengan garis tepi searah warna jilbab
         private void drawHijabOpening(Canvas c, int skinCol) {
+            // Bingkai jilbab menonjol: cincin tebal (gelap di luar, terang di dalam), lalu bukaan kulit + poni + bayangan dalam
+            float rr = 11f * u;
             rf.set(fx(36.5f), fy(18f), fx(63.5f), fy(49f));
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(5.2f * u);
+            p.setColor(shade(curHijabC, 0.80f));
+            c.drawRoundRect(rf, rr, rr, p);
+            p.setStrokeWidth(3.2f * u);
+            p.setColor(shade(curHijabC, 1.06f));
+            c.drawRoundRect(rf, rr, rr, p);
             p.setStyle(Paint.Style.FILL);
             p.setColor(skinCol);
-            c.drawRoundRect(rf, 11f * u, 11f * u, p);
+            c.drawRoundRect(rf, rr, rr, p);
+            c.save();
+            Path cp = new Path();
+            cp.addRoundRect(rf, rr, rr, Path.Direction.CW);
+            c.clipPath(cp);
+            p.setColor(col("#5B3A29"));
+            c.drawRect(fx(36f), fy(17f), fx(64f), fy(23.5f), p);
             p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(1.1f * u);
-            p.setColor(shade(skinCol, 0.82f));
-            c.drawRoundRect(rf, 11f * u, 11f * u, p);
+            p.setStrokeWidth(3.4f * u);
+            p.setColor(shade(skinCol, 0.78f));
+            c.drawRoundRect(rf, rr, rr, p);
+            c.restore();
             p.setStyle(Paint.Style.FILL);
         }
 
