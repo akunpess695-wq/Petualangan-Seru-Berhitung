@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.7.0";
+    private static final String APP_VERSION = "6.7.1";
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -4204,6 +4204,20 @@ public class MainActivity extends Activity {
         private int curHairC = 0;
         private boolean curHood = false;
         private boolean curSkipFace = false; private float zBias = 0f; private boolean skipTop = false;
+        // Penempelan: balok hiasan (rambut, tali tas) tidak boleh digambar sebelum permukaan induknya.
+        private boolean parOn = false;
+        private int parAnchor = -1;
+        private final float[] par = new float[6];
+        private final float[] ppz = new float[8];
+        private void attach(float x0, float y0, float x1, float y1, float z0, float z1, int anchor) {
+            par[0] = x0; par[1] = y0; par[2] = x1; par[3] = y1; par[4] = z0; par[5] = z1;
+            parAnchor = anchor;
+            parOn = true;
+        }
+        private void detach() {
+            parOn = false;
+            parAnchor = -1;
+        }
         private float curHt = 13.5f;
 
         private int shade(int color, float k) {
@@ -4228,6 +4242,15 @@ public class MainActivity extends Activity {
                 pxs[i] = fx(50f + xr * sc);
                 pys[i] = fy(50f + y2 * sc);
                 pzs[i] = z2;
+            }
+            if (parOn) {
+                for (int i = 0; i < 8; i++) {
+                    float px = ((i & 1) != 0 ? par[2] : par[0]) - 50f;
+                    float py = ((i & 2) != 0 ? par[3] : par[1]) - 50f + yShift;
+                    float pz = ((i & 4) != 0 ? par[5] : par[4]) + zShift;
+                    float pzr = -px * s3t + pz * c3t;
+                    ppz[i] = py * s3p + pzr * c3p;
+                }
             }
             for (int f = 0; f < 5 && fn < MAXF; f++) {
                 if (f == 4 && skipTop) {
@@ -4256,6 +4279,22 @@ public class MainActivity extends Activity {
                 fc[i] = shade(base, 0.64f + 0.52f * lit);
                 fk[i] = f == 0 ? kind : 0;
                 fz[i] = (pzs[q[0]] + pzs[q[1]] + pzs[q[2]] + pzs[q[3]]) / 4f + zBias;
+                if (parOn) {
+                    boolean outer = f == 0 ? z1 >= par[5] - 0.001f
+                            : f == 1 ? z0 <= par[4] + 0.001f
+                            : f == 2 ? x1 >= par[2] - 0.001f
+                            : f == 3 ? x0 <= par[0] + 0.001f
+                            : y0 <= par[1] + 0.001f;
+                    int ref = outer ? f : parAnchor;
+                    if (ref >= 0) {
+                        int[] rq = BOX_FACES[ref];
+                        float pd = (ppz[rq[0]] + ppz[rq[1]] + ppz[rq[2]] + ppz[rq[3]]) / 4f;
+                        float own = fz[i] - zBias;
+                        if (own < pd + 0.05f) {
+                            fz[i] = pd + 0.05f + 0.0008f * own + zBias;
+                        }
+                    }
+                }
                 for (int k = 0; k < 4; k++) {
                     fq[i * 8 + k * 2] = pxs[q[k]];
                     fq[i * 8 + k * 2 + 1] = pys[q[k]];
@@ -4451,9 +4490,12 @@ public class MainActivity extends Activity {
             int bagDark = col("#1B5E20");
             addBox(39f, 45f, 61f, 61f, -13.5f, -7.2f, bagMain, bagTop, bagDark, 0);
             addBox(42f, 43.5f, 58f, 48f, -14.5f, -7.5f, bagTop, bagTop, bagMain, 0);
-            addBox(40f, 45f, 43.5f, 58f, 7.1f, 8.3f, bagDark, bagDark, bagDark, 0);
-            addBox(56.5f, 45f, 60f, 58f, 7.1f, 8.3f, bagDark, bagDark, bagDark, 0);
-            addBox(46f, 50f, 54f, 53f, 8.2f, 8.8f, col("#A5D6A7"), col("#A5D6A7"), col("#2E7D32"), 0);
+            // Tali bahu + tali dada menempel di depan badan (induk: badan, permukaan depan).
+            attach(36f, 42f, 64f, 64f, -7f, 7f, 0);
+            addBox(38f, 42.5f, 41.5f, 59f, 7.05f, 7.9f, bagDark, bagDark, bagDark, 0);
+            addBox(58.5f, 42.5f, 62f, 59f, 7.05f, 7.9f, bagDark, bagDark, bagDark, 0);
+            addBox(41.5f, 55.3f, 58.5f, 57.3f, 7.05f, 7.6f, col("#A5D6A7"), col("#A5D6A7"), col("#2E7D32"), 0);
+            detach();
             // kaki / rok + sepatu
             float shoeTop = girl ? 85f : 83f;
             if (girl) {
@@ -4489,6 +4531,7 @@ public class MainActivity extends Activity {
             int hc = hood ? col(HOOD_MAIN[animal]) : (hijab ? ((curHid >= 0) ? curHairC : col("#F7F7F7")) : curHairC);
             srcRect(33f, 14f, 67f, 46f);
             addBox(hx0, hy0, hx1, hy1, -hz, hz, skin, hc, hc, 1);
+            attach(hx0, hy0, hx1, hy1, -hz, hz, -1);
             float m = (hood || hijab) ? 3f : 1.5f;
             // penutup atas + poni (stiker topi menempel di sisi depan balok ini)
             srcRect(33f, 14f, 67f, 46f);
@@ -4527,6 +4570,7 @@ public class MainActivity extends Activity {
                 addCurlyHair(hx0, hx1, hy0, hy1, hz, m, hc);
                 hairLift = 5f;
             }
+            detach();
             curSkipFace = it[1] == 8 || it[1] == 10;
             if (it[0] >= 0) {
                 addHat3D(it[0], hy0 - m - 1.5f - hairLift);
