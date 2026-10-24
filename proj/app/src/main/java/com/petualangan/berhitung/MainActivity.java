@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.8.1";
+    private static final String APP_VERSION = "6.8.3";
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -4182,6 +4182,9 @@ public class MainActivity extends Activity {
         private final int[] fk = new int[MAXF];
         private final int[] fo = new int[MAXF];
         private final boolean[] fsm = new boolean[MAXF];
+        private final float[] flit = new float[MAXF];
+        private boolean curHijab = false;
+        private int curSkin = 0;
         private final float[][] rpx = new float[4][16];
         private final float[][] rpy = new float[4][16];
         private final float[][] rpz = new float[4][16];
@@ -4401,6 +4404,7 @@ public class MainActivity extends Activity {
                     int base = b == 0 ? colTop : (hnz < -0.5f ? colBack : colSide);
                     int i = fn++;
                     fc[i] = shade(base, 0.64f + 0.52f * lit);
+                    flit[i] = 0.64f + 0.52f * lit;
                     fz[i] = (rpz[b][a] + rpz[b][j] + rpz[b + 1][j] + rpz[b + 1][a]) / 4f + zBias;
                     fsm[i] = true;
                     fq[i * 8] = rpx[b][a];
@@ -4493,6 +4497,9 @@ public class MainActivity extends Activity {
                     rect(c, 62f, 20f, 69f, 58f, 3f, curHairC);
                 }
             } else if (kind == 1) {
+                if (curHijab) {
+                    drawHijabOpening(c, shade(curSkin, flit[i]));
+                }
                 drawFaceAll(c);
             } else if (kind == 4) {
                 drawHat(c, it[0], curHt);
@@ -4596,6 +4603,8 @@ public class MainActivity extends Activity {
             final boolean girl = gender == 1;
             final boolean hijab = girl && !hood;
             curHood = hood;
+            curHijab = hijab;
+            curSkin = skin;
             curHt = hood ? 8f : 13.5f;
             curHid = it[6];
             curHairC = curHid >= 0 ? col(itIcon(curHid)) : col("#4E342E");
@@ -4694,15 +4703,28 @@ public class MainActivity extends Activity {
             addBox(36f, 42f, 64f, 64f, -7f, 7f, shirt, shirt, shirt, 2); if (!girl) { zBias = 6f; skipTop = true; addBox(35.5f, 60.6f, 64.5f, 64.6f, -7.5f, 7.5f, col("#2B2B2B"), col("#2B2B2B"), col("#2B2B2B"), 0); skipTop = false; zBias = 0f; }
             if (girl) {
                 int wh = (curHid >= 0) ? curHairC : col("#F7F7F7");
-                addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
+                if (hijab) {
+                    // Drape jilbab di dada: balok bulat yang menyatu dengan cangkang kepala
+                    addRBox(29f, 39f, 71f, 50f, -9f, 10.5f, 6f, 2.5f, 3f, 2f, 3f, wh, wh, wh, 0);
+                    addRBox(34f, 48f, 66f, 60f, -8f, 10f, 5f, 2f, 3f, 2.5f, 2.5f, wh, wh, wh, 0);
+                } else {
+                    addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
+                }
             }
             // kepala (ikut bergerak halus naik-turun mengikuti napas)
             yShift = headBob;
             int hc = hood ? col(HOOD_MAIN[animal]) : (hijab ? ((curHid >= 0) ? curHairC : col("#F7F7F7")) : curHairC);
-            srcRect(33f, 14f, 67f, 46f);
-            addRBox(hx0, hy0, hx1, hy1, -hz, hz, 6f, 3f, 3f, 2.5f, 3f, skin, hc, hc, 1);
-            attach(hx0, hy0, hx1, hy1, -hz, hz, -1);
             float m = (hood || hijab) ? 3f : 1.5f;
+            if (hijab) {
+                // Jilbab = satu cangkang bulat yang membungkus kepala; wajah dilukis sebagai bukaan (stiker)
+                srcRect(30.76f, 9.765f, 69.24f, 47.88f);
+                addRBox(hx0 - 2.5f, hy0 - 4.5f, hx1 + 2.5f, hy1 + 2f, -hz - 2.5f, hz, 9f, 4f, 4f, 3f, 3f, hc, hc, hc, 1);
+            } else {
+                srcRect(33f, 14f, 67f, 46f);
+                addRBox(hx0, hy0, hx1, hy1, -hz, hz, 6f, 3f, 3f, 2.5f, 3f, skin, hc, hc, 1);
+            }
+            attach(hx0, hy0, hx1, hy1, -hz, hz, -1);
+            if (!hijab) {
             // penutup atas + poni (stiker topi menempel di sisi depan balok ini)
             srcRect(33f, 14f, 67f, 46f);
             addBox(hx0 - m, hy0 - m - 1.5f, hx1 + m, hy0 + 7f, -hz - m, hz + m, hc, hc, hc, 0);
@@ -4714,6 +4736,7 @@ public class MainActivity extends Activity {
             float sideZ1 = (hood || hijab) ? hz + m : hz - 7f;
             addBox(hx0 - m, hy0 - m, hx0 + 3f, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
             addBox(hx1 - 3f, hy0 - m, hx1 + m, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
+            }
             if (hood) {
                 // sedikit poni di dahi di bawah tudung
                 int bangC = (girl && curHid < 0) ? col("#F7F7F7") : curHairC; addBox(hx0 + 3f, hy0 + 7f, hx1 - 3f, hy0 + 11f, hz - 0.5f, hz + 0.8f, bangC, bangC, bangC, 0);
@@ -4746,7 +4769,7 @@ public class MainActivity extends Activity {
                 addHat3D(it[0], hy0 - m - 1.5f - hairLift);
             }
             if (curSkipFace) {
-                boolean cover = hood || hijab; zBias = c3t > 0.2f ? 40f : 0f; addGlasses3D(it[1], hx0, hx1, hz, cover ? m + 0.9f : 0.9f, cover ? -4f : 0f, cover ? hz + m + 0.5f : hz + 1.2f); zBias = 0f;
+                boolean cover = hood || hijab; zBias = c3t > 0.2f ? 40f : 0f; addGlasses3D(it[1], hx0, hx1, hz, hijab ? 3.8f : (cover ? m + 0.9f : 0.9f), cover ? -4f : 0f, hijab ? hz + 1.2f : (cover ? hz + m + 0.5f : hz + 1.2f)); zBias = 0f;
             }
             yShift = 0f;
             flushFaces(c);
@@ -4820,6 +4843,10 @@ public class MainActivity extends Activity {
                 bx(48.3f, ey - 1.5f, 51.7f, ey - 0.3f, hz, hz + 1.2f, fr);
                 bx(hx0 - off, ey - 1.5f, hx0 - off + 1.2f, ey - 0.3f, zb, zf, fr);
                 bx(hx1 + off - 1.2f, ey - 1.5f, hx1 + off, ey - 0.3f, zb, zf, fr);
+                if (curHijab) {
+                    bx(hx0 - off, ey - 1.5f, 37.3f, ey - 0.3f, hz, hz + 1.2f, fr);
+                    bx(62.7f, ey - 1.5f, hx1 + off, ey - 0.3f, hz, hz + 1.2f, fr);
+                }
             } else {
                 int dk = col("#111111");
                 for (int k = 0; k < 2; k++) {
@@ -4829,6 +4856,10 @@ public class MainActivity extends Activity {
                 bx(48.5f, ey - 2.5f, 51.5f, ey - 1f, hz, hz + 1.2f, dk);
                 bx(hx0 - off, ey - 2.5f, hx0 - off + 1.2f, ey - 1f, zb, zf, dk);
                 bx(hx1 + off - 1.2f, ey - 2.5f, hx1 + off, ey - 1f, zb, zf, dk);
+                if (curHijab) {
+                    bx(hx0 - off, ey - 2.5f, 36.3f, ey - 1f, hz, hz + 1.2f, dk);
+                    bx(63.7f, ey - 2.5f, hx1 + off, ey - 1f, hz, hz + 1.2f, dk);
+                }
             }
         }
 
@@ -4907,6 +4938,19 @@ public class MainActivity extends Activity {
             c.drawPath(path, p);
             p.setStyle(Paint.Style.FILL);
             dot(c, 45f, 50.6f, 1.3f, col("#FFC107"));
+        }
+
+        // Bukaan wajah jilbab: kulit berbentuk persegi membulat dengan garis tepi searah warna jilbab
+        private void drawHijabOpening(Canvas c, int skinCol) {
+            rf.set(fx(36.5f), fy(18f), fx(63.5f), fy(49f));
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(skinCol);
+            c.drawRoundRect(rf, 11f * u, 11f * u, p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(1.1f * u);
+            p.setColor(shade(curHairC, 0.8f));
+            c.drawRoundRect(rf, 11f * u, 11f * u, p);
+            p.setStyle(Paint.Style.FILL);
         }
 
         private void drawFaceAll(Canvas c) {
