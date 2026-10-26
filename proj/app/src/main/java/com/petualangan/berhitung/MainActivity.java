@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.13.0";
+    private static final String APP_VERSION = "6.14.0";
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -4824,7 +4824,7 @@ public class MainActivity extends Activity {
             final float hy0 = 8f;
             final float hy1 = 42f;
             final float hz = 17f;
-            float armLen = longSleeve ? 19f : 11f;
+            float armLen = (longSleeve || girl) ? 19f : 11f; // v6.14.0: putri selalu berlengan panjang (hanya telapak tangan terlihat)
 
             fn = 0;
             // Tas sekolah 3D di punggung. Kedalaman negatif membuatnya berada di belakang badan.
@@ -4832,8 +4832,11 @@ public class MainActivity extends Activity {
             int bagMain = col("#2E7D32");
             int bagTop = col("#43A047");
             int bagDark = col("#1B5E20");
-            addBox(39f, 45f, 61f, 61f, -13.5f, -7.2f, bagMain, bagTop, bagDark, 0);
-            addBox(42f, 43.5f, 58f, 48f, -14.5f, -7.5f, bagTop, bagTop, bagMain, 0);
+            // v6.14.0: untuk putri tas turun (y +5) dan mundur (z -3.5) agar berada di atas kain kerudung.
+            final float bdy = girl ? 5f : 0f;
+            final float bdz = girl ? -3.5f : 0f;
+            addBox(39f, 45f + bdy, 61f, 61f + bdy, -13.5f + bdz, -7.2f + bdz, bagMain, bagTop, bagDark, 0);
+            addBox(42f, 43.5f + bdy, 58f, 48f + bdy, -14.5f + bdz, -7.5f + bdz, bagTop, bagTop, bagMain, 0);
             // Tali bahu + tali dada menempel di depan badan (induk: badan, permukaan depan).
             attach(36f, 42f, 64f, TORSO_BOT, -7f, 7f, 0);
             if (!(girl && !hood)) {
@@ -4845,12 +4848,9 @@ public class MainActivity extends Activity {
             // kaki / rok + sepatu
             float shoeTop = 83f;
             if (girl) {
-                // Rok v6.13.3: A-line pendek (sampai lutut), lalu dua kaki berkaos kaki putih seperti putra.
-                addRBox(36f, 65f, 64f, 76f, -7.2f, 7.2f, 6.5f, 1f, 2f, 1f, 2f, red, red, red, 0);
-                addRBox(34.5f, 72f, 65.5f, 78.5f, -7.8f, 7.8f, 6.5f, 0.8f, 1f, 0.8f, 1.5f, red, red, red, 0);
-                int sock = col("#F5F5F5");
-                addRBox(39f, 77f, 49.5f, 83.5f, -4.8f, 4.8f, 4f, 0.5f, 1f, 0.5f, 1f, sock, sock, sock, 0);
-                addRBox(50.5f, 77f, 61f, 83.5f, -4.8f, 4.8f, 4f, 0.5f, 1f, 0.5f, 1f, sock, sock, sock, 0);
+                // Rok v6.14.0: rok panjang A-line sampai mata kaki, kaki tidak terlihat (hanya sepatu).
+                addRBox(36f, 64.5f, 64f, 77f, -7.2f, 7.2f, 6.5f, 1f, 2f, 1f, 2f, red, red, red, 0);
+                addRBox(34f, 73f, 66f, 84.4f, -8.2f, 8.2f, 7f, 0.8f, 1.2f, 0.8f, 1.2f, red, red, red, 0);
             } else {
                 addRBox(38f, 65f, 49.7f, 83f, -5.5f, 5.5f, 5f, 1f, 2f, 1f, 2f, red, red, red, 0);
                 addRBox(50.3f, 65f, 62f, 83f, -5.5f, 5.5f, 5f, 1f, 2f, 1f, 2f, red, red, red, 0);
@@ -4880,14 +4880,10 @@ public class MainActivity extends Activity {
                 addRBox(33.2f, 41.6f, 66.8f, 49.5f, -5.6f, 5.6f, 4.8f, 1.5f, 2f, 1f, 2f, shirt, shirt, shirt, 0);
             }
             if (girl) {
+                // v6.14.0: kain kerudung jatuh menutup leher, bahu, dada atas dan punggung atas (aurat tertutup).
                 int wh = (curHid >= 0) ? curHairC : col("#F7F7F7");
-                if (hijab) {
-                    // Jilbab v6.13.1: cape bahu membulat (jatuh dari kepala ke dada), tanpa corong.
-                    int whd = shade(wh, 0.93f);
-                    addRBox(34f, 38f, 66f, 52f, -8f, 9.5f, 7f, 4f, 4f, 1.5f, 4f, wh, shade(wh, 1.04f), whd, 0);
-                } else {
-                    addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
-                }
+                int whd = shade(wh, 0.93f);
+                addRBox(34f, 38.5f, 66f, 55f, -10f, 10.5f, 8f, 4f, 4f, 3f, 4f, wh, shade(wh, 1.04f), whd, 0);
             }
             // kepala (ikut bergerak halus naik-turun mengikuti napas)
             yShift = headBob - HEAD_LIFT;
@@ -4897,7 +4893,7 @@ public class MainActivity extends Activity {
             float m = hood ? 3f : 1.5f;
             {
                 srcRect(33f, 14f, 67f, 46f);
-                addRBox(hx0, hy0, hx1, hy1, -hz, hz, 10f, 4f, 3.5f, 3f, 3f, hijab ? hc : skin, hc, hc, 1);
+                addRBox(hx0, hy0, hx1, hy1, -hz, hz, hijab ? 11.5f : 10f, hijab ? 5f : 4f, hijab ? 4.5f : 3.5f, 3f, 3f, hijab ? hc : skin, hc, hc, 1);
             }
             attach(hx0, hy0, hx1, hy1, -hz, hz, -1);
             if (!hijab) {
@@ -4915,7 +4911,7 @@ public class MainActivity extends Activity {
             }
             if (hijab) {
                 // Kerudung v6.13.4: kepala sendiri berwarna kain (wajah = bukaan oval), ditambah kain belakang yang jatuh ke bahu.
-                addRBox(hx0 - 0.5f, hy0 + 3f, hx1 + 0.5f, hy1 + 7f, -hz - 1.5f, -4f, 7f, 0f, 0f, 3f, 5f, shade(hc, 0.96f), hc, shade(hc, 0.92f), 0);
+                addRBox(hx0 - 0.5f, hy0 + 3f, hx1 + 0.5f, hy1 - 1f, -hz - 1.5f, -4f, 9f, 0f, 0f, 3f, 5f, shade(hc, 0.96f), hc, shade(hc, 0.92f), 0);
             }
             if (hood) {
                 // sedikit poni di dahi di bawah tudung
@@ -5321,7 +5317,7 @@ public class MainActivity extends Activity {
 
             int pants = col("#C62828"); if (it[5] >= 0) { String[] cp = itIcon(it[5]).split(","); if (cp.length > 2) { pants = col(cp[2]); } }
             if (gender == 1) {
-                rect(c, 35f, 64f, 65f, 86f, 3f, pants);
+                rect(c, 35f, 64f, 65f, 86f, 3f, pants); // rok panjang sampai mata kaki
             } else {
                 rect(c, 38f, 66f, 49.6f, 87f, 2f, pants);
                 rect(c, 50.4f, 66f, 62f, 87f, 2f, pants);
@@ -5339,7 +5335,7 @@ public class MainActivity extends Activity {
                 slvC = col(cs[1]);
                 longSleeve = true;
             }
-            float armEnd = longSleeve ? 61f : 53f;
+            float armEnd = (longSleeve || gender == 1) ? 61f : 53f;
             rect(c, 24f, 45f, 34f, 67f, 2.5f, skin);
             rect(c, 66f, 45f, 76f, 67f, 2.5f, skin);
             rect(c, 24f, 45f, 34f, armEnd, 2.5f, slvC);
@@ -5360,7 +5356,7 @@ public class MainActivity extends Activity {
             if (hijab2d) {
                 int wh = (hid >= 0) ? hairC : col("#F7F7F7");
                 hoodRects(c, wh, 0f);
-                rect(c, 36f, 45f, 64f, 53f, 3f, wh);
+                rect(c, 35f, 44f, 65f, 58f, 3f, wh); // v6.14.0: kain menutup leher dan dada atas
             } else {
                 drawHair(c, hid, hairC, hood);
             }
