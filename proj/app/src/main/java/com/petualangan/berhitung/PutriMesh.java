@@ -28,7 +28,7 @@ final class PutriMesh {
             PINK = {1.0, 0.66, 0.66}, HIJ = {0.93, 0.93, 0.97};
     static final double[] HC = {0, 70.5, 0.5}, HR = {12.2, 13.2, 11.8};
     static final double[][] TORSO = {{62, 6.0, 5.5, 0, 0}, {56, 8.5, 6.5, 0, 0}, {52, 12.5, 8, 0, 0}, {46, 11.5, 7.6, 0, 0}, {38, 10, 7, 0, 0}, {34, 9.6, 6.8, 0, 0}};
-    static final double[][] CAPE = {{62, 8.6, 8.0, 0, 0}, {58, 11.2, 9.2, 0, 0}, {54, 13.8, 10.0, 0, -0.3}, {48, 13.2, 9.6, 0, -0.3}, {42, 12.0, 9.0, 0, -0.3}, {36, 11.0, 8.4, 0, -0.2}};
+    static final double[][] CAPE = {{62, 8.6, 8.0, 0, 0}, {58, 12.2, 10.2, 0, 0}, {54, 14.0, 10.4, 0, -0.3}, {48, 13.2, 9.6, 0, -0.3}, {42, 12.0, 9.0, 0, -0.3}, {36, 11.0, 8.4, 0, -0.2}};
     static final double[][] SKIRT = {{40, 10.2, 7.6, 0, 0}, {36, 10.4, 7.8, 0, 0}, {25, 11.6, 9.0, 0, 0}, {14, 13.0, 10.4, 0, 0}, {8, 13.6, 11, 0, 0}};
 
     static double onHead(double x, double y, double off) {
@@ -206,21 +206,21 @@ final class PutriMesh {
         M.loft(TORSO, WHITE, 48, 16, null, null);
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg;
-            double[][] path = {{s * 13.2, 49, 0}, {s * 14.8, 43, 0.8}, {s * 16.0, 36, 2.0}, {s * 16.8, 30.5, 3.2}, {s * 17.2, 28.5, 3.5}};
-            double[] rd = {4.2, 3.8, 3.5, 3.9, 4.7};
+            double[][] path = {{s * 13.2, 49, 0}, {s * 14.8, 43, 0.8}, {s * 16.0, 36, 2.0}, {s * 16.8, 31.0, 3.2}, {s * 17.1, 27.8, 3.5}};
+            double[] rd = {4.2, 3.8, 3.5, 3.7, 4.0};
             double[][] rad = new double[5][];
             for (int i = 0; i < 5; i++) rad[i] = new double[]{rd[i], rd[i]};
             M.tube(path, rad, WHITE, 16);
-            M.ellipsoid(new double[]{s * 17.5, 25.2, 3.9}, new double[]{3.0, 3.9, 2.6}, SKIN, 18, 12);
+            M.ellipsoid(new double[]{s * 17.1, 25.6, 3.5}, new double[]{2.9, 4.4, 2.5}, SKIN, 18, 12);
         }
-        M.superbox(new double[]{0, 37.5, -11.6}, new double[]{9.4, 9.0, 3.8}, BAG, 0.32, 36, 20);
-        M.superbox(new double[]{0, 40.0, -15.0}, new double[]{9.6, 6.2, 0.9}, BAG, 0.30, 36, 20);
-        M.superbox(new double[]{0, 37.5, -16.1}, new double[]{1.6, 1.3, 0.5}, new double[]{0.62, 0.62, 0.66}, 0.3, 16, 8);
+        M.superbox(new double[]{0, 35.0, -11.6}, new double[]{9.4, 9.0, 3.8}, BAG, 0.32, 36, 20);
+        M.superbox(new double[]{0, 37.5, -15.0}, new double[]{9.6, 6.2, 0.9}, BAG, 0.30, 36, 20);
+        M.superbox(new double[]{0, 35.0, -16.1}, new double[]{1.6, 1.3, 0.5}, new double[]{0.62, 0.62, 0.66}, 0.3, 16, 8);
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg;
-            double[][] pth = {{s * 7.2, 45, -9.0}, {s * 10.0, 53, -5.5}, {s * 11.4, 54, 0.5},
+            double[][] pth = {{s * 6.8, 42.5, -10.5}, {s * 9.2, 49, -8.0}, {s * 10.6, 53, -5.0}, {s * 11.4, 54, 0.5},
                     {s * 10.5, 49, tz(10.5, 49) + 1.0}, {s * 9.8, 42, tz(9.8, 42) + 1.0}, {s * 9.6, 36, tz(9.6, 36) + 0.9}};
-            M.tube(pth, rr(6, 1.5, 0.55), BAG, 8);
+            M.tube(pth, rr(7, 1.5, 0.55), BAG, 8);
         }
         // kepala + wajah
         M.ellipsoid(HC, HR, SKIN, 48, 28);
@@ -249,9 +249,9 @@ final class PutriMesh {
                             double back = clamp((-(v[2] - HJC[2]) / HJR[2] - 0.1) / 0.9);
                             double low = clamp((HJC[1] + 3 - v[1]) / HJR[1]);
                             double w = back * low;
-                            v[1] -= 16.0 * Math.pow(w, 1.4);
-                            v[0] *= 1 - 0.5 * w;
-                            v[2] -= 1.5 * w;
+                            v[1] -= 7.0 * Math.pow(w, 1.4);
+                            v[0] *= 1 - 0.15 * w;
+                            v[2] -= 0.5 * w;
                         }
                 });
         double[][] rim = new double[57][];

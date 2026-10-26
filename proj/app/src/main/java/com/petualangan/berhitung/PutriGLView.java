@@ -18,24 +18,29 @@ import javax.microedition.khronos.opengles.GL10;
 
 /**
  * Tampilan 3D putri (Tahap E). Pakai: addView(new PutriGLView(ctx)), dan teruskan
- * onResume()/onPause() dari Activity. Geser jari = putar. Latar transparan.
+ * onResume()/onPause() dari Activity. Geser jari = putar. Latar opak putih (setBackgroundRgb untuk mengganti).
  * Tidak mengubah AvatarView lama.
  */
 final class PutriGLView extends GLSurfaceView {
     private static PutriMesh sMesh; // dibuat sekali, dipakai ulang
 
     private volatile float yaw = 0f, pitch = 0f; // derajat
+    private volatile float bgR = 1f, bgG = 1f, bgB = 1f; // warna latar (default putih = warna kartu)
     private float lastX, lastY;
     private final Renderer renderer = new Renderer();
 
     PutriGLView(Context ctx) {
         super(ctx);
         setEGLContextClientVersion(2);
-        setEGLConfigChooser(8, 8, 8, 8, 16, 0); // RGBA + depth 16
-        getHolder().setFormat(PixelFormat.TRANSLUCENT);
-        setZOrderMediaOverlay(true);
+        setEGLConfigChooser(8, 8, 8, 0, 16, 0); // RGB + depth 16
+        getHolder().setFormat(PixelFormat.OPAQUE); // latar opak (transparan menghasilkan kotak hitam)
         setRenderer(renderer);
         setRenderMode(RENDERMODE_WHEN_DIRTY);
+    }
+
+    /** Warna latar (0xRRGGBB); harus sama dengan kartu induk karena tampilan ini opak. Panggil sebelum tampil. */
+    void setBackgroundRgb(int rgb) {
+        bgR = ((rgb >> 16) & 255) / 255f; bgG = ((rgb >> 8) & 255) / 255f; bgB = (rgb & 255) / 255f;
     }
 
     void setAngles(float yawDeg, float pitchDeg) {
@@ -106,7 +111,7 @@ final class PutriGLView extends GLSurfaceView {
 
         @Override
         public void onSurfaceCreated(GL10 gl, EGLConfig cfg) {
-            GLES20.glClearColor(0f, 0f, 0f, 0f);
+            GLES20.glClearColor(bgR, bgG, bgB, 1f);
             GLES20.glEnable(GLES20.GL_DEPTH_TEST);
             GLES20.glDisable(GLES20.GL_CULL_FACE); // dua sisi, seperti pratinjau
             prog = link(compile(GLES20.GL_VERTEX_SHADER, VS), compile(GLES20.GL_FRAGMENT_SHADER, FS));
