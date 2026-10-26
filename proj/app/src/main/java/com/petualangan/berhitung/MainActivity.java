@@ -78,7 +78,10 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.14.0";
+    private static final String APP_VERSION = "6.15.0";
+    // Tahap E: putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
+    private static final boolean USE_PUTRI_GL = true;
+    private PutriGLView putriGL;
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -757,12 +760,14 @@ public class MainActivity extends Activity {
             handler.removeCallbacksAndMessages(null);
         }
         pauseGame();
+        if (putriGL != null) putriGL.onPause();
         super.onPause();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        if (putriGL != null) putriGL.onResume();
         resumeGame();
     }
 
@@ -5832,7 +5837,13 @@ public class MainActivity extends Activity {
 
         LinearLayout pv = card();
         pv.setGravity(Gravity.CENTER_HORIZONTAL);
-        pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(250), dp(250)));
+        if (USE_PUTRI_GL && genderOf[shopPl] == 1) {
+            putriGL = new PutriGLView(this);
+            pv.addView(putriGL, new LinearLayout.LayoutParams(dp(250), dp(250)));
+        } else {
+            putriGL = null;
+            pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(250), dp(250)));
+        }
         LinearLayout gr = new LinearLayout(this);
         gr.setOrientation(LinearLayout.HORIZONTAL);
         for (int g = 0; g < 2; g++) {
