@@ -4712,11 +4712,10 @@ public class MainActivity extends Activity {
             if (girl) {
                 int wh = (curHid >= 0) ? curHairC : col("#F7F7F7");
                 if (hijab) {
-                    // Drape jilbab di dada: balok bulat yang menyatu dengan cangkang kepala
-                    addRBox(36f, 56f, 64f, 65f, -7.5f, 10f, 5f, 2f, 3f, 2f, 2.5f, wh, wh, wh, 0);
-                    addRBox(30f, 49f, 70f, 59f, -8.5f, 11f, 6f, 2f, 3f, 2f, 3f, wh, wh, wh, 0);
-                    addRBox(25.5f, 42.5f, 74.5f, 53f, -9f, 11.5f, 7f, 2f, 3f, 2f, 3f, wh, wh, wh, 0);
-                    addRBox(30f, 38f, 70f, 47f, -14f, 15f, 8f, 2f, 3f, 2f, 3f, wh, wh, wh, 0);
+                    // Drape jilbab: jatuh dari bahu ke dada, meruncing halus (bahu lebar, dada lebih sempit)
+                    addRBox(35f, 57f, 65f, 66f, -8f, 11f, 4.5f, 1.5f, 2f, 1.5f, 2.5f, wh, wh, wh, 0);
+                    addRBox(31.5f, 49f, 68.5f, 59f, -9f, 11.5f, 5f, 1.5f, 2.5f, 1.5f, 3f, wh, wh, wh, 0);
+                    addRBox(29f, 41f, 71f, 51f, -9.5f, 12f, 6f, 2f, 3f, 1.5f, 3f, wh, wh, wh, 0);
                 } else {
                     addBox(34f, 42f, 66f, 53f, 6.5f, 9f, wh, wh, wh, 0);
                 }
@@ -4729,8 +4728,7 @@ public class MainActivity extends Activity {
             if (hijab) {
                 // Jilbab = satu cangkang bulat yang membungkus kepala; wajah dilukis sebagai bukaan (stiker)
                 srcRect(30.76f, 9.765f, 69.24f, 47.88f);
-                addRBox(hx0 - 2.5f, hy0 - 2f, hx1 + 2.5f, hy1 + 2f, -hz - 7f, hz + 3f, 7f, 3f, 5f, 2f, 4f, hc, hc, hc, 1);
-                addRBox(hx0 + 0.5f, hy0 - 7f, hx1 - 0.5f, hy0 + 7f, -hz - 4f, hz - 1f, 10f, 4f, 5f, 2f, 3f, hc, hc, hc, 0);
+                addRBox(hx0 - 2.5f, hy0 - 2f, hx1 + 2.5f, hy1 + 2f, -hz - 7f, hz + 3f, 8f, 4.5f, 6f, 2.5f, 4f, hc, hc, hc, 1);
             } else {
                 srcRect(33f, 14f, 67f, 46f);
                 addRBox(hx0, hy0, hx1, hy1, -hz, hz, 6f, 3f, 3f, 2.5f, 3f, skin, hc, hc, 1);
@@ -4770,7 +4768,7 @@ public class MainActivity extends Activity {
                     addBox(hx0 - m, hy0 + 7f, hx1 + m, hy0 + 12f, hz - 1f, hz + m, hc, hc, hc, 0);
                 }
             }
-            float hairLift = hijab ? 3f : 0f;
+            float hairLift = hijab ? -2.7f : 0f;
             if (!hood && !hijab && (curHid < 0 || curHid == 39)) {
                 addCurlyHair(hx0, hx1, hy0, hy1, hz, m, hc);
                 hairLift = 5f;
@@ -4954,29 +4952,26 @@ public class MainActivity extends Activity {
 
         // Bukaan wajah jilbab: kulit berbentuk persegi membulat dengan garis tepi searah warna jilbab
         private void drawHijabOpening(Canvas c, int skinCol) {
-            // Bingkai jilbab menonjol: cincin tebal (gelap di luar, terang di dalam), lalu bukaan kulit + poni + bayangan dalam
-            float rr = 11f * u;
-            rf.set(fx(36.5f), fy(18f), fx(63.5f), fy(49f));
+            // Bukaan wajah oval membulat dengan tepi kain tipis (gelap di luar, terang di dalam)
+            float rr = 12f * u;
+            rf.set(fx(37f), fy(17f), fx(63f), fy(43f));
             p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(5.2f * u);
-            p.setColor(shade(curHijabC, 0.80f));
+            p.setStrokeWidth(4f * u);
+            p.setColor(shade(curHijabC, 0.86f));
             c.drawRoundRect(rf, rr, rr, p);
-            p.setStrokeWidth(3.2f * u);
-            p.setColor(shade(curHijabC, 1.06f));
+            p.setStrokeWidth(2.2f * u);
+            p.setColor(shade(curHijabC, 1.05f));
             c.drawRoundRect(rf, rr, rr, p);
             p.setStyle(Paint.Style.FILL);
             p.setColor(skinCol);
             c.drawRoundRect(rf, rr, rr, p);
+            // bayangan lembut di dahi tempat kain menaungi kulit
             c.save();
             Path cp = new Path();
             cp.addRoundRect(rf, rr, rr, Path.Direction.CW);
             c.clipPath(cp);
             p.setColor(shade(skinCol, 0.9f));
-            c.drawRect(fx(36f), fy(17f), fx(64f), fy(21f), p);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(3.4f * u);
-            p.setColor(shade(skinCol, 0.78f));
-            c.drawRoundRect(rf, rr, rr, p);
+            c.drawRect(fx(36f), fy(16f), fx(64f), fy(20.5f), p);
             c.restore();
             p.setStyle(Paint.Style.FILL);
         }
