@@ -4766,7 +4766,7 @@ public class MainActivity extends Activity {
             final boolean girl = gender == 1;
             final boolean hijab = girl && !hood;
             curHood = hood;
-            curHijab = false; // v6.13.1: jilbab dibuat sebagai bingkai kain (bukan cangkang), jadi jalur bukaan-wajah lama dimatikan
+            curHijab = hijab; // v6.13.4: kepala berukuran sama dengan putra, berwarna kain; wajah = bukaan oval (stiker)
             curSkin = skin;
             curHt = hood ? 8f : 13.5f;
             curHid = it[6];
@@ -4894,10 +4894,10 @@ public class MainActivity extends Activity {
             hs = HEAD_SCALE;
             int hc = hood ? col(HOOD_MAIN[animal]) : (hijab ? ((curHid >= 0) ? curHairC : col("#F7F7F7")) : curHairC);
             curHijabC = hc;
-            float m = hood ? 3f : (hijab ? 2f : 1.5f);
+            float m = hood ? 3f : 1.5f;
             {
                 srcRect(33f, 14f, 67f, 46f);
-                addRBox(hx0, hy0, hx1, hy1, -hz, hz, 10f, 4f, 3.5f, 3f, 3f, skin, hc, hc, 1);
+                addRBox(hx0, hy0, hx1, hy1, -hz, hz, 10f, 4f, 3.5f, 3f, 3f, hijab ? hc : skin, hc, hc, 1);
             }
             attach(hx0, hy0, hx1, hy1, -hz, hz, -1);
             if (!hijab) {
@@ -4914,11 +4914,8 @@ public class MainActivity extends Activity {
             addBox(hx1 - 3f, hy0 - m, hx1 + m, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
             }
             if (hijab) {
-                // Kerudung v6.13.2: kubah dahi + kain belakang + dua pipi tipis, semua membulat dan rapat ke kepala.
-                addRBox(hx0 - m, hy0 - 3f, hx1 + m, hy0 + 8f, -hz - m, hz + 0.8f, 10f, 4.5f, 4.5f, 0f, 0f, hc, shade(hc, 1.04f), hc, 0);
-                addRBox(hx0 - m, hy0 + 2f, hx1 + m, hy1 + 7f, -hz - m, -2f, 8f, 0f, 0f, 3f, 5f, shade(hc, 0.96f), hc, shade(hc, 0.92f), 0);
-                addRBox(hx0 - m, hy0 + 6f, hx0 + 2.5f, hy1 + 1f, -2f, hz + 0.8f, 2.2f, 0f, 0f, 1f, 3f, shade(hc, 0.97f), hc, hc, 0);
-                addRBox(hx1 - 2.5f, hy0 + 6f, hx1 + m, hy1 + 1f, -2f, hz + 0.8f, 2.2f, 0f, 0f, 1f, 3f, shade(hc, 0.97f), hc, hc, 0);
+                // Kerudung v6.13.4: kepala sendiri berwarna kain (wajah = bukaan oval), ditambah kain belakang yang jatuh ke bahu.
+                addRBox(hx0 - 0.5f, hy0 + 3f, hx1 + 0.5f, hy1 + 7f, -hz - 1.5f, -4f, 7f, 0f, 0f, 3f, 5f, shade(hc, 0.96f), hc, shade(hc, 0.92f), 0);
             }
             if (hood) {
                 // sedikit poni di dahi di bawah tudung
@@ -5142,7 +5139,7 @@ public class MainActivity extends Activity {
         private void drawHijabOpening(Canvas c, int skinCol) {
             // Bukaan wajah oval membulat dengan tepi kain tipis (gelap di luar, terang di dalam)
             float rr = 12f * u;
-            rf.set(fx(37f), fy(17f), fx(63f), fy(43f));
+            rf.set(fx(37.5f), fy(19f), fx(62.5f), fy(42.5f));
             p.setStyle(Paint.Style.STROKE);
             p.setStrokeWidth(4f * u);
             p.setColor(shade(curHijabC, 0.86f));
