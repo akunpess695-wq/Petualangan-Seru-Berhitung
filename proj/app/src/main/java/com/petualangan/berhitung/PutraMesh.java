@@ -23,9 +23,9 @@ final class PutraMesh {
     private int voff = 0;
 
     static final double PI = Math.PI;
-    static final double[] WHITE = {0.99, 0.99, 1.0}, SKIN = {1.0, 0.878, 0.702}, MAR = {0.64, 0.12, 0.18},
+    static final double[] WHITE = {0.95, 0.95, 0.98}, SKIN = {1.0, 0.878, 0.702}, MAR = {0.64, 0.12, 0.18},
             BAG = {0.75, 0.14, 0.16}, SHOE = {0.106, 0.106, 0.106}, BROWN = {0.31, 0.19, 0.14},
-            PINK = {1.0, 0.72, 0.70}, HIJ = {0.93, 0.93, 0.97};
+            PINK = {1.0, 0.76, 0.72}, HIJ = {0.93, 0.93, 0.97};
     static final double[] HC = {0, 68.5, 0.8}, HR = {12.6, 12.9, 12.5};
     // tabel: {y, rx, rz, cx, cz}
     static final double[][] TORSO = {{57, 6.0, 5.5, 0, 0}, {52.5, 10.6, 8.2, 0, 0}, {49, 11.6, 8.9, 0, -0.2}, {40, 11.3, 8.8, 0, -0.2}, {31, 10.9, 8.6, 0, -0.2}, {29, 10.9, 8.6, 0, -0.2}};
@@ -296,15 +296,15 @@ final class PutraMesh {
 
     // ---- rakitan putra ----
     static final double[] EYE = {0.29, 0.15, 0.10}, EYE2 = {0.56, 0.33, 0.20}, PUPIL = {0.10, 0.05, 0.04}, LASH = {0.13, 0.07, 0.05}, LIP = {0.88, 0.31, 0.31};
-    static final double[] HAIR = {0.357, 0.227, 0.180}, PBAG = {0.80, 0.18, 0.18}, PANTS = {0.608, 0.118, 0.176}, CAP = {1.0, 1.0, 1.0}, SOLE = {0.96, 0.96, 0.96};
+    static final double[] HAIR = {0.357, 0.227, 0.180}, PBAG = {0.80, 0.18, 0.18}, PANTS = {0.608, 0.118, 0.176}, CAP = {0.92, 0.93, 0.97}, SOLE = {0.96, 0.96, 0.96};
     static final double[] HH = {13.0, 13.3, 13.0};            // jari-jari cangkang rambut (sedikit di luar kepala)
     static final double HAIR_W = Math.toRadians(66);          // lebar bukaan wajah pada rambut
     static final double[][] PANTSTOP = {{31, 10.4, 8.4, 0, -0.2}, {29, 10.6, 8.6, 0, -0.2}, {26, 10.9, 8.8, 0, -0.2}, {23.5, 11.0, 8.8, 0, -0.2}};
     // peci: {y, rx, rz, cx, cz}, tutup datar di atas, bibir tipis di bawah
-    static final double[][] PECI = {{90.2, 0.0, 0.0, 0, 0.8}, {90.15, 10.0, 10.0, 0, 0.8}, {89.4, 11.1, 11.1, 0, 0.8}, {83.6, 11.9, 11.9, 0, 0.8}, {76.9, 12.3, 12.3, 0, 0.8}, {76.2, 12.15, 12.15, 0, 0.8}, {76.2, 11.2, 11.2, 0, 0.8}};
+    static final double[][] PECI = {{89.0, 0.0, 0.0, 0, 0.8}, {88.95, 10.0, 10.0, 0, 0.8}, {88.2, 11.1, 11.1, 0, 0.8}, {82.4, 12.2, 12.2, 0, 0.8}, {75.8, 12.9, 12.9, 0, 0.8}, {75.0, 12.8, 12.8, 0, 0.8}, {75.0, 11.0, 11.0, 0, 0.8}};
 
     /** garis rambut (batas bukaan wajah): y di tengah 76,5 dan turun ke 74 di sisi (dahi terlihat, poni tipis di bawah peci). */
-    static double hairlineY(double w) { return 74.6 - 3.4 * sq(w / HAIR_W); }
+    static double hairlineY(double w) { return 73.3 - 3.6 * sq(w / HAIR_W); }
     /** tepi bawah rambut: di samping berhenti di y=69,5 (telinga terlihat), makin ke belakang turun ke y=63. */
     static double lowerY(double aw) {
         double d1 = Math.toRadians(100), d2 = Math.toRadians(140);
@@ -340,7 +340,11 @@ final class PutraMesh {
         double[][] collar = new double[41][];
         for (int i = 0; i < 40; i++) { double t = 2 * PI * i / 40; collar[i] = new double[]{cq[2] + (cq[0] + 0.3) * Math.sin(t), 55.6, cq[3] + (cq[1] + 0.3) * Math.cos(t)}; }
         collar[40] = collar[0];
-        M.tube(collar, rr(41, 0.7, 0.6), WHITE, 10); // kerah
+        M.tube(collar, rr(41, 0.75, 0.65), new double[]{0.86, 0.88, 0.95}, 10); // kerah
+        double[][] plk = new double[10][];
+        for (int i = 0; i < 10; i++) { double y = 54.5 - 25.0 * i / 9; plk[i] = new double[]{0, y, tz(0, y) - 0.2 + 0.35}; }
+        M.tube(plk, rr(10, 0.45, 0.3), new double[]{0.80, 0.83, 0.92}, 6); // lajur kancing kemeja
+        for (int bi2 = 0; bi2 < 5; bi2++) { double y = 51.0 - 5.2 * bi2; M.ellipsoid(new double[]{0, y, tz(0, y) + 0.45}, new double[]{0.55, 0.55, 0.3}, new double[]{0.70, 0.74, 0.86}, 8, 6); }
         // lengan kemeja panjang
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg;
@@ -350,6 +354,9 @@ final class PutraMesh {
             for (int i = 0; i < 4; i++) rad[i] = new double[]{rd[i], rd[i]};
             M.tube(path, rad, WHITE, 16);
             M.ellipsoid(new double[]{s * 10.8, 48.5, -0.6}, new double[]{3.9, 3.9, 3.9}, WHITE, 16, 10);
+            double[][] cuff = new double[2][];
+            cuff[0] = new double[]{s * 14.6, 30.6, -1.95}; cuff[1] = new double[]{s * 14.9, 29.2, -2.0};
+            M.tube(cuff, new double[][]{{4.1, 4.1}, {4.2, 4.2}}, new double[]{0.86, 0.88, 0.95}, 16); // manset
             M.ellipsoid(new double[]{s * 15.0, 26.6, -0.4}, new double[]{2.7, 4.0, 2.5}, SKIN, 18, 12);
         }
         // ransel: badan + saku depan + kancing + tali
@@ -384,15 +391,15 @@ final class PutraMesh {
                 lrad[i] = new double[]{r, r};
             }
             M.tube(lash, lrad, LASH, 6); // bulu mata atas tipis
-            M.decal(s * 8.2, 61.9, 2.6, 1.6, 0.30, 0.05, PINK, 18, 10); // pipi
+            M.decal(s * 8.0, 62.0, 2.1, 1.3, 0.30, 0.05, PINK, 18, 10); // pipi
             double[][] br = new double[4][], brr = new double[4][];
-            double[] bx = {2.4, 4.4, 7.0, 9.8}, by = {71.5, 72.3, 72.1, 70.9}, bw = {0.65, 0.85, 0.8, 0.45};
+            double[] bx = {2.4, 4.4, 7.0, 9.8}, by = {71.0, 71.8, 71.6, 70.4}, bw = {0.65, 0.85, 0.8, 0.45};
             for (int i = 0; i < 4; i++) { br[i] = new double[]{s * bx[i], by[i], onHead(s * bx[i], by[i], 0.3)}; brr[i] = new double[]{bw[i], bw[i]}; }
             M.tube(br, brr, HAIR, 8); // alis tebal
         }
         double[][] arc = new double[7][];
         for (int i = 0; i < 7; i++) { double x = -3.6 + 7.2 * i / 6, y = 60.0 + 0.16 * x * x; arc[i] = new double[]{x, y, onHead(x, y, 0.3)}; }
-        M.tube(arc, rr(7, 0.38, 0.34), LIP, 6); // senyum
+        M.tube(arc, rr(7, 0.30, 0.28), LIP, 6); // senyum
         // rambut: cangkang di atas kepala, bukaan wajah dipotong di depan; bagian bawah berhenti di y=63
         final double th0 = Math.asin((63.0 - HC[1]) / HH[1]);
         M.skull(HC, HH, HAIR, 144, 64, th0, (w, y) -> {
@@ -430,7 +437,8 @@ final class PutraMesh {
             }
         }
         M.facet(pp, CAP);
-        M.scaleFrom(headStart, 1.25, 0.95, 1.18, 0, 56.0, 0.8); // kepala chibi: lebih lebar, sedikit lebih pendek
+        final int dummy = 0;
+        M.scaleFrom(headStart, 1.2, 1.02, 1.15, 0, 56.0, 0.8); // kepala chibi: lebih lebar, sedikit lebih pendek
         M.finish();
         return M;
     }
@@ -453,7 +461,25 @@ final class PutraMesh {
         }
     }
 
+    /** Pemendekan kaki: y<=29 diskala 0,86; di atas 29 digeser turun 4,06 (proporsi seperti lembar desain). */
+    private void shortenLegs() {
+        final double K = 0.86, Y0 = 29.0, SH = Y0 * (1 - K);
+        for (int k = 0; k < bp.size(); k++) {
+            float[] p = bp.get(k), n = bn.get(k);
+            for (int i = 0; i < p.length; i += 3) {
+                double y = p[i + 1];
+                if (y <= Y0) {
+                    p[i + 1] = (float) (y * K);
+                    double a = n[i], b = n[i + 1] / K, c = n[i + 2];
+                    double l = Math.sqrt(a * a + b * b + c * c); if (l < 1e-9) l = 1;
+                    n[i] = (float) (a / l); n[i + 1] = (float) (b / l); n[i + 2] = (float) (c / l);
+                } else p[i + 1] = (float) (y - SH);
+            }
+        }
+    }
+
     private void finish() {
+        shortenLegs();
         int nv = 0, ni = 0;
         for (float[] a : bp) nv += a.length / 3;
         for (int[] a : bi) ni += a.length;
