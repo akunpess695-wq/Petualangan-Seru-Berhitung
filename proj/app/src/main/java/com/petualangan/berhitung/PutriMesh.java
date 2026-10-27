@@ -36,6 +36,8 @@ final class PutriMesh {
             {72.0, 16.0, 16.8, 0, -3.5}, {68.0, 16.0, 16.8, 0, -3.6}, {64.0, 15.5, 16.2, 0, -4.0}, {60.0, 14.8, 15.0, 0, -4.3},
             {56.0, 13.9, 14.0, 0, -4.6}, {52.0, 12.8, 13.5, 0, -4.1}, {48.0, 12.2, 13.8, 0, -4.2}, {44.0, 11.8, 13.8, 0, -4.4},
             {40.0, 11.5, 13.8, 0, -4.4}};
+    // penutup leher (bagian bawah hijab): menutup kepala dari bawah supaya kulit tidak terlihat lewat celah tepi hijab
+    static final double[][] NECK = {{64, 12.2, 11.8, 0, -0.3}, {62, 11.3, 10.6, 0, -0.7}, {60, 9.9, 9.0, 0, -1.0}, {58, 9.2, 8.4, 0, -1.8}, {56, 9.5, 8.0, 0, -2.2}, {54, 10.4, 8.3, 0, -1.2}, {52.5, 10.7, 8.3, 0, -0.5}};
     static final double[][] SKIRT = {{31, 10.4, 8.4, 0, -0.2}, {29, 10.7, 8.7, 0, -0.2}, {20, 11.6, 9.4, 0, -0.4}, {10, 12.5, 10.1, 0, -0.7}, {5.2, 12.9, 10.4, 0, -0.8}};
 
     static double onHead(double x, double y, double off) {
@@ -308,14 +310,15 @@ final class PutriMesh {
         }
         M.tube(arc, rr(7, 0.32, 0.3), LIP, 6); // senyum tipis
 
+        M.loft(NECK, HIJ, 48, 14, null, null); // penutup leher putih
         // jilbab: satu cangkang (kubah -> bahu -> ujung V depan dan belakang), bukaan wajah dipotong
         final double yc = 68.3, hh = 12.4, pw = Math.toRadians(47);
         final double d0 = Math.toRadians(76), d1 = Math.toRadians(110);
         M.loft(HIJAB, HIJ, 144, 52, null, ph -> {
             double d = Math.abs(((ph + PI) % (2 * PI)) - PI), yb;
             if (d < d0) yb = 54.4 - 10.4 * (1 - d / d0);                 // cape depan: V sampai dada
-            else if (d < d1) { double t = (d - d0) / (d1 - d0); t = t * t * (3 - 2 * t); yb = 54.4 + 6.5 * t; } // bahu tetap terlihat
-            else yb = 43.0 + 19.0 * Math.sin(PI - d);                    // belakang: sisi miring lurus ke ujung runcing
+            else if (d < d1) { double t = (d - d0) / (d1 - d0); t = t * t * (3 - 2 * t); yb = 54.4 + 4.6 * t; } // bahu tetap terlihat
+            else yb = 43.0 + 17.0 * Math.sin(PI - d);                    // belakang: sisi miring lurus ke ujung runcing
             return new double[]{89.5, yb};
         }, (ph, y) -> sq(ph / pw) + sq((y - yc) / hh) < 1.0);
         // bingkai bukaan (tepi jilbab yang tebal di sekeliling wajah)
