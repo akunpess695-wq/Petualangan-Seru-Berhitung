@@ -33,7 +33,7 @@ final class PutriGLView extends GLSurfaceView {
     private volatile float bgR = 1f, bgG = 1f, bgB = 1f; // warna latar (default putih = warna kartu)
     private volatile String lookPakaian, lookRambut;          // "badan,lengan[,celana/rok]" dan "#hex" (null = bawaan)
     private volatile boolean showPeci = true;                 // hanya berlaku untuk putra
-    private volatile int hood = -1;                           // nomor tudung hewan (0..11), -1 = tanpa tudung
+    private volatile int hood = -1;                           // nomor tudung hewan (slot 0..24, lihat HoodMesh.used), -1 = tanpa tudung
     private volatile int hairStyle = 0;                       // PutraMesh.STYLE_*; terlihat hanya bila peci dilepas
     private volatile float[] bgGrad;                          // 6 warna rgb + jumlah ruas di [18]; null = latar rata
     private float lastX, lastY;
@@ -62,7 +62,7 @@ final class PutriGLView extends GLSurfaceView {
      * Boleh dipanggil sebelum atau sesudah tampil.
      */
     /** Pasang tudung hewan (0..11) atau lepas (-1). Panggil sebelum setLook, yang memuat ulang mesh. */
-    void setHood(int animal) { hood = (animal >= 0 && animal < HoodMesh.COUNT && animal != 12) ? animal : -1; }
+    void setHood(int animal) { hood = HoodMesh.used(animal) ? animal : -1; }
 
     void setLook(String pakaian, String rambut, String latar, boolean peci, int gayaRambut) {
         lookPakaian = pakaian; lookRambut = rambut; showPeci = peci; hairStyle = gayaRambut;
