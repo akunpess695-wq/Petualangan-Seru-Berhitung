@@ -24,10 +24,21 @@ final class PutraMesh {
 
     // ---- penanda bagian: tiap potongan geometri diberi nomor bagian supaya warnanya bisa diganti / disembunyikan
     // per tampilan tanpa mengubah mesh bersama (static di PutriGLView). ----
-    static final int P_OTHER = 0, P_SHIRT = 1, P_TRIM = 2, P_BUTTON = 3, P_SLEEVE = 4, P_PANTS = 5, P_HAIR = 6, P_PECI = 7;
+    static final int P_OTHER = 0, P_SHIRT = 1, P_TRIM = 2, P_BUTTON = 3, P_SLEEVE = 4, P_PANTS = 5, P_HAIR = 6, P_PECI = 7,
+            P_HAIR_CREW = 8, P_HAIR_SPIKY = 9, P_HAIR_MESSY = 10, P_HAIR_DET = 11;
+    /** Gaya rambut (terlihat hanya bila peci dilepas). 0 = cangkang rambut bawaan (rapi). */
+    static final int STYLE_DEFAULT = 0, STYLE_CREW = 1, STYLE_SPIKY = 2, STYLE_MESSY = 3;
     private int cur = P_OTHER;                         // bagian untuk potongan yang dibuat berikutnya
     private final ArrayList<Integer> bpt = new ArrayList<>();
     byte[] part;                                       // bagian tiap titik (sama panjang dengan vertCount)
+
+    // ---- gradasi rambut: pengali terang/gelap per titik (1 = warna asli). Hanya dipakai bagian rambut; warna dasar
+    // tetap "#hex" pilihan pemain, jadi semua warna rambut otomatis ikut bergradasi (akar gelap, ujung terang, sorot). ----
+    interface ShadeFn { double f(double[] p, double[] n, int i, int j, int nu, int nv); }
+    private ShadeFn curShade = null;                   // dipakai grid() untuk potongan yang dibuat berikutnya
+    private final ArrayList<float[]> bs = new ArrayList<>();
+    float[] shade;                                     // pengali tiap titik (sama panjang dengan vertCount)
+    private double tone = 1.0;                         // variasi nada per helai
 
     static final double PI = Math.PI;
     static final double[] WHITE = {0.95, 0.95, 0.98}, SKIN = {1.0, 0.878, 0.702}, MAR = {0.64, 0.12, 0.18},
@@ -103,7 +114,7 @@ final class PutraMesh {
     // ---- primitif ----
     private void grid(double[][][] P, double[] colr, boolean closedU, boolean flip, boolean[][] keep) {
         int nu = P.length, nv = P[0].length;
-        float[] fp = new float[nu * nv * 3], fn = new float[nu * nv * 3], fc = new float[nu * nv * 3];
+        float[] fp = new float[nu * nv * 3], fn = new float[nu * nv * 3], fc = new float[nu * nv * 3], fs = new float[nu * nv];
         for (int i = 0; i < nu; i++) {
             for (int j = 0; j < nv; j++) {
                 double[] du;
@@ -117,6 +128,7 @@ final class PutraMesh {
                 else dv = sub(P[i][j + 1], P[i][j - 1]);
                 double[] n = unit(cross(du, dv));
                 if (flip) { n[0] = -n[0]; n[1] = -n[1]; n[2] = -n[2]; }
+                fs[i * nv + j] = curShade == null ? 1f : (float) curShade.f(P[i][j], n, i, j, nu, nv);
                 int o = (i * nv + j) * 3;
                 for (int k = 0; k < 3; k++) { fp[o + k] = (float) P[i][j][k]; fn[o + k] = (float) n[k]; fc[o + k] = (float) colr[k]; }
             }
@@ -133,7 +145,7 @@ final class PutraMesh {
         }
         int[] fi = new int[F.size()];
         for (int k = 0; k < fi.length; k++) fi[k] = F.get(k) + voff;
-        bp.add(fp); bn.add(fn); bc.add(fc); bi.add(fi); bpt.add(cur);
+        bp.add(fp); bn.add(fn); bc.add(fc); bi.add(fi); bpt.add(cur); bs.add(fs);
         voff += nu * nv;
     }
     private static void add(ArrayList<Integer> f, int a, int b, int c) { f.add(a); f.add(b); f.add(c); }
@@ -297,7 +309,8 @@ final class PutraMesh {
                 q++;
             }
         }
-        bp.add(fp); bn.add(fn); bc.add(fc); bi.add(fi); bpt.add(cur);
+        float[] fs1 = new float[cnt]; java.util.Arrays.fill(fs1, 1f);
+        bp.add(fp); bn.add(fn); bc.add(fc); bi.add(fi); bpt.add(cur); bs.add(fs1);
         voff += cnt;
     }
 
@@ -418,6 +431,7 @@ final class PutraMesh {
         M.tube(arc, rr(7, 0.30, 0.28), LIP, 6); // senyum
         // rambut: cangkang di atas kepala, bukaan wajah dipotong di depan; bagian bawah berhenti di y=63
         M.cur = P_HAIR;
+        M.curShade = SHELL;
         final double th0 = Math.asin((63.0 - HC[1]) / HH[1]);
         M.skull(HC, HH, HAIR, 144, 64, th0, (w, y) -> {
             double aw = Math.abs(w);
@@ -428,6 +442,7 @@ final class PutraMesh {
         for (int sg = -1; sg <= 1; sg += 2)
             M.ellipsoid(new double[]{sg * 12.2, 66.0, 0.6}, new double[]{1.7, 3.0, 2.1}, SKIN, 16, 10);
         M.cur = P_HAIR;
+        M.curShade = constShade(0.9);
         // tepi rambut (poni dan cambang) diberi tabung tipis supaya tepi tidak bergerigi
         double[][] fr = new double[17][], frr = new double[17][];
         for (int i = 0; i < 17; i++) { double w = -HAIR_W + 2 * HAIR_W * i / 16; fr[i] = onHair(w, hairlineY(w)); frr[i] = new double[]{0.55, 0.55}; }
@@ -444,6 +459,7 @@ final class PutraMesh {
             }
             M.tube(sb, sbr, HAIR, 8);
         }
+        M.curShade = null;
         // peci: bidang datar bersegi 12
         M.cur = P_PECI;
         int ns = 12;
@@ -457,10 +473,205 @@ final class PutraMesh {
             }
         }
         M.facet(pp, CAP);
+        M.hairStyles();
+        M.detail();
+        M.curShade = null;
         M.cur = P_OTHER;
         M.scaleFrom(headStart, 1.2, 1.02, 1.15, 0, 56.0, 0.8); // kepala chibi: lebih lebar, sedikit lebih pendek
         M.finish();
         return M;
+    }
+
+    // ---- gaya rambut tambahan (tiap gaya = bagian sendiri; hanya yang dipilih yang digambar) ----
+    private static double[] norm3(double x, double y, double z) {
+        double l = Math.sqrt(x * x + y * y + z * z);
+        if (l < 1e-9) l = 1;
+        return new double[]{x / l, y / l, z / l};
+    }
+    /** arah keluar kira-kira (normal elipsoid cangkang rambut) di titik p */
+    private static double[] outward(double[] p) {
+        return norm3((p[0] - HC[0]) / sq(HH[0]), (p[1] - HC[1]) / sq(HH[1]), (p[2] - HC[2]) / sq(HH[2]));
+    }
+    /** Helai runcing/melengkung: tabung meruncing dari titik 'base' (agak terbenam) ke arah 'dir' sepanjang 'len'; bend = lengkung samping. */
+    private void strand(double[] base, double[] dir, double len, double r0, double[] bend, int pts, double[] colr) {
+        tone = 0.88 + 0.24 * hash01(base[0] * 13.1 + base[1] * 3.7 + base[2] * 7.7);
+        double[][] path = new double[pts][], rad = new double[pts][];
+        for (int k = 0; k < pts; k++) {
+            double t = k == 0 ? -0.18 : (double) k / (pts - 1);
+            double r = r0 * (k == 0 ? 1.0 : Math.max(0.06 / r0, 1.0 - 0.93 * t));
+            path[k] = new double[]{base[0] + dir[0] * len * t + bend[0] * len * t * t,
+                    base[1] + dir[1] * len * t + bend[1] * len * t * t,
+                    base[2] + dir[2] * len * t + bend[2] * len * t * t};
+            rad[k] = new double[]{r, r};
+        }
+        tube(path, rad, colr, 7);
+    }
+    private static final double[] NOBEND = {0, 0, 0};
+    static double crewLine(double w) { return 76.2 - 3.2 * sq(w / HAIR_W); }
+    static double crewLower(double aw) {
+        double d1 = Math.toRadians(100), d2 = Math.toRadians(140);
+        if (aw <= d1) return 73.0;
+        if (aw >= d2) return 67.0;
+        return 73.0 - 6.0 * (aw - d1) / (d2 - d1);
+    }
+
+
+    // ---- gradasi & detail rambut ----
+    private static double hash01(double v) { double a = Math.sin(v * 12.9898 + 78.233) * 43758.5453; return a - Math.floor(a); }
+    private static double smooth(double a, double b, double x) { double t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); }
+    private static ShadeFn constShade(final double v) { return (p, n, i, j, nu, nv) -> v; }
+    /** goresan helai di permukaan cangkang pada sudut w, tinggi y (-1..1): melengkung ke bawah dari pusaran di puncak. */
+    private static double streak(double w, double y) {
+        double a = Math.sin(w * 24 + 2.6 * Math.sin(w * 5 + y * 0.35) + y * 0.22);
+        double b = Math.sin(w * 37 - y * 0.5 + 1.3);
+        double c = hash01(Math.floor((w + PI) * 24 / (2 * PI) * 2.0) * 1.7) - 0.5; // nada beda tiap kelompok helai
+        return 0.55 * a + 0.25 * b + 0.5 * c;
+    }
+    /** Pengali cangkang: akar gelap di bawah -> terang di puncak, cincin sorot, goresan helai (juga menggoyang normal agar kilap bergaris). */
+    private static double shellShade(double[] p, double[] n, double yLow, double ySpan) {
+        double dx = p[0] - HC[0], dz = p[2] - HC[2], y = p[1];
+        double w = Math.atan2(dx, dz);
+        double u = clamp((y - yLow) / ySpan);
+        double m = 0.64 + 0.42 * Math.pow(u, 0.85);
+        double face = Math.max(0, Math.cos(w + 0.6));                  // sisi menghadap cahaya (kiri-depan)
+        double yc = 77.0 + 1.3 * Math.cos(w + 0.6);
+        m += 0.30 * Math.pow(face, 1.4) * Math.exp(-sq((y - yc) / 2.3)); // cincin sorot (angel ring)
+        m += 0.07 * Math.exp(-sq((y - 76.0) / 2.6)) * Math.max(0, -Math.cos(w + 0.6)); // pantulan lembut sisi lawan
+        double st = streak(w, y);
+        m *= 1.0 + 0.10 * st;
+        double k = 0.20 * st;                                          // goyang normal sepanjang busur
+        double tx = Math.cos(w), tz = -Math.sin(w);
+        n[0] += tx * k; n[2] += tz * k;
+        double[] q = unit(n); n[0] = q[0]; n[1] = q[1]; n[2] = q[2];
+        return m;
+    }
+    private static final ShadeFn SHELL = (p, n, i, j, nu, nv) -> shellShade(p, n, 64.0, 18.0);
+    private static final ShadeFn CREWSHELL = (p, n, i, j, nu, nv) -> shellShade(p, n, 66.0, 16.0) * 0.97;
+    /** helai/duri: akar gelap -> ujung terang; j = urutan sepanjang helai. */
+    private final ShadeFn STRAND = (p, n, i, j, nu, nv) -> {
+        double t = nv > 1 ? (double) j / (nv - 1) : 0;
+        return tone * (0.68 + 0.50 * Math.pow(t, 0.8));
+    };
+    /** untaian rambut yang menempel di permukaan cangkang (bagian P_HAIR_DET): memberi volume berlapis. */
+    private void lock(double w0, double y0, double yEnd, double r0, double drift, double toneV, int pts) {
+        double[][] path = new double[pts][], rad = new double[pts][];
+        for (int k = 0; k < pts; k++) {
+            double t = (double) k / (pts - 1);
+            double y = Math.min(81.4, y0 + (yEnd - y0) * Math.pow(t, 0.85));
+            double w = w0 + drift * Math.pow(t, 1.4);
+            double[] b = onHair(w, y), o = outward(b);
+            double env = Math.min(1.0, 0.42 + t * 5.0) * (1.0 - 0.62 * Math.pow(t, 2.4));  // akar tipis, tengah gemuk, ujung runcing
+            double r = Math.max(0.12, r0 * env);
+            double off = 0.18 + 0.30 * r;                                  // sebagian terbenam di cangkang
+            path[k] = new double[]{b[0] + o[0] * off, b[1] + o[1] * off, b[2] + o[2] * off};
+            rad[k] = new double[]{r, r};
+        }
+        tone = toneV;
+        tube(path, rad, HAIR, 6);
+    }
+    private void detail() {
+        cur = P_HAIR_DET;
+        curShade = (p, n, i, j, nu, nv) -> {
+            double t = nv > 1 ? (double) j / (nv - 1) : 0;
+            double base = 0.72 + 0.30 * Math.pow(t, 0.7);                 // akar lebih gelap, ujung lebih terang
+            double side = n[0] * -0.45 + n[1] * 0.65 + n[2] * 0.62;      // sisi menghadap cahaya sedikit lebih terang
+            return tone * base * (1.0 + 0.10 * Math.max(0, side));
+        };
+        java.util.Random r = new java.util.Random(23);
+        int N = 76;
+        for (int k = 0; k < N; k++) {
+            double w0 = -PI + 2 * PI * (k + r.nextDouble() * 0.7) / N;
+            double aw = Math.abs(w0);
+            // tepi bawah di sudut ini (garis rambut di depan, tepi cambang di samping/belakang) + sedikit di atasnya
+            double edge = aw < HAIR_W ? hairlineY(w0) : lowerY(aw);
+            double yEnd = edge + 0.5 + r.nextDouble() * 1.4;
+            double y0 = 79.8 + r.nextDouble() * 1.4;
+            double drift = (w0 < 0 ? -1 : 1) * (0.10 + 0.30 * r.nextDouble());       // disisir menjauhi pusaran
+            double toneV = (k % 3 == 0) ? 1.10 : (k % 3 == 1 ? 0.90 : 1.0) + (r.nextDouble() - 0.5) * 0.08;
+            lock(w0, y0, yEnd, 1.05 + 0.40 * r.nextDouble(), drift, toneV, 9);
+        }
+        // helai pendek berlapis lebih rendah: menutup celah dan memberi kesan tebal di sisi dan belakang
+        for (int k = 0; k < 28; k++) {
+            double w0 = -PI + 2 * PI * (k + 0.35 + r.nextDouble() * 0.3) / 28;
+            double aw = Math.abs(w0);
+            double edge = aw < HAIR_W ? hairlineY(w0) : lowerY(aw);
+            double ys = Math.min(78.0, edge + 7.5 + r.nextDouble() * 2.0);
+            lock(w0, ys, edge + 0.4, 0.95 + 0.3 * r.nextDouble(), (k % 2 == 0 ? 1 : -1) * 0.12, 0.84 + 0.3 * r.nextDouble(), 7);
+        }
+        curShade = null;
+        cur = P_OTHER;
+    }
+
+    private void hairStyles() {
+        // 1. Crew cut: pendek rapi, tepi lebih tinggi (telinga dan pelipis terbuka); menggantikan cangkang bawaan
+        cur = P_HAIR_CREW;
+        curShade = CREWSHELL;
+        double th0 = Math.asin((64.5 - HC[1]) / HH[1]);
+        skull(HC, HH, HAIR, 96, 44, th0, (w, y) -> {
+            double aw = Math.abs(w);
+            return aw < HAIR_W ? y < crewLine(w) : y < crewLower(aw);
+        });
+        curShade = constShade(0.86);
+        double[][] fr = new double[17][], frr = new double[17][];
+        for (int i = 0; i < 17; i++) { double w = -HAIR_W + 2 * HAIR_W * i / 16; fr[i] = onHair(w, crewLine(w)); frr[i] = new double[]{0.5, 0.5}; }
+        tube(fr, frr, HAIR, 8);
+        for (int sg = -1; sg <= 1; sg += 2) {
+            int n = 16;
+            double[][] sb = new double[n][], sbr = new double[n][];
+            for (int i = 0; i < n; i++) {
+                double w = HAIR_W + (PI - HAIR_W) * i / (n - 1.0);
+                sb[i] = onHair(sg * w, crewLower(w)); sbr[i] = new double[]{0.5, 0.5};
+            }
+            tube(sb, sbr, HAIR, 8);
+        }
+
+        curShade = STRAND;
+        // 2. Spiky: duri tegak ke atas dalam tiga lingkar + satu di puncak; yang di depan condong ke depan
+        cur = P_HAIR_SPIKY;
+        java.util.Random sr = new java.util.Random(5);
+        double[][] ring = {{76.4, 14, 0.0, 5.4, 3.5}, {79.1, 10, PI / 10, 5.9, 3.5}, {81.0, 5, PI / 5, 6.3, 3.3}};
+        for (double[] rg : ring) {
+            int n = (int) rg[1];
+            for (int k = 0; k < n; k++) {
+                double w = rg[2] + 2 * PI * k / n;
+                double[] b = onHair(w, rg[0]);
+                double[] o = outward(b);
+                double front = Math.max(0, 1 - Math.abs(Math.atan2(Math.sin(w), Math.cos(w))) / 1.1);
+                double[] d = norm3(o[0] * 0.55, 0.9, o[2] * 0.55 + 0.5 * front - 0.12 * (1 - front));
+                double[] side = norm3(-d[2], 0, d[0]);
+                double bs = (sr.nextDouble() - 0.5) * 0.35;
+                strand(b, d, rg[3] * (0.9 + 0.2 * sr.nextDouble()), rg[4], new double[]{side[0] * bs, 0, side[2] * bs}, 3, HAIR);
+            }
+        }
+        strand(onHair(0, 81.6), new double[]{0, 1, 0.15}, 7.0, 3.3, NOBEND, 3, HAIR);
+
+        // 3. Berantakan: jumbai melengkung ke segala arah (acak tetap) + beberapa poni jatuh di dahi
+        cur = P_HAIR_MESSY;
+        java.util.Random rnd = new java.util.Random(11);
+        double[][] mring = {{77.0, 12, 0.2}, {80.0, 6, 0.6}};
+        for (double[] rg : mring) {
+            int n = (int) rg[1];
+            for (int k = 0; k < n; k++) {
+                double w = rg[2] + 2 * PI * k / n + (rnd.nextDouble() - 0.5) * 0.35;
+                double[] b = onHair(w, rg[0] + (rnd.nextDouble() - 0.5) * 1.2);
+                double[] o = outward(b);
+                double[] d = norm3(o[0] * 0.6 + (rnd.nextDouble() - 0.5) * 0.9, 0.7 + rnd.nextDouble() * 0.3, o[2] * 0.6 + (rnd.nextDouble() - 0.5) * 0.9);
+                double[] side = norm3(-d[2], 0, d[0]);
+                double bs = (rnd.nextDouble() - 0.5) * 0.9;
+                strand(b, d, 4.6 + rnd.nextDouble() * 2.2, 2.7, new double[]{side[0] * bs, 0.25 * Math.abs(bs) * -1, side[2] * bs}, 4, HAIR);
+            }
+        }
+        strand(onHair(0.2, 81.3), norm3(0.35, 1, 0.3), 6.0, 3.0, new double[]{0.4, -0.2, 0.2}, 4, HAIR);
+        strand(onHair(-0.5, 80.8), norm3(-0.5, 1, -0.1), 5.2, 2.9, new double[]{-0.3, -0.25, -0.2}, 4, HAIR);
+        for (int k = 0; k < 5; k++) {
+            double w = Math.toRadians(-48 + 24 * k);
+            double[] b = onHair(w, hairlineY(w) + 2.2);
+            double[] d = norm3(Math.sin(w) * 0.7, -0.38, Math.cos(w) * 0.8);
+            double sd = (k % 2 == 0 ? 1 : -1) * 0.35;
+            strand(b, d, 4.2, 1.7, new double[]{Math.cos(w) * sd, 0, -Math.sin(w) * sd}, 4, HAIR);
+        }
+        curShade = null;
+        cur = P_OTHER;
     }
     private static double clamp(double a) { return a < 0 ? 0 : (a > 1 ? 1 : a); }
     private static double tz(double x, double y) { double[] q = interp(TORSO, y); return q[1] * Math.sqrt(Math.max(0, 1 - sq(x / q[0]))); }
@@ -504,10 +715,11 @@ final class PutraMesh {
         for (float[] a : bp) nv += a.length / 3;
         for (int[] a : bi) ni += a.length;
         pos = new float[nv * 3]; nor = new float[nv * 3]; col = new float[nv * 3]; idx = new int[ni];
-        part = new byte[nv];
+        part = new byte[nv]; shade = new float[nv];
         int pv = 0, pi = 0;
         for (int k = 0; k < bp.size(); k++) {
             java.util.Arrays.fill(part, pv / 3, (pv + bp.get(k).length) / 3, (byte) (int) bpt.get(k));
+            System.arraycopy(bs.get(k), 0, shade, pv / 3, bs.get(k).length);
             System.arraycopy(bp.get(k), 0, pos, pv, bp.get(k).length);
             System.arraycopy(bn.get(k), 0, nor, pv, bn.get(k).length);
             System.arraycopy(bc.get(k), 0, col, pv, bc.get(k).length);
@@ -558,22 +770,40 @@ final class PutraMesh {
                 case P_BUTTON: k = btn; break;
                 case P_SLEEVE: k = arm; break;
                 case P_PANTS: k = pants; break;
-                case P_HAIR: k = hair; break;
+                case P_HAIR: case P_HAIR_CREW: case P_HAIR_SPIKY: case P_HAIR_MESSY: case P_HAIR_DET: {
+                    // gradasi: warna dasar (pilihan pemain, atau bawaan) dikali pengali terang/gelap per titik
+                    double[] bc0 = hair != null ? hair : new double[]{c[i * 3], c[i * 3 + 1], c[i * 3 + 2]};
+                    double m = shade[i], sheen = Math.max(0, m - 1) * 0.30;
+                    k = new double[]{Math.min(1, bc0[0] * m + sheen), Math.min(1, bc0[1] * m + sheen * 0.95), Math.min(1, bc0[2] * m + sheen * 0.85)};
+                    break;
+                }
                 default: break;
             }
             if (k != null) { c[i * 3] = (float) k[0]; c[i * 3 + 1] = (float) k[1]; c[i * 3 + 2] = (float) k[2]; }
         }
         return c;
     }
-    /** Indeks segitiga untuk satu tampilan; showPeci=false membuang semua segitiga peci. */
-    int[] indexFor(boolean showPeci) {
-        if (showPeci) return idx;
+    /** Indeks segitiga untuk satu tampilan (tanpa gaya rambut tambahan). */
+    int[] indexFor(boolean showPeci) { return indexFor(showPeci, STYLE_DEFAULT); }
+    /**
+     * Indeks segitiga untuk satu tampilan. showPeci=false membuang peci; gaya rambut (STYLE_*) hanya digambar bila
+     * peci dilepas, sebab rambut tertutup peci. Gaya crew cut menggantikan cangkang rambut bawaan.
+     */
+    int[] indexFor(boolean showPeci, int style) {
+        boolean[] hide = new boolean[16];
+        boolean st = !showPeci;
+        hide[P_PECI] = !showPeci;
+        hide[P_HAIR_CREW] = !(st && style == STYLE_CREW);
+        hide[P_HAIR_SPIKY] = !(st && style == STYLE_SPIKY);
+        hide[P_HAIR_MESSY] = !(st && style == STYLE_MESSY);
+        hide[P_HAIR_DET] = !(st && style != STYLE_CREW);   // untaian volume: tidak dipakai crew cut (rambut pendek rapi)
+        if (st && style == STYLE_CREW) hide[P_HAIR] = true;
         int n = 0;
-        for (int t = 0; t < idx.length; t += 3) if (part[idx[t]] != P_PECI) n += 3;
+        for (int t = 0; t < idx.length; t += 3) if (!hide[part[idx[t]]]) n += 3;
         int[] r = new int[n];
         int o = 0;
         for (int t = 0; t < idx.length; t += 3)
-            if (part[idx[t]] != P_PECI) { r[o++] = idx[t]; r[o++] = idx[t + 1]; r[o++] = idx[t + 2]; }
+            if (!hide[part[idx[t]]]) { r[o++] = idx[t]; r[o++] = idx[t + 1]; r[o++] = idx[t + 2]; }
         return r;
     }
 
