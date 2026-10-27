@@ -31,11 +31,11 @@ final class PutriMesh {
     static final double[][] TORSO = {{57, 6.0, 5.5, 0, 0}, {52.5, 10.6, 8.2, 0, 0}, {49, 11.6, 8.9, 0, -0.2}, {40, 11.3, 8.8, 0, -0.2}, {31, 10.9, 8.6, 0, -0.2}, {29, 10.9, 8.6, 0, -0.2}};
     // hijab = SATU cangkang: kubah kepala -> lebar di bahu -> ujung runcing depan & belakang
     static final double[][] HIJAB = {
-            {89.5, 0.6, 0.6, 0, -3.5}, {89.0, 3.8, 4.0, 0, -3.5}, {88.0, 6.5, 6.8, 0, -3.5}, {86.5, 8.9, 9.4, 0, -3.5},
+            {89.5, 0.15, 0.15, 0, -3.5}, {89.0, 3.8, 4.0, 0, -3.5}, {88.0, 6.5, 6.8, 0, -3.5}, {86.5, 8.9, 9.4, 0, -3.5},
             {84.5, 11.2, 11.8, 0, -3.5}, {82.0, 13.1, 13.8, 0, -3.5}, {79.0, 14.7, 15.4, 0, -3.5}, {75.5, 15.7, 16.5, 0, -3.5},
             {72.0, 16.0, 16.8, 0, -3.5}, {68.0, 16.0, 16.8, 0, -3.6}, {64.0, 15.5, 16.2, 0, -4.0}, {60.0, 14.8, 15.0, 0, -4.3},
-            {56.0, 13.9, 14.0, 0, -4.6}, {52.0, 12.8, 13.5, 0, -4.1}, {48.0, 12.2, 13.8, 0, -4.2}, {44.0, 11.8, 13.8, 0, -4.4},
-            {40.0, 11.5, 13.8, 0, -4.4}};
+            {56.0, 13.9, 14.0, 0, -4.6}, {52.0, 15.8, 16.0, 0, -3.8}, {48.0, 17.2, 17.5, 0, -4.0}, {44.0, 17.6, 17.5, 0, -4.0},
+            {40.0, 17.6, 17.5, 0, -4.0}};
     // penutup leher (bagian bawah hijab): menutup kepala dari bawah supaya kulit tidak terlihat lewat celah tepi hijab
     static final double[][] NECK = {{64, 12.2, 11.8, 0, -0.3}, {62, 11.3, 10.6, 0, -0.7}, {60, 9.9, 9.0, 0, -1.0}, {58, 9.2, 8.4, 0, -1.8}, {56, 9.5, 8.0, 0, -2.2}, {54, 10.4, 8.3, 0, -1.2}, {52.5, 10.7, 8.3, 0, -0.5}};
     static final double[][] SKIRT = {{31, 10.4, 8.4, 0, -0.2}, {29, 10.7, 8.7, 0, -0.2}, {20, 11.6, 9.4, 0, -0.4}, {10, 12.5, 10.1, 0, -0.7}, {5.2, 12.9, 10.4, 0, -0.8}};
@@ -314,11 +314,11 @@ final class PutriMesh {
         // jilbab: satu cangkang (kubah -> bahu -> ujung V depan dan belakang), bukaan wajah dipotong
         final double yc = 68.3, hh = 12.4, pw = Math.toRadians(47);
         final double d0 = Math.toRadians(76), d1 = Math.toRadians(110);
-        M.loft(HIJAB, HIJ, 144, 52, null, ph -> {
+        M.loft(HIJAB, HIJ, 216, 72, null, ph -> {
             double d = Math.abs(((ph + PI) % (2 * PI)) - PI), yb;
             if (d < d0) yb = 54.4 - 10.4 * (1 - d / d0);                 // cape depan: V sampai dada
-            else if (d < d1) { double t = (d - d0) / (d1 - d0); t = t * t * (3 - 2 * t); yb = 54.4 + 4.6 * t; } // bahu tetap terlihat
-            else yb = 43.0 + 17.0 * Math.sin(PI - d);                    // belakang: sisi miring lurus ke ujung runcing
+            else if (d < d1) { double t = (d - d0) / (d1 - d0); t = t * t * (3 - 2 * t); yb = 54.4 - 7.4 * t; } // samping: tepi turun menutup bahu
+            else yb = 43.0 + 4.0 * Math.sin(PI - d) / Math.sin(PI - d1); // belakang: tepi landai ke ujung y=43
             return new double[]{89.5, yb};
         }, (ph, y) -> sq(ph / pw) + sq((y - yc) / hh) < 1.0);
         // bingkai bukaan (tepi jilbab yang tebal di sekeliling wajah)
