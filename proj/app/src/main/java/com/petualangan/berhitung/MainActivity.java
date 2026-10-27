@@ -286,7 +286,10 @@ public class MainActivity extends Activity {
     private static final String[] AVATARS = {
             "\uD83E\uDD81", "\uD83D\uDC2F", "\uD83D\uDC3C", "\uD83D\uDC28", "\uD83D\uDC38", "\uD83E\uDD8A",
             "\uD83D\uDC30", "\uD83D\uDC36", "\uD83D\uDC31", "\uD83E\uDD84", "\uD83D\uDC27", "\uD83E\uDD89",
-            "\uD83D\uDE42"
+            "\uD83D\uDE42",
+            // 13..23: hewan khas Indonesia
+            "\uD83E\uDDA7", "\uD83E\uDD8E", "\uD83D\uDC18", "\uD83E\uDD8F", "\uD83E\uDD9A", "\uD83D\uDC12",
+            "\uD83D\uDC35", "\uD83E\uDD85", "\uD83E\uDD8C", "\uD83D\uDC02", "\uD83D\uDC22"
     };
     private final int[] avatar = new int[MAX_PLAYERS];
     // 0 = putra, 1 = putri (dipakai avatar 3D)
@@ -4062,7 +4065,7 @@ public class MainActivity extends Activity {
     /** Pasang pakaian, rambut (putra) / warna jilbab (putri), latar, dan peci milik pemain pl ke tampilan 3D. */
     private void applyLook3D(PutriGLView v, int pl) {
         int ba = eqValid(pl, 5), hr = eqValid(pl, 6), bg = eqValid(pl, 4);
-        v.setHood(avatar[pl] >= 0 && avatar[pl] < NO_HOOD ? avatar[pl] : -1); // tudung hewan 3D (putra dan putri)
+        v.setHood(avatar[pl] >= 0 && avatar[pl] < GL_HOODS ? avatar[pl] : -1); // tudung hewan 3D (putra dan putri)
         v.setLook(ba >= 0 ? itIcon(ba) : null, hr >= 0 ? itIcon(hr) : null, bg >= 0 ? itIcon(bg) : null,
                 genderOf[pl] != 0 || !peciOff(pl), (genderOf[pl] == 0 && hr >= 0) ? hairStyleOf(hr) : PutraMesh.STYLE_DEFAULT);
     }
@@ -4082,13 +4085,29 @@ public class MainActivity extends Activity {
     // Semua digambar dengan kode (tanpa file gambar). Gambar dibuat di kotak 100 x 100 satuan.
     // mode 0 = seluruh badan, 1 = zoom kepala, 2 = zoom badan dan tangan kanan (untuk pratinjau barang).
     private static final int NO_HOOD = 12;
+    // Indeks 0..11 = hewan lama (warna jangan diubah: disalin di HoodMesh.java), 12 = tanpa tudung, 13..23 = hewan Nusantara.
     private static final String[] HOOD_MAIN = {"#F2B24C", "#F28C28", "#FFFFFF", "#9AA5AD", "#5DBB4A", "#E8631C",
-            "#F6EEF3", "#A8744A", "#F2A65A", "#F3EAF7", "#37474F", "#8D6E4B"};
+            "#F6EEF3", "#A8744A", "#F2A65A", "#F3EAF7", "#37474F", "#8D6E4B", "#000000",
+            "#C4571F", "#6E7F4A", "#8C8A93", "#7D7F82", "#F2B705", "#8A6B4F", "#C98A4B", "#6B4A2E", "#C98F52", "#5B3A29", "#4E8B5A"};
     private static final String[] HOOD_ACC = {"#B5651D", "#212121", "#212121", "#DDE3E6", "#FFFFFF", "#FFFFFF",
-            "#F8BBD0", "#5D3A1E", "#C77B30", "#F06292", "#FFFFFF", "#E6D5B8"};
+            "#F8BBD0", "#5D3A1E", "#C77B30", "#F06292", "#FFFFFF", "#E6D5B8", "#000000",
+            "#8A3A14", "#3F4A2A", "#E3B7B0", "#C9C3B0", "#0F8F5B", "#E8B8A8", "#F0DDBA", "#F1E3C4", "#F7EBD8", "#F3EAD7", "#C79A3B"};
+    private static final String[] HOOD_NAMES = {"Singa", "Harimau Sumatra", "Panda", "Koala", "Katak", "Rubah",
+            "Kelinci", "Anjing", "Kucing", "Unicorn", "Penguin", "Burung Hantu", "Tanpa tudung",
+            "Orangutan Kalimantan", "Komodo", "Gajah Sumatra", "Badak Jawa", "Cenderawasih", "Tarsius", "Bekantan",
+            "Elang Jawa", "Kancil", "Banteng", "Penyu Hijau"};
+    // Urutan kotak di toko: hewan lama, hewan Nusantara, lalu "tanpa tudung" selalu di kotak terakhir.
+    private static final int[] HOOD_ORDER = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+            13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 12};
+    // Jumlah tudung yang sudah punya mesh GL (HoodMesh). Hewan 13..23 baru ada di kartu 2D dan avatar balok.
+    private static final int GL_HOODS = 12;
+
+    private static boolean isHood(int a) {
+        return a >= 0 && a < AVATARS.length && a != NO_HOOD;
+    }
 
     // ---------- Avatar 3D tahap 1: data mesh balok ----------
-    private static final int MAXF = 900;
+    private static final int MAXF = 1400;
     // Sisi balok: depan, belakang, kanan, kiri, atas (indeks sudut: bit0=x, bit1=y, bit2=z)
     private static final int[][] BOX_FACES = {{4, 5, 7, 6}, {1, 0, 2, 3}, {5, 1, 3, 7}, {0, 4, 6, 2}, {0, 1, 5, 4}};
     private static final float[][] BOX_NORM = {{0f, 0f, 1f}, {0f, 0f, -1f}, {1f, 0f, 0f}, {-1f, 0f, 0f}, {0f, -1f, 0f}};
@@ -4762,42 +4781,236 @@ public class MainActivity extends Activity {
             }
         }
 
-        // Telinga / tanduk tudung hewan sebagai balok 3D
+        // Balok simetris kiri-kanan (pusat kepala x = 50).
+        private void symBox(float xa, float xb, float ya, float yb, float z0, float z1, int c) {
+            addBox(xa, ya, xb, yb, z0, z1, c, c, c, 0);
+            addBox(100f - xb, ya, 100f - xa, yb, z0, z1, c, c, c, 0);
+        }
+
+        // Tanda tipis di muka tudung (depan dahi), simetris.
+        private void frontMark(float xa, float xb, float ya, float yb, int c) {
+            symBox(xa, xb, ya, yb, 19.7f, 20.7f, c);
+        }
+
+        // Tanda tipis di muka tudung, satu balok (tengah).
+        private void frontMarkC(float xa, float xb, float ya, float yb, int c) {
+            addBox(xa, ya, xb, yb, 19.7f, 20.7f, c, c, c, 0);
+        }
+
+        // Tanda tipis di puncak tudung.
+        private void topMark(float xa, float xb, float z0, float z1, int c) {
+            addBox(xa, 2.7f, xb, 4.2f, z0, z1, c, c, c, 0);
+        }
+
+        // Telinga / tanduk / surai tudung hewan sebagai balok 3D (24 hewan, 12 = tanpa tudung)
         private void addEars(int a, int main, int acc, float hx0, float hx1, float hy0, float hy1) {
-            if (a == 0 || a == 1 || a == 2 || a == 3) {
-                float w = a == 3 ? 11f : 9f;
-                float h = a == 3 ? 9f : 7f;
-                int ec = (a == 0 || a == 2) ? acc : main;
-                addBox(hx0 - 3f, hy0 - h - 2f, hx0 - 3f + w, hy0 - 1f, -4.5f, 4.5f, ec, ec, ec, 0);
-                addBox(hx1 + 3f - w, hy0 - h - 2f, hx1 + 3f, hy0 - 1f, -4.5f, 4.5f, ec, ec, ec, 0);
-            } else if (a == 4) {
-                addBox(hx0 + 2f, hy0 - 9f, hx0 + 13f, hy0 - 1f, -5f, 5f, main, main, main, 0);
-                addBox(hx1 - 13f, hy0 - 9f, hx1 - 2f, hy0 - 1f, -5f, 5f, main, main, main, 0);
-            } else if (a == 5 || a == 8) {
-                addBox(hx0 - 1f, hy0 - 13f, hx0 + 7f, hy0 - 1f, -3f, 3f, main, main, main, 0);
-                addBox(hx1 - 7f, hy0 - 13f, hx1 + 1f, hy0 - 1f, -3f, 3f, main, main, main, 0);
-            } else if (a == 6) {
-                addBox(hx0 + 5f, hy0 - 22f, hx0 + 12f, hy0 - 1f, -3f, 3f, main, main, main, 0);
-                addBox(hx1 - 12f, hy0 - 22f, hx1 - 5f, hy0 - 1f, -3f, 3f, main, main, main, 0);
-            } else if (a == 7) {
-                addBox(hx0 - 7f, hy0 + 2f, hx0 - 1f, hy0 + 24f, -5f, 5f, acc, acc, acc, 0);
-                addBox(hx1 + 1f, hy0 + 2f, hx1 + 7f, hy0 + 24f, -5f, 5f, acc, acc, acc, 0);
-            } else if (a == 9) {
-                int gold = col("#FFD54F");
-                addBox(47f, hy0 - 15f, 53f, hy0 - 1f, -3f, 3f, gold, gold, gold, 0);
-                addBox(hx0, hy0 - 8f, hx0 + 7f, hy0 - 1f, -3f, 3f, main, main, main, 0);
-                addBox(hx1 - 7f, hy0 - 8f, hx1, hy0 - 1f, -3f, 3f, main, main, main, 0);
-            } else if (a == 11) {
-                int tuft = col("#6D4C41");
-                addBox(hx0, hy0 - 11f, hx0 + 6f, hy0 - 1f, -3f, 3f, tuft, tuft, tuft, 0);
-                addBox(hx1 - 6f, hy0 - 11f, hx1, hy0 - 1f, -3f, 3f, tuft, tuft, tuft, 0);
+            final int dk = shade(main, 0.62f);
+            final int blk = col("#212121");
+            final int wht = Color.WHITE;
+            switch (a) {
+                case 0: // singa
+                    symBox(hx0 - 3f, hx0 + 6f, hy0 - 9f, hy0 - 1f, -4.5f, 4.5f, acc);
+                    symBox(hx0 - 0.5f, hx0 + 3.5f, hy0 - 6.5f, hy0 - 2f, 2.5f, 4.9f, shade(acc, 1.35f));
+                    symBox(hx0 - 8f, hx0 - 2f, hy0 + 1f, hy0 + 22f, -13f, 15f, acc);
+                    symBox(hx0 - 10f, hx0 - 5f, hy0 + 8f, hy0 + 28f, -9f, 12f, shade(acc, 0.82f));
+                    addBox(42f, hy0 - 8f, 58f, hy0 - 3f, 6f, 15f, acc, acc, acc, 0);
+                    break;
+                case 1: // harimau
+                    symBox(hx0 - 3f, hx0 + 6f, hy0 - 9f, hy0 - 1f, -4.5f, 4.5f, main);
+                    symBox(hx0 - 0.5f, hx0 + 3.5f, hy0 - 6.5f, hy0 - 2f, 2.5f, 4.9f, col("#FFE9C7"));
+                    topMark(39f, 41.2f, -9f, 9f, acc);
+                    topMark(48.9f, 51.1f, -9f, 9f, acc);
+                    topMark(58.8f, 61f, -9f, 9f, acc);
+                    frontMark(43f, 45.2f, 5f, 11f, acc);
+                    frontMarkC(48.8f, 51.2f, 5f, 13f, acc);
+                    symBox(27.4f, 28.7f, 11f, 13f, -6f, 14f, acc);
+                    symBox(27.4f, 28.7f, 17f, 19f, -6f, 14f, acc);
+                    symBox(27.4f, 28.7f, 23f, 25f, -6f, 14f, acc);
+                    symBox(27.6f, 34f, 25f, 33f, 8f, 20.6f, wht);
+                    break;
+                case 2: // panda
+                    symBox(hx0 - 3f, hx0 + 6f, hy0 - 9f, hy0 - 1f, -4.5f, 4.5f, acc);
+                    symBox(hx0 - 0.5f, hx0 + 3.5f, hy0 - 6.5f, hy0 - 2f, 2.5f, 4.9f, col("#5A5A5A"));
+                    symBox(27.4f, 28.7f, 14f, 27f, 2f, 17f, acc);
+                    break;
+                case 3: // koala
+                    symBox(hx0 - 3f, hx0 + 8f, hy0 - 11f, hy0 - 1f, -4.5f, 4.5f, main);
+                    symBox(hx0 - 0.5f, hx0 + 5.5f, hy0 - 8f, hy0 - 2.5f, 2.5f, 4.9f, acc);
+                    frontMarkC(45.5f, 54.5f, 8.5f, 14f, col("#455A64"));
+                    break;
+                case 4: // katak
+                    symBox(hx0 + 2f, hx0 + 13f, hy0 - 9f, hy0 - 1f, -5f, 5f, main);
+                    symBox(hx0 + 4f, hx0 + 11f, hy0 - 8f, hy0 - 2f, 1.5f, 5.4f, wht);
+                    symBox(hx0 + 6f, hx0 + 9f, hy0 - 6.5f, hy0 - 3f, 5.3f, 5.8f, blk);
+                    topMark(44f, 48f, -6f, -2f, shade(main, 0.78f));
+                    topMark(55f, 58f, 2f, 6f, shade(main, 0.78f));
+                    topMark(38f, 41f, 5f, 9f, shade(main, 0.78f));
+                    break;
+                case 5: // rubah
+                    symBox(hx0 - 1f, hx0 + 7f, hy0 - 13f, hy0 - 1f, -3f, 3f, main);
+                    symBox(hx0 + 0.5f, hx0 + 6f, hy0 - 13f, hy0 - 9.5f, -3.1f, 3.1f, col("#3E2723"));
+                    symBox(hx0 + 1.5f, hx0 + 5f, hy0 - 10f, hy0 - 3f, 2.5f, 3.4f, col("#FFE0B2"));
+                    symBox(27.5f, 34f, 25f, 33f, 8f, 20.6f, wht);
+                    frontMarkC(46.5f, 53.5f, 5f, 13f, wht);
+                    break;
+                case 6: // kelinci
+                    symBox(hx0 + 5f, hx0 + 12f, hy0 - 22f, hy0 - 1f, -3f, 3f, main);
+                    symBox(hx0 + 6.5f, hx0 + 10.5f, hy0 - 19f, hy0 - 3f, 2.6f, 3.4f, acc);
+                    symBox(27.6f, 33f, 27f, 33f, 8f, 20.6f, wht);
+                    break;
+                case 7: // anjing
+                    symBox(hx0 - 7f, hx0 - 1f, hy0 + 2f, hy0 + 24f, -5f, 5f, acc);
+                    symBox(hx0 - 8f, hx0 - 6.5f, hy0 + 4f, hy0 + 20f, -3.5f, 3.5f, shade(acc, 0.8f));
+                    frontMarkC(47f, 53f, 4.5f, 15f, col("#F5E6D3"));
+                    topMark(36f, 44f, 2f, 12f, acc);
+                    break;
+                case 8: // kucing
+                    symBox(hx0 - 1f, hx0 + 7f, hy0 - 13f, hy0 - 1f, -3f, 3f, main);
+                    symBox(hx0 + 0.5f, hx0 + 5.5f, hy0 - 10f, hy0 - 2f, 2.5f, 3.4f, col("#F4A6B0"));
+                    topMark(42f, 44f, -8f, 8f, acc);
+                    topMark(48.5f, 51.5f, -8f, 8f, acc);
+                    topMark(56f, 58f, -8f, 8f, acc);
+                    frontMark(44f, 46f, 5f, 11f, acc);
+                    frontMarkC(49f, 51f, 5f, 13f, acc);
+                    symBox(27.4f, 28.7f, 12f, 13.6f, -6f, 14f, acc);
+                    symBox(27.4f, 28.7f, 18f, 19.6f, -6f, 14f, acc);
+                    break;
+                case 9: { // unicorn
+                    int gold = col("#FFD54F");
+                    symBox(hx0, hx0 + 7f, hy0 - 8f, hy0 - 1f, -3f, 3f, main);
+                    symBox(hx0 + 1f, hx0 + 5.5f, hy0 - 6f, hy0 - 2f, 2.5f, 3.4f, col("#F8BBD0"));
+                    addBox(47f, hy0 - 15f, 53f, hy0 - 1f, -3f, 3f, gold, gold, gold, 0);
+                    addBox(48.4f, hy0 - 19f, 51.6f, hy0 - 14f, -1.6f, 1.6f, col("#FFE082"), col("#FFE082"), col("#FFE082"), 0);
+                    addBox(46.8f, hy0 - 11f, 53.2f, hy0 - 9.5f, -3.2f, 3.2f, col("#FFA000"), col("#FFA000"), col("#FFA000"), 0);
+                    addBox(46.8f, hy0 - 6.5f, 53.2f, hy0 - 5f, -3.2f, 3.2f, col("#FFA000"), col("#FFA000"), col("#FFA000"), 0);
+                    addBox(hx1 + 0.5f, hy0 - 2f, hx1 + 6f, hy0 + 26f, -12f, 8f, acc, acc, acc, 0);
+                    addBox(hx1 + 3f, hy0 + 6f, hx1 + 8f, hy0 + 30f, -14f, 4f, col("#B39DDB"), col("#B39DDB"), col("#B39DDB"), 0);
+                    break;
+                }
+                case 10: // penguin
+                    symBox(hx0 + 1f, hx0 + 7f, hy0 - 9f, hy0 - 1f, -2.5f, 2.5f, col("#FFCA28"));
+                    symBox(27.4f, 28.7f, 17f, 30f, 2f, 18f, wht);
+                    frontMark(37f, 45f, 6f, 9.5f, wht);
+                    addBox(46f, 6f, 54f, 12f, 20f, 24f, col("#FFB300"), col("#FFB300"), col("#FFB300"), 0);
+                    break;
+                case 11: // burung hantu
+                    symBox(hx0, hx0 + 6f, hy0 - 11f, hy0 - 1f, -3f, 3f, col("#6D4C41"));
+                    symBox(hx0 + 1f, hx0 + 4.5f, hy0 - 8f, hy0 - 2f, 2.5f, 3.4f, acc);
+                    symBox(37f, 48f, 5f, 14.5f, 19.8f, 20.8f, col("#C9AE86"));
+                    symBox(38.5f, 46.5f, 6.5f, 13f, 20.7f, 21.3f, wht);
+                    symBox(41f, 44f, 8.4f, 11.2f, 21.2f, 21.8f, col("#5D4037"));
+                    addBox(48.2f, 10f, 51.8f, 15f, 20.4f, 22.8f, col("#FFB300"), col("#FFB300"), col("#FFB300"), 0);
+                    break;
+                case 13: // orangutan
+                    addBox(36f, hy0 - 7f, 64f, hy0 - 2f, -12f, 12f, main, main, main, 0);
+                    addBox(44f, hy0 - 10f, 56f, hy0 - 5f, -8f, 8f, main, main, main, 0);
+                    symBox(hx0 - 6f, hx0 - 1f, hy0 + 4f, hy0 + 34f, -12f, 14f, main);
+                    symBox(hx0 - 7f, hx0 - 4f, hy0 + 10f, hy0 + 38f, -9f, 10f, acc);
+                    symBox(31.5f, 36f, 22f, 34f, 17.5f, 21.5f, col("#D9A66E"));
+                    frontMark(38f, 45f, 11f, 12.6f, acc);
+                    break;
+                case 14: // komodo
+                    symBox(hx0 + 1f, hx0 + 7f, hy0 - 7f, hy0 - 1f, -3f, 3f, acc);
+                    addBox(48.5f, hy0 - 8f, 51.5f, hy0 - 2f, -12f, -6f, acc, acc, acc, 0);
+                    addBox(48.5f, hy0 - 8f, 51.5f, hy0 - 2f, -4f, 2f, acc, acc, acc, 0);
+                    addBox(48.5f, hy0 - 8f, 51.5f, hy0 - 2f, 4f, 10f, acc, acc, acc, 0);
+                    frontMark(36f, 40f, 5f, 8.5f, acc);
+                    frontMark(42f, 46f, 9f, 12.5f, acc);
+                    frontMarkC(47.5f, 52.5f, 5f, 8.5f, acc);
+                    symBox(27.4f, 28.7f, 14f, 15.6f, -6f, 14f, col("#D4C25A"));
+                    symBox(27.4f, 28.7f, 24f, 25.6f, -6f, 14f, col("#D4C25A"));
+                    break;
+                case 15: // gajah
+                    symBox(hx0 - 12f, hx0 - 1f, hy0 + 1f, hy0 + 22f, -6f, 8f, main);
+                    symBox(hx0 - 12.8f, hx0 - 11.4f, hy0 + 4f, hy0 + 18f, -3f, 6f, acc);
+                    addBox(46.5f, 6f, 53.5f, 24f, 19.8f, 23.5f, shade(main, 0.95f), shade(main, 0.95f), shade(main, 0.95f), 0);
+                    addBox(46.2f, 11f, 53.8f, 11.8f, 23.3f, 23.7f, dk, dk, dk, 0);
+                    addBox(46.2f, 15f, 53.8f, 15.8f, 23.3f, 23.7f, dk, dk, dk, 0);
+                    addBox(46.2f, 19f, 53.8f, 19.8f, 23.3f, 23.7f, dk, dk, dk, 0);
+                    symBox(32.5f, 35f, 35f, 43f, 19f, 21.5f, col("#FFF8E1"));
+                    break;
+                case 16: // badak jawa
+                    symBox(hx0 + 1f, hx0 + 7f, hy0 - 7f, hy0 - 1f, -3f, 3f, main);
+                    addBox(46f, hy0 - 4f, 54f, hy0 - 1f, 0f, 7f, dk, dk, dk, 0);
+                    addBox(47.8f, hy0 - 15f, 52.2f, hy0 - 3f, 1.2f, 5.2f, acc, acc, acc, 0);
+                    addBox(48.8f, hy0 - 18f, 51.2f, hy0 - 14f, 2.2f, 4.2f, shade(acc, 0.8f), shade(acc, 0.8f), shade(acc, 0.8f), 0);
+                    symBox(27.4f, 28.7f, 14f, 15f, -8f, 16f, dk);
+                    symBox(27.4f, 28.7f, 22f, 23f, -8f, 16f, dk);
+                    symBox(27.4f, 28.7f, 28f, 29f, -8f, 16f, dk);
+                    break;
+                case 17: { // cenderawasih
+                    int orange = col("#FF8F00");
+                    addBox(40f, hy0 - 20f, 42f, hy0 - 3f, -14f, -10f, acc, acc, acc, 0);
+                    addBox(58f, hy0 - 20f, 60f, hy0 - 3f, -14f, -10f, acc, acc, acc, 0);
+                    addBox(48.5f, hy0 - 24f, 51.5f, hy0 - 3f, -16f, -12f, orange, orange, orange, 0);
+                    addBox(47.5f, 7f, 52.5f, 11f, 20f, 23f, col("#9CC8D8"), col("#9CC8D8"), col("#9CC8D8"), 0);
+                    frontMarkC(37f, 63f, 12.5f, 15f, acc);
+                    symBox(26.5f, 31f, hy0 + 2f, hy0 + 28f, -8f, 10f, col("#E8891C"));
+                    symBox(24f, 28f, hy0 + 10f, hy0 + 34f, -6f, 8f, main);
+                    break;
+                }
+                case 18: // tarsius
+                    symBox(hx0 - 8f, hx0 + 2f, hy0 - 10f, hy0 + 6f, -3f, 3f, main);
+                    symBox(hx0 - 6f, hx0, hy0 - 8f, hy0 + 3f, 2.5f, 3.4f, acc);
+                    symBox(37f, 47f, 4.5f, 14.5f, 19.8f, 21f, col("#FFD866"));
+                    symBox(40f, 44f, 7.5f, 12.5f, 20.9f, 21.5f, col("#3E2723"));
+                    break;
+                case 19: // bekantan
+                    symBox(hx0 - 6f, hx0 - 1f, hy0 + 4f, hy0 + 30f, -12f, 14f, acc);
+                    symBox(hx0 - 1f, hx0 + 3.5f, hy0 - 3.5f, hy0 - 1f, -2.5f, 2.5f, main);
+                    addBox(46.5f, 8f, 53.5f, 22f, 19.8f, 24f, col("#E8A47C"), col("#E8A47C"), col("#E8A47C"), 0);
+                    addBox(47.6f, 20f, 49.2f, 21.5f, 23.9f, 24.3f, dk, dk, dk, 0);
+                    addBox(50.8f, 20f, 52.4f, 21.5f, 23.9f, 24.3f, dk, dk, dk, 0);
+                    break;
+                case 20: { // elang jawa
+                    int crest = col("#2B1D12");
+                    addBox(42f, hy0 - 9f, 45f, hy0 - 1f, -8f, 2f, crest, crest, crest, 0);
+                    addBox(47f, hy0 - 13f, 53f, hy0 - 1f, -10f, 0f, crest, crest, crest, 0);
+                    addBox(55f, hy0 - 9f, 58f, hy0 - 1f, -8f, 2f, crest, crest, crest, 0);
+                    addBox(47.5f, 8f, 52.5f, 16f, 20f, 24f, col("#E8B923"), col("#E8B923"), col("#E8B923"), 0);
+                    addBox(48.2f, 15f, 51.8f, 19f, 22f, 24f, col("#37474F"), col("#37474F"), col("#37474F"), 0);
+                    frontMark(37f, 45f, 12f, 13.6f, crest);
+                    symBox(27.4f, 28.7f, 14f, 15.5f, -6f, 16f, acc);
+                    symBox(27.4f, 28.7f, 20f, 21.5f, -6f, 16f, acc);
+                    symBox(27.4f, 28.7f, 26f, 27.5f, -6f, 16f, acc);
+                    break;
+                }
+                case 21: // kancil
+                    symBox(hx0 + 3f, hx0 + 10f, hy0 - 16f, hy0 - 1f, -3f, 3f, main);
+                    symBox(hx0 + 4.3f, hx0 + 8.7f, hy0 - 14f, hy0 - 3f, 2.5f, 3.4f, col("#FFD9C4"));
+                    topMark(38f, 40.5f, -4f, -1f, acc);
+                    topMark(44f, 46.5f, 3f, 6f, acc);
+                    frontMark(44f, 46f, 6f, 8f, acc);
+                    frontMark(35f, 37f, 10f, 12f, acc);
+                    symBox(27.6f, 34f, 25f, 33f, 8f, 20.6f, acc);
+                    frontMarkC(49.4f, 50.6f, 4f, 14f, dk);
+                    break;
+                case 22: { // banteng
+                    int tip = col("#3B2416");
+                    symBox(hx0 - 9f, hx0 + 1f, hy0 + 1f, hy0 + 6f, -3f, 3f, acc);
+                    symBox(hx0 - 9f, hx0 - 4f, hy0 - 9f, hy0 + 2f, -3f, 3f, acc);
+                    symBox(hx0 - 8.4f, hx0 - 4.6f, hy0 - 13f, hy0 - 8f, -2f, 2f, tip);
+                    addBox(43f, hy0 - 6f, 57f, hy0 - 2f, 4f, 14f, tip, tip, tip, 0);
+                    symBox(27.6f, 34f, 26f, 33f, 8f, 20.6f, acc);
+                    break;
+                }
+                case 23: // penyu
+                    topMark(44f, 56f, -6f, 6f, acc);
+                    topMark(36f, 42f, -6f, 6f, shade(acc, 0.88f));
+                    topMark(58f, 64f, -6f, 6f, shade(acc, 0.88f));
+                    frontMarkC(43f, 57f, 5f, 13f, acc);
+                    frontMark(36f, 42f, 6f, 12f, shade(acc, 0.88f));
+                    symBox(hx0 - 7f, hx0 - 1f, hy0 + 16f, hy0 + 30f, -4f, 8f, main);
+                    break;
+                default:
+                    break;
             }
         }
 
         // Avatar chibi anak SD: seragam putih-merah, putra / putri (kerudung), rambut dan tudung 3D.
         private void drawChar3D(Canvas c) {
             final int skin = col("#F6D3A8");
-            final boolean hood = animal >= 0 && animal < NO_HOOD;
+            final boolean hood = isHood(animal);
             final boolean girl = gender == 1;
             final boolean hijab = girl && !hood;
             curHood = hood;
@@ -5337,7 +5550,7 @@ public class MainActivity extends Activity {
 
         private void drawChar(Canvas c) {
             final int skin = col("#F2CFA5");
-            final boolean hood = animal >= 0 && animal < NO_HOOD;
+            final boolean hood = isHood(animal);
             final float ht = hood ? 8f : 13.5f;
 
             p.setStyle(Paint.Style.FILL);
@@ -5466,94 +5679,441 @@ public class MainActivity extends Activity {
             flat(c, 63.5f - g, 14f - g, 70f + g, 44f + g, 3f + g, color);
         }
 
+        // Tudung hewan 2D (kartu toko). Urutan: bagian di belakang tudung (telinga, tanduk, surai),
+        // badan tudung, lalu detail di depan (belang, bercak, paruh, mata, dsb.).
         private void drawHood(Canvas c, int a) {
             int main = col(HOOD_MAIN[a]);
             int acc = col(HOOD_ACC[a]);
             int inner = col("#FFE0B2");
+            int dk = shade(main, 0.62f);
+            int blk = col("#212121");
+            int wht = Color.WHITE;
+
+            // ---------- 1. di belakang tudung ----------
             if (a == 0) {
+                // singa: surai bergumpal dua lapis + telinga bulat
                 ball(c, 33f, 10f, 5f, acc);
                 ball(c, 67f, 10f, 5f, acc);
-                ball(c, 28f, 22f, 4.5f, acc);
-                ball(c, 28f, 32f, 4.5f, acc);
-                ball(c, 72f, 22f, 4.5f, acc);
-                ball(c, 72f, 32f, 4.5f, acc);
+                dot(c, 33f, 10.3f, 2.4f, shade(acc, 1.35f));
+                dot(c, 67f, 10.3f, 2.4f, shade(acc, 1.35f));
+                float[] my = {16f, 24f, 32f, 40f};
+                for (int i = 0; i < 4; i++) {
+                    float mx = (i == 0 || i == 3) ? 29f : 27.5f;
+                    ball(c, mx, my[i], 4.6f, acc);
+                    ball(c, 100f - mx, my[i], 4.6f, acc);
+                    dot(c, mx + 1.6f, my[i] + 0.5f, 2.3f, shade(acc, 1.22f));
+                    dot(c, 100f - mx - 1.6f, my[i] + 0.5f, 2.3f, shade(acc, 1.22f));
+                }
             } else if (a == 1) {
+                // harimau: telinga bulat berisi krem, tepi gelap
+                dot(c, 32f, 10f, 5.8f, blk);
+                dot(c, 68f, 10f, 5.8f, blk);
                 ball(c, 32f, 10f, 5f, main);
                 ball(c, 68f, 10f, 5f, main);
-                dot(c, 32f, 10f, 2.3f, inner);
-                dot(c, 68f, 10f, 2.3f, inner);
+                dot(c, 32f, 10.3f, 2.7f, col("#FFE9C7"));
+                dot(c, 68f, 10.3f, 2.7f, col("#FFE9C7"));
             } else if (a == 2) {
+                // panda: telinga hitam berisi abu
                 ball(c, 32f, 9f, 5.5f, acc);
                 ball(c, 68f, 9f, 5.5f, acc);
+                dot(c, 32f, 9.4f, 2.4f, col("#5A5A5A"));
+                dot(c, 68f, 9.4f, 2.4f, col("#5A5A5A"));
             } else if (a == 3) {
+                // koala: telinga besar berbulu halus
                 ball(c, 29f, 13f, 7f, main);
                 ball(c, 71f, 13f, 7f, main);
-                dot(c, 29f, 13f, 4f, acc);
-                dot(c, 71f, 13f, 4f, acc);
+                dot(c, 29f, 13f, 4.2f, acc);
+                dot(c, 71f, 13f, 4.2f, acc);
+                dot(c, 26.6f, 10.4f, 1.3f, wht);
+                dot(c, 31.5f, 9.6f, 1.2f, wht);
+                dot(c, 73.4f, 10.4f, 1.3f, wht);
+                dot(c, 68.5f, 9.6f, 1.2f, wht);
             } else if (a == 4) {
-                ball(c, 37f, 8f, 5.5f, main);
-                ball(c, 63f, 8f, 5.5f, main);
-            } else if (a == 5 || a == 8) {
+                // katak: gundukan mata
+                ball(c, 37f, 8f, 5.8f, main);
+                ball(c, 63f, 8f, 5.8f, main);
+            } else if (a == 5) {
+                // rubah: telinga runcing, ujung cokelat tua, bagian dalam krem
+                tri(c, 30.5f, 15.5f, 32.5f, -2f, 44f, 9f, dk);
+                tri(c, 69.5f, 15.5f, 67.5f, -2f, 56f, 9f, dk);
                 tri(c, 31f, 15f, 33f, -1f, 43f, 9f, main);
                 tri(c, 69f, 15f, 67f, -1f, 57f, 9f, main);
-                tri(c, 34f, 12f, 35f, 3f, 40f, 9f, a == 5 ? inner : acc);
-                tri(c, 66f, 12f, 65f, 3f, 60f, 9f, a == 5 ? inner : acc);
+                tri(c, 33f, 13f, 34f, 3f, 40.5f, 9f, inner);
+                tri(c, 67f, 13f, 66f, 3f, 59.5f, 9f, inner);
+                tri(c, 31.8f, 5f, 33f, -1f, 36.5f, 3.2f, col("#3E2723"));
+                tri(c, 68.2f, 5f, 67f, -1f, 63.5f, 3.2f, col("#3E2723"));
+            } else if (a == 8) {
+                // kucing: telinga runcing berisi merah muda
+                tri(c, 30.5f, 15.5f, 32.5f, -2f, 44f, 9f, dk);
+                tri(c, 69.5f, 15.5f, 67.5f, -2f, 56f, 9f, dk);
+                tri(c, 31f, 15f, 33f, -1f, 43f, 9f, main);
+                tri(c, 69f, 15f, 67f, -1f, 57f, 9f, main);
+                tri(c, 33.5f, 13f, 34.5f, 3f, 40.5f, 9f, col("#F4A6B0"));
+                tri(c, 66.5f, 13f, 65.5f, 3f, 59.5f, 9f, col("#F4A6B0"));
             } else if (a == 6) {
+                // kelinci: telinga panjang, bagian dalam merah muda
                 rect(c, 35f, -4f, 43f, 12f, 4f, main);
                 rect(c, 57f, -4f, 65f, 12f, 4f, main);
                 flat(c, 37f, -1f, 41f, 10f, 2f, acc);
                 flat(c, 59f, -1f, 63f, 10f, 2f, acc);
+                flat(c, 37.6f, 0f, 39f, 5f, 0.7f, shade(acc, 1.08f));
+                flat(c, 61f, 0f, 62.4f, 5f, 0.7f, shade(acc, 1.08f));
             } else if (a == 7) {
+                // anjing: telinga lipat
                 rect(c, 23f, 14f, 33f, 38f, 4f, acc);
                 rect(c, 67f, 14f, 77f, 38f, 4f, acc);
+                flat(c, 25f, 17f, 28f, 33f, 1.5f, shade(acc, 1.3f));
+                flat(c, 72f, 17f, 75f, 33f, 1.5f, shade(acc, 1.3f));
             } else if (a == 9) {
+                // unicorn: telinga + cula emas berulir
                 tri(c, 33f, 12f, 35f, 3f, 41f, 9f, main);
                 tri(c, 67f, 12f, 65f, 3f, 59f, 9f, main);
+                tri(c, 35f, 11f, 36f, 5f, 39f, 9f, col("#F8BBD0"));
+                tri(c, 65f, 11f, 64f, 5f, 61f, 9f, col("#F8BBD0"));
                 tri(c, 46f, 9f, 50f, -5f, 54f, 9f, col("#FFD54F"));
+                line(c, 47.2f, 6f, 52.6f, 4.6f, 0.9f, col("#FFA000"));
+                line(c, 48.2f, 2.5f, 51.8f, 1.4f, 0.8f, col("#FFA000"));
+                line(c, 49.2f, -0.8f, 50.8f, -1.2f, 0.7f, col("#FFA000"));
             } else if (a == 11) {
+                // burung hantu: jambul telinga
                 tri(c, 31f, 15f, 32f, 1f, 42f, 9f, col("#6D4C41"));
                 tri(c, 69f, 15f, 68f, 1f, 58f, 9f, col("#6D4C41"));
+                tri(c, 33f, 12f, 34f, 5f, 38.5f, 9f, acc);
+                tri(c, 67f, 12f, 66f, 5f, 61.5f, 9f, acc);
+            } else if (a == 13) {
+                // orangutan: rambut panjang menjuntai + gundukan rambut di atas
+                rect(c, 25.5f, 16f, 34f, 54f, 4f, main);
+                rect(c, 66f, 16f, 74.5f, 54f, 4f, main);
+                for (int i = 0; i < 5; i++) {
+                    line(c, 28f + i * 1.3f, 24f, 27.5f + i * 1.4f, 50f, 0.6f, acc);
+                    line(c, 72f - i * 1.3f, 24f, 72.5f - i * 1.4f, 50f, 0.6f, acc);
+                }
+                ball(c, 39f, 8f, 5.6f, main);
+                ball(c, 50f, 4.5f, 6.4f, main);
+                ball(c, 61f, 8f, 5.6f, main);
+            } else if (a == 14) {
+                // komodo: tonjolan tanduk kecil di sudut kepala
+                tri(c, 31f, 13f, 30.5f, 1f, 39f, 9f, acc);
+                tri(c, 69f, 13f, 69.5f, 1f, 61f, 9f, acc);
+            } else if (a == 15) {
+                // gajah: telinga lebar berisi merah muda
+                ball(c, 25.5f, 27f, 8.8f, main);
+                ball(c, 74.5f, 27f, 8.8f, main);
+                dot(c, 27.2f, 27f, 5.6f, acc);
+                dot(c, 72.8f, 27f, 5.6f, acc);
+                line(c, 26f, 21f, 28f, 33f, 0.6f, shade(acc, 0.85f));
+                line(c, 74f, 21f, 72f, 33f, 0.6f, shade(acc, 0.85f));
+            } else if (a == 16) {
+                // badak: telinga kecil
+                ball(c, 33f, 10f, 4.6f, main);
+                ball(c, 67f, 10f, 4.6f, main);
+                dot(c, 33f, 10.3f, 2.1f, acc);
+                dot(c, 67f, 10.3f, 2.1f, acc);
+            } else if (a == 17) {
+                // cenderawasih: dua pita ekor panjang melengkung dan satu jambul oranye
+                line(c, 46f, 9f, 36f, 2f, 1.6f, acc);
+                line(c, 36f, 2f, 34f, -9f, 1.6f, acc);
+                line(c, 54f, 9f, 64f, 2f, 1.6f, acc);
+                line(c, 64f, 2f, 66f, -9f, 1.6f, acc);
+                line(c, 50f, 9f, 50f, -11f, 1.2f, col("#FF8F00"));
+                ball(c, 34f, -9f, 1.6f, acc);
+                ball(c, 66f, -9f, 1.6f, acc);
+            } else if (a == 18) {
+                // tarsius: telinga besar seperti kelelawar
+                ball(c, 27f, 15f, 8.2f, main);
+                ball(c, 73f, 15f, 8.2f, main);
+                dot(c, 27.6f, 15.5f, 5.2f, acc);
+                dot(c, 72.4f, 15.5f, 5.2f, acc);
+            } else if (a == 19) {
+                // bekantan: jubah bulu krem di sisi + telinga kecil
+                rect(c, 26f, 16f, 34f, 46f, 4f, acc);
+                rect(c, 66f, 16f, 74f, 46f, 4f, acc);
+                ball(c, 31f, 14f, 3.6f, main);
+                ball(c, 69f, 14f, 3.6f, main);
+            } else if (a == 20) {
+                // elang jawa: jambul bulu tegak
+                tri(c, 40f, 9f, 38f, -7f, 46f, 9f, col("#2B1D12"));
+                tri(c, 45f, 9f, 50f, -12f, 55f, 9f, col("#2B1D12"));
+                tri(c, 54f, 9f, 62f, -7f, 60f, 9f, col("#2B1D12"));
+                tri(c, 47.5f, 8f, 50f, -6f, 52.5f, 8f, wht);
+            } else if (a == 21) {
+                // kancil: telinga tegak panjang, dalam merah muda
+                rect(c, 33f, -3f, 41f, 13f, 4f, main);
+                rect(c, 59f, -3f, 67f, 13f, 4f, main);
+                flat(c, 35f, 0f, 39f, 10.5f, 2f, col("#FFD9C4"));
+                flat(c, 61f, 0f, 65f, 10.5f, 2f, col("#FFD9C4"));
+            } else if (a == 22) {
+                // banteng: tanduk krem melengkung ke atas, ujung gelap + telinga
+                line(c, 33f, 13f, 22f, 11.5f, 5.8f, blk);
+                line(c, 22f, 11.5f, 21f, -2f, 5.8f, blk);
+                line(c, 67f, 13f, 78f, 11.5f, 5.8f, blk);
+                line(c, 78f, 11.5f, 79f, -2f, 5.8f, blk);
+                line(c, 33f, 13f, 22f, 11.5f, 4.3f, acc);
+                line(c, 22f, 11.5f, 21f, -1f, 4.3f, acc);
+                line(c, 67f, 13f, 78f, 11.5f, 4.3f, acc);
+                line(c, 78f, 11.5f, 79f, -1f, 4.3f, acc);
+                line(c, 21.1f, 3f, 21f, -2f, 3.4f, col("#3B2416"));
+                line(c, 78.9f, 3f, 79f, -2f, 3.4f, col("#3B2416"));
+                ball(c, 30f, 21f, 3.4f, main);
+                ball(c, 70f, 21f, 3.4f, main);
+            } else if (a == 23) {
+                // penyu: sirip depan di sisi
+                rect(c, 21f, 32f, 32f, 44f, 5f, main);
+                rect(c, 68f, 32f, 79f, 44f, 5f, main);
+                flat(c, 23f, 35f, 29.5f, 41.5f, 3f, shade(main, 1.18f));
+                flat(c, 70.5f, 35f, 77f, 41.5f, 3f, shade(main, 1.18f));
             }
 
+            // ---------- 2. badan tudung ----------
             hoodRects(c, 0x55000000, 0.5f);
             hoodRects(c, main, 0f);
 
-            if (a == 1 || a == 8) {
-                int sc = a == 1 ? acc : col("#C77B30");
+            // ---------- 3. detail di depan ----------
+            if (a == 0) {
+                // singa: jambul dahi
+                tri(c, 39f, 9f, 42.5f, 2.5f, 46f, 9f, acc);
+                tri(c, 45f, 9f, 50f, 0f, 55f, 9f, acc);
+                tri(c, 54f, 9f, 57.5f, 2.5f, 61f, 9f, acc);
+                line(c, 31.3f, 18f, 34.2f, 22f, 0.6f, shade(acc, 0.8f));
+                line(c, 68.7f, 18f, 65.8f, 22f, 0.6f, shade(acc, 0.8f));
+            } else if (a == 1) {
+                // harimau (belang tebal di dahi dan pipi, pipi putih)
+                int sc = acc;
+                flat(c, 42f, 9f, 44.6f, 15f, 0.9f, sc);
+                flat(c, 48.8f, 9f, 51.2f, 18f, 0.9f, sc);
+                flat(c, 55.4f, 9f, 58f, 15f, 0.9f, sc);
+                flat(c, 38f, 17f, 41f, 21f, 0.8f, sc);
+                flat(c, 59f, 17f, 62f, 21f, 0.8f, sc);
+                flat(c, 30.5f, 25f, 36.2f, 27.4f, 0.7f, sc);
+                flat(c, 30.5f, 31f, 36.2f, 33.4f, 0.7f, sc);
+                flat(c, 30.5f, 37f, 36.2f, 39.4f, 0.7f, sc);
+                flat(c, 63.8f, 25f, 69.5f, 27.4f, 0.7f, sc);
+                flat(c, 63.8f, 31f, 69.5f, 33.4f, 0.7f, sc);
+                flat(c, 63.8f, 37f, 69.5f, 39.4f, 0.7f, sc);
+                tri(c, 30f, 44f, 30f, 38f, 36.5f, 44f, wht);
+                tri(c, 70f, 44f, 70f, 38f, 63.5f, 44f, wht);
+            } else if (a == 2) {
+                // panda: bercak mata miring + pipi
+                flat(c, 30.8f, 24f, 36.2f, 36f, 2.6f, acc);
+                flat(c, 63.8f, 24f, 69.2f, 36f, 2.6f, acc);
+                dot(c, 33.5f, 40f, 1.5f, col("#F8C9D0"));
+                dot(c, 66.5f, 40f, 1.5f, col("#F8C9D0"));
+            } else if (a == 3) {
+                // koala: hidung besar + bulu putih di dagu
+                flat(c, 45f, 9.5f, 55f, 16f, 3f, col("#455A64"));
+                dot(c, 48f, 11.5f, 1f, col("#78909C"));
+                tri(c, 30f, 44f, 30f, 36f, 36.5f, 44f, acc);
+                tri(c, 70f, 44f, 70f, 36f, 63.5f, 44f, acc);
+                dot(c, 40f, 17f, 0.8f, dk);
+                dot(c, 59f, 15f, 0.8f, dk);
+            } else if (a == 4) {
+                // katak: mata menonjol, lubang hidung, bintik kulit
+                dot(c, 37f, 8f, 3.9f, wht);
+                dot(c, 63f, 8f, 3.9f, wht);
+                dot(c, 37.5f, 8.3f, 1.9f, blk);
+                dot(c, 62.5f, 8.3f, 1.9f, blk);
+                dot(c, 38.1f, 7.4f, 0.6f, wht);
+                dot(c, 62.9f, 7.4f, 0.6f, wht);
+                dot(c, 48.6f, 13f, 0.8f, dk);
+                dot(c, 51.4f, 13f, 0.8f, dk);
+                dot(c, 42f, 17f, 1.5f, shade(main, 0.78f));
+                dot(c, 58f, 18f, 1.5f, shade(main, 0.78f));
+                dot(c, 45f, 20f, 1.1f, shade(main, 0.78f));
+                dot(c, 55.5f, 13.5f, 1.2f, shade(main, 0.78f));
+            } else if (a == 5) {
+                // rubah: pipi putih + belang putih di dahi
+                tri(c, 30f, 44f, 30f, 34f, 36.5f, 44f, wht);
+                tri(c, 70f, 44f, 70f, 34f, 63.5f, 44f, wht);
+                tri(c, 44f, 23f, 56f, 23f, 50f, 12f, wht);
+            } else if (a == 6) {
+                // kelinci: bulu halus di dahi + pipi pink
+                dot(c, 46f, 11f, 2.2f, wht);
+                dot(c, 50f, 9.5f, 2.4f, wht);
+                dot(c, 54f, 11f, 2.2f, wht);
+                dot(c, 33.3f, 39.5f, 1.6f, col("#F8BBD0"));
+                dot(c, 66.7f, 39.5f, 1.6f, col("#F8BBD0"));
+            } else if (a == 7) {
+                // anjing: garis putih di dahi + bercak mata kiri
+                flat(c, 47f, 9f, 53f, 23f, 2.5f, col("#F5E6D3"));
+                flat(c, 30.6f, 14f, 36f, 31f, 2.6f, acc);
+                dot(c, 40f, 17f, 0.9f, shade(main, 0.8f));
+                dot(c, 60f, 15f, 0.9f, shade(main, 0.8f));
+            } else if (a == 8) {
+                // kucing: belang M di dahi + kumis di pipi
+                int sc = acc;
                 flat(c, 44f, 9f, 46f, 15f, 0.8f, sc);
                 flat(c, 49f, 9f, 51f, 16f, 0.8f, sc);
                 flat(c, 54f, 9f, 56f, 15f, 0.8f, sc);
-                if (a == 1) {
-                    flat(c, 30.5f, 26f, 36f, 28f, 0.6f, acc);
-                    flat(c, 30.5f, 33f, 36f, 35f, 0.6f, acc);
-                    flat(c, 64f, 26f, 69.5f, 28f, 0.6f, acc);
-                    flat(c, 64f, 33f, 69.5f, 35f, 0.6f, acc);
-                }
-            } else if (a == 2) {
-                dot(c, 33.2f, 30f, 2.6f, acc);
-                dot(c, 66.8f, 30f, 2.6f, acc);
-            } else if (a == 3) {
-                flat(c, 46f, 10f, 54f, 15f, 2.5f, col("#455A64"));
-            } else if (a == 4) {
-                dot(c, 37f, 8f, 3.8f, Color.WHITE);
-                dot(c, 63f, 8f, 3.8f, Color.WHITE);
-                dot(c, 37.5f, 8.3f, 1.8f, Color.BLACK);
-                dot(c, 62.5f, 8.3f, 1.8f, Color.BLACK);
-            } else if (a == 5) {
-                tri(c, 30f, 44f, 30f, 34f, 36.5f, 44f, Color.WHITE);
-                tri(c, 70f, 44f, 70f, 34f, 63.5f, 44f, Color.WHITE);
+                flat(c, 39f, 17f, 42f, 19f, 0.7f, sc);
+                flat(c, 58f, 17f, 61f, 19f, 0.7f, sc);
+                flat(c, 30.5f, 26f, 35f, 27.6f, 0.6f, sc);
+                flat(c, 65f, 26f, 69.5f, 27.6f, 0.6f, sc);
+                line(c, 30.8f, 36f, 36.3f, 35.2f, 0.5f, wht);
+                line(c, 30.8f, 39f, 36.3f, 38.4f, 0.5f, wht);
+                line(c, 69.2f, 36f, 63.7f, 35.2f, 0.5f, wht);
+                line(c, 69.2f, 39f, 63.7f, 38.4f, 0.5f, wht);
             } else if (a == 9) {
+                // unicorn: surai pelangi di sisi kanan + kilau bintang
                 rect(c, 65.5f, 10f, 72f, 38f, 3f, acc);
+                flat(c, 67f, 14f, 71f, 32f, 2f, col("#B39DDB"));
+                flat(c, 66.6f, 26f, 70.6f, 42f, 2f, col("#80DEEA"));
+                dot(c, 40f, 16f, 1.4f, col("#FFD54F"));
+                dot(c, 36.5f, 12f, 0.9f, col("#FFD54F"));
+                dot(c, 44f, 12.5f, 0.8f, col("#FFD54F"));
             } else if (a == 10) {
+                // penguin: paruh, sayap putih, alis putih, jambul kuning
                 tri(c, 46f, 10f, 54f, 10f, 50f, 16f, col("#FFB300"));
-                flat(c, 31f, 27f, 36.2f, 41f, 2f, Color.WHITE);
-                flat(c, 63.8f, 27f, 69f, 41f, 2f, Color.WHITE);
+                flat(c, 31f, 27f, 36.2f, 41f, 2f, wht);
+                flat(c, 63.8f, 27f, 69f, 41f, 2f, wht);
+                flat(c, 37f, 17.5f, 45f, 21f, 1.8f, wht);
+                flat(c, 55f, 17.5f, 63f, 21f, 1.8f, wht);
+                tri(c, 36f, 17f, 28f, 7f, 34f, 10f, col("#FFCA28"));
+                tri(c, 64f, 17f, 72f, 7f, 66f, 10f, col("#FFCA28"));
             } else if (a == 11) {
-                dot(c, 42.5f, 14f, 4.8f, Color.WHITE);
-                dot(c, 57.5f, 14f, 4.8f, Color.WHITE);
+                // burung hantu: mata besar bercincin, paruh, bulu bergaris
+                dot(c, 42.5f, 14f, 6.4f, col("#C9AE86"));
+                dot(c, 57.5f, 14f, 6.4f, col("#C9AE86"));
+                dot(c, 42.5f, 14f, 4.8f, wht);
+                dot(c, 57.5f, 14f, 4.8f, wht);
                 dot(c, 42.5f, 14f, 2.2f, col("#5D4037"));
                 dot(c, 57.5f, 14f, 2.2f, col("#5D4037"));
+                dot(c, 43.3f, 13.1f, 0.7f, wht);
+                dot(c, 58.3f, 13.1f, 0.7f, wht);
                 tri(c, 48.5f, 17f, 51.5f, 17f, 50f, 21f, col("#FFB300"));
+                for (int i = 0; i < 3; i++) {
+                    float yy = 25f + i * 7f;
+                    line(c, 31.6f, yy, 33.3f, yy + 2f, 0.6f, col("#5D4037"));
+                    line(c, 33.3f, yy + 2f, 35f, yy, 0.6f, col("#5D4037"));
+                    line(c, 65f, yy, 66.7f, yy + 2f, 0.6f, col("#5D4037"));
+                    line(c, 66.7f, yy + 2f, 68.4f, yy, 0.6f, col("#5D4037"));
+                }
+            } else if (a == 13) {
+                // orangutan: bantalan pipi, garis rambut, alis tebal
+                dot(c, 33.3f, 31f, 4.4f, col("#D9A66E"));
+                dot(c, 66.7f, 31f, 4.4f, col("#D9A66E"));
+                line(c, 50f, 8.5f, 46f, 17f, 0.8f, acc);
+                line(c, 50f, 8.5f, 54f, 17f, 0.8f, acc);
+                line(c, 42f, 9.5f, 40f, 19f, 0.8f, acc);
+                line(c, 58f, 9.5f, 60f, 19f, 0.8f, acc);
+                line(c, 38f, 22.5f, 45f, 21f, 1.5f, acc);
+                line(c, 62f, 22.5f, 55f, 21f, 1.5f, acc);
+            } else if (a == 14) {
+                // komodo: sisik, jambul duri, lubang hidung, bintik kuning
+                for (int r = 0; r < 3; r++) {
+                    for (int q = 0; q < 6; q++) {
+                        float sx = 37f + q * 4.8f + ((r & 1) == 1 ? 2.4f : 0f);
+                        if (sx < 61f) {
+                            flat(c, sx, 11.5f + r * 3.8f, sx + 3f, 13.6f + r * 3.8f, 0.8f, acc);
+                        }
+                    }
+                }
+                for (int q = 0; q < 5; q++) {
+                    float sx = 38f + q * 6f;
+                    tri(c, sx - 2f, 9.2f, sx, 4.5f, sx + 2f, 9.2f, shade(acc, 1.35f));
+                }
+                dot(c, 47.4f, 21f, 0.8f, blk);
+                dot(c, 52.6f, 21f, 0.8f, blk);
+                dot(c, 33.2f, 20f, 1f, col("#D4C25A"));
+                dot(c, 66.8f, 20f, 1f, col("#D4C25A"));
+                dot(c, 33.2f, 30f, 1f, col("#D4C25A"));
+                dot(c, 66.8f, 30f, 1f, col("#D4C25A"));
+                dot(c, 33.2f, 39f, 1f, col("#D4C25A"));
+                dot(c, 66.8f, 39f, 1f, col("#D4C25A"));
+            } else if (a == 15) {
+                // gajah: belalai berkerut di dahi + gading
+                flat(c, 45.2f, 9f, 54.8f, 23f, 4.4f, shade(main, 0.93f));
+                line(c, 46.4f, 13f, 53.6f, 13f, 0.55f, dk);
+                line(c, 46.4f, 16.4f, 53.6f, 16.4f, 0.55f, dk);
+                line(c, 46.4f, 19.8f, 53.6f, 19.8f, 0.55f, dk);
+                dot(c, 48.5f, 22.6f, 0.9f, blk);
+                dot(c, 51.5f, 22.6f, 0.9f, blk);
+                tri(c, 30f, 37f, 36.5f, 44f, 30f, 49f, col("#FFF8E1"));
+                tri(c, 70f, 37f, 63.5f, 44f, 70f, 49f, col("#FFF8E1"));
+            } else if (a == 16) {
+                // badak jawa: satu cula, lipatan kulit
+                tri(c, 44f, 10f, 50f, -4f, 56f, 10f, acc);
+                tri(c, 47.6f, 3f, 50f, -4f, 52.4f, 3f, shade(acc, 0.8f));
+                flat(c, 43.5f, 8f, 56.5f, 12.5f, 2.2f, dk);
+                line(c, 38f, 17f, 62f, 17f, 0.7f, dk);
+                for (int i = 0; i < 3; i++) {
+                    float yy = 24f + i * 8f;
+                    line(c, 30.6f, yy, 36f, yy + 1.2f, 0.6f, dk);
+                    line(c, 69.4f, yy, 64f, yy + 1.2f, 0.6f, dk);
+                }
+            } else if (a == 17) {
+                // cenderawasih: paruh biru, leher hijau zamrud, bulu rumbai di sisi
+                flat(c, 30f, 14f, 34f, 42f, 2f, col("#E8891C"));
+                flat(c, 66f, 14f, 70f, 42f, 2f, col("#E8891C"));
+                flat(c, 31f, 30f, 34.4f, 44f, 1.6f, col("#FFB300"));
+                flat(c, 65.6f, 30f, 69f, 44f, 1.6f, col("#FFB300"));
+                flat(c, 37.5f, 18.4f, 62.5f, 22.4f, 2f, acc);
+                tri(c, 46.5f, 9f, 53.5f, 9f, 50f, 16f, col("#9CC8D8"));
+            } else if (a == 18) {
+                // tarsius: mata raksasa kuning
+                ball(c, 41f, 15.5f, 5.6f, col("#FFD866"));
+                ball(c, 59f, 15.5f, 5.6f, col("#FFD866"));
+                dot(c, 41f, 15.5f, 3.7f, col("#3E2723"));
+                dot(c, 59f, 15.5f, 3.7f, col("#3E2723"));
+                dot(c, 42.4f, 14f, 1.2f, wht);
+                dot(c, 60.4f, 14f, 1.2f, wht);
+                dot(c, 50f, 19f, 1f, col("#E8A0A0"));
+                dot(c, 36f, 9.5f, 0.8f, dk);
+                dot(c, 63f, 10f, 0.8f, dk);
+            } else if (a == 19) {
+                // bekantan: hidung besar menjuntai + bulu pipi krem
+                flat(c, 46.5f, 9f, 53.5f, 17f, 3f, col("#E8A47C"));
+                ball(c, 50f, 18f, 5.1f, col("#E8A47C"));
+                dot(c, 48.3f, 19.6f, 0.85f, dk);
+                dot(c, 51.7f, 19.6f, 0.85f, dk);
+                tri(c, 30f, 44f, 30f, 34f, 36.5f, 44f, acc);
+                tri(c, 70f, 44f, 70f, 34f, 63.5f, 44f, acc);
+                line(c, 37f, 11f, 44f, 12.5f, 1f, dk);
+                line(c, 63f, 11f, 56f, 12.5f, 1f, dk);
+            } else if (a == 20) {
+                // elang jawa: paruh bengkok, alis garang, bulu bergaris krem
+                tri(c, 45.5f, 10f, 54.5f, 10f, 50f, 21f, col("#E8B923"));
+                tri(c, 47.8f, 17.5f, 52.2f, 17.5f, 50f, 24f, col("#37474F"));
+                line(c, 36.5f, 22.5f, 44.5f, 19.2f, 1.5f, col("#2B1D12"));
+                line(c, 63.5f, 22.5f, 55.5f, 19.2f, 1.5f, col("#2B1D12"));
+                for (int i = 0; i < 4; i++) {
+                    float yy = 24f + i * 5.2f;
+                    flat(c, 30.8f, yy, 35.8f, yy + 1.6f, 0.6f, acc);
+                    flat(c, 64.2f, yy, 69.2f, yy + 1.6f, 0.6f, acc);
+                }
+                line(c, 38f, 12f, 40f, 19f, 0.7f, acc);
+                line(c, 62f, 12f, 60f, 19f, 0.7f, acc);
+            } else if (a == 21) {
+                // kancil: bintik rusa, garis hidung, bulu putih di pipi
+                dot(c, 38f, 12f, 1.3f, acc);
+                dot(c, 44f, 17f, 1.3f, acc);
+                dot(c, 57f, 12f, 1.3f, acc);
+                dot(c, 62f, 18f, 1.3f, acc);
+                dot(c, 41f, 20f, 1f, acc);
+                dot(c, 58.5f, 21f, 1f, acc);
+                line(c, 50f, 9f, 50f, 22f, 0.9f, shade(main, 0.72f));
+                tri(c, 30f, 44f, 30f, 35f, 36.5f, 44f, acc);
+                tri(c, 70f, 44f, 70f, 35f, 63.5f, 44f, acc);
+            } else if (a == 22) {
+                // banteng: jambul keriting gelap + pipi putih
+                dot(c, 44f, 12f, 2.6f, col("#3B2416"));
+                dot(c, 50f, 10.5f, 3f, col("#3B2416"));
+                dot(c, 56f, 12f, 2.6f, col("#3B2416"));
+                flat(c, 30.4f, 35f, 36.2f, 44f, 2.4f, acc);
+                flat(c, 63.8f, 35f, 69.6f, 44f, 2.4f, acc);
+                line(c, 38f, 22f, 44f, 20.6f, 1.2f, col("#3B2416"));
+                line(c, 62f, 22f, 56f, 20.6f, 1.2f, col("#3B2416"));
+            } else if (a == 23) {
+                // penyu: perisai sisik di atas, garis kuning di sisi, bintik
+                flat(c, 42.5f, 10f, 57.5f, 21f, 3.6f, acc);
+                flat(c, 35.2f, 11.5f, 41.5f, 20f, 2.6f, shade(acc, 0.88f));
+                flat(c, 58.5f, 11.5f, 64.8f, 20f, 2.6f, shade(acc, 0.88f));
+                line(c, 46f, 12f, 54f, 12f, 0.5f, shade(acc, 0.65f));
+                line(c, 46f, 15.5f, 54f, 15.5f, 0.5f, shade(acc, 0.65f));
+                line(c, 46f, 19f, 54f, 19f, 0.5f, shade(acc, 0.65f));
+                line(c, 33.2f, 25f, 33.2f, 41f, 0.9f, col("#F5E6A8"));
+                line(c, 66.8f, 25f, 66.8f, 41f, 0.9f, col("#F5E6A8"));
+                dot(c, 26.5f, 38f, 0.7f, col("#F5E6A8"));
+                dot(c, 73.5f, 38f, 0.7f, col("#F5E6A8"));
             }
         }
 
@@ -5748,7 +6308,7 @@ public class MainActivity extends Activity {
             items[k] = (e >= 0 && e < ITEMS.length && itSlot(e) == k && owns(e) && itFits(e, genderOf[pl])) ? e : -1;
         }
         int a = avatar[pl];
-        AvatarView av3 = new AvatarView(this, a >= NO_HOOD ? -1 : a, items, mode, true);
+        AvatarView av3 = new AvatarView(this, isHood(a) ? a : -1, items, mode, true);
         av3.gender = genderOf[pl];
         return av3;
     }
@@ -5931,22 +6491,26 @@ public class MainActivity extends Activity {
         c.addView(tabGrid, lp(WRAP, 12));
 
         if (shopTab == 0) {
-            c.addView(text("Pilih tudung hewan (gratis)", 13, DARK, true), lp(WRAP, 12));
-            for (int r = 0; r < 4; r++) {
+            c.addView(text("Pilih tudung hewan (gratis): " + HOOD_NAMES[Math.max(0, Math.min(HOOD_NAMES.length - 1, avatar[shopPl]))],
+                    13, DARK, true), lp(WRAP, 12));
+            final int nTiles = HOOD_ORDER.length;
+            final int rows = (nTiles + 3) / 4;
+            for (int r = 0; r < rows; r++) {
                 LinearLayout row = new LinearLayout(this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 for (int q = 0; q < 4; q++) {
-                    final int k = r * 4 + q;
-                    if (k >= AVATARS.length) {
+                    final int idx = r * 4 + q;
+                    if (idx >= nTiles) {
                         row.addView(new View(this), weight(q == 0 ? 0 : 4, q == 3 ? 0 : 4));
                         continue;
                     }
+                    final int k = HOOD_ORDER[idx];
                     boolean on = avatar[shopPl] == k;
-                    AvatarView t = previewView(k >= NO_HOOD ? -1 : k, -1, -1, 1); t.gender = genderOf[shopPl];
+                    AvatarView t = previewView(isHood(k) ? k : -1, -1, -1, 1); t.gender = genderOf[shopPl];
                     t.setBackground(on ? box(PLAYER_COLORS[shopPl], 16) : box(GRAY, 16));
                     t.setOnClickListener(v -> {
                         for (int j = 0; j < np; j++) {
-                            if (k < NO_HOOD && j != shopPl && avatar[j] == k) {
+                            if (isHood(k) && j != shopPl && avatar[j] == k) {
                                 avatar[j] = avatar[shopPl];
                                 prefs.edit().putInt("avatar" + j, avatar[j]).apply();
                             }
