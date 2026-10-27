@@ -289,7 +289,8 @@ public class MainActivity extends Activity {
             "\uD83D\uDE42",
             // 13..23: hewan khas Indonesia
             "\uD83E\uDDA7", "\uD83E\uDD8E", "\uD83D\uDC18", "\uD83E\uDD8F", "\uD83E\uDD9A", "\uD83D\uDC12",
-            "\uD83D\uDC35", "\uD83E\uDD85", "\uD83E\uDD8C", "\uD83D\uDC02", "\uD83D\uDC22"
+            "\uD83D\uDC35", "\uD83E\uDD85", "\uD83E\uDD8C", "\uD83D\uDC02", "\uD83D\uDC22",
+            "\uD83D\uDC3B"
     };
     private final int[] avatar = new int[MAX_PLAYERS];
     // 0 = putra, 1 = putri (dipakai avatar 3D)
@@ -4088,17 +4089,17 @@ public class MainActivity extends Activity {
     // Indeks 0..11 = hewan lama (warna jangan diubah: disalin di HoodMesh.java), 12 = tanpa tudung, 13..23 = hewan Nusantara.
     private static final String[] HOOD_MAIN = {"#F2B24C", "#F28C28", "#FFFFFF", "#9AA5AD", "#5DBB4A", "#E8631C",
             "#F6EEF3", "#A8744A", "#F2A65A", "#F3EAF7", "#37474F", "#8D6E4B", "#000000",
-            "#C4571F", "#6E7F4A", "#8C8A93", "#7D7F82", "#F2B705", "#8A6B4F", "#C98A4B", "#6B4A2E", "#C98F52", "#5B3A29", "#4E8B5A"};
+            "#C4571F", "#6E7F4A", "#8C8A93", "#7D7F82", "#F2B705", "#8A6B4F", "#C98A4B", "#6B4A2E", "#C98F52", "#5B3A29", "#4E8B5A", "#7A4B2E"};
     private static final String[] HOOD_ACC = {"#B5651D", "#212121", "#212121", "#DDE3E6", "#FFFFFF", "#FFFFFF",
             "#F8BBD0", "#5D3A1E", "#C77B30", "#F06292", "#FFFFFF", "#E6D5B8", "#000000",
-            "#8A3A14", "#3F4A2A", "#E3B7B0", "#C9C3B0", "#0F8F5B", "#E8B8A8", "#F0DDBA", "#F1E3C4", "#F7EBD8", "#F3EAD7", "#C79A3B"};
+            "#8A3A14", "#3F4A2A", "#E3B7B0", "#C9C3B0", "#0F8F5B", "#E8B8A8", "#F0DDBA", "#F1E3C4", "#F7EBD8", "#F3EAD7", "#C79A3B", "#E2C6A0"};
     private static final String[] HOOD_NAMES = {"Singa", "Harimau Sumatra", "Panda", "Koala", "Katak", "Rubah",
             "Kelinci", "Anjing", "Kucing", "Unicorn", "Penguin", "Burung Hantu", "Tanpa tudung",
             "Orangutan Kalimantan", "Komodo", "Gajah Sumatra", "Badak Jawa", "Cenderawasih", "Tarsius", "Bekantan",
-            "Elang Jawa", "Kancil", "Banteng", "Penyu Hijau"};
+            "Elang Jawa", "Kancil", "Banteng", "Penyu Hijau", "Beruang"};
     // Urutan kotak di toko: hewan lama, hewan Nusantara, lalu "tanpa tudung" selalu di kotak terakhir.
     private static final int[] HOOD_ORDER = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-            13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 12};
+            13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 12};
     private static boolean isHood(int a) {
         return a >= 0 && a < AVATARS.length && a != NO_HOOD;
     }
@@ -4818,8 +4819,8 @@ public class MainActivity extends Activity {
                     topMark(39f, 41.2f, -9f, 9f, acc);
                     topMark(48.9f, 51.1f, -9f, 9f, acc);
                     topMark(58.8f, 61f, -9f, 9f, acc);
-                    frontMark(43f, 45.2f, 5f, 11f, acc);
-                    frontMarkC(48.8f, 51.2f, 5f, 13f, acc);
+                    frontMark(43f, 45.2f, 4.3f, 7.6f, acc);
+                    frontMarkC(48.8f, 51.2f, 4.3f, 7.6f, acc);
                     symBox(27.4f, 28.7f, 11f, 13f, -6f, 14f, acc);
                     symBox(27.4f, 28.7f, 17f, 19f, -6f, 14f, acc);
                     symBox(27.4f, 28.7f, 23f, 25f, -6f, 14f, acc);
@@ -4848,8 +4849,7 @@ public class MainActivity extends Activity {
                     symBox(hx0 + 0.5f, hx0 + 6f, hy0 - 13f, hy0 - 9.5f, -3.1f, 3.1f, col("#3E2723"));
                     symBox(hx0 + 1.5f, hx0 + 5f, hy0 - 10f, hy0 - 3f, 2.5f, 3.4f, col("#FFE0B2"));
                     symBox(27.5f, 34f, 25f, 33f, 8f, 20.6f, wht);
-                    frontMarkC(46.5f, 53.5f, 5f, 13f, wht);
-                    break;
+                                        break;
                 case 6: // kelinci
                     symBox(hx0 + 5f, hx0 + 12f, hy0 - 22f, hy0 - 1f, -3f, 3f, main);
                     symBox(hx0 + 6.5f, hx0 + 10.5f, hy0 - 19f, hy0 - 3f, 2.6f, 3.4f, acc);
@@ -4858,7 +4858,7 @@ public class MainActivity extends Activity {
                 case 7: // anjing
                     symBox(hx0 - 7f, hx0 - 1f, hy0 + 2f, hy0 + 24f, -5f, 5f, acc);
                     symBox(hx0 - 8f, hx0 - 6.5f, hy0 + 4f, hy0 + 20f, -3.5f, 3.5f, shade(acc, 0.8f));
-                    frontMarkC(47f, 53f, 4.5f, 15f, col("#F5E6D3"));
+                    frontMarkC(47f, 53f, 4.3f, 7.8f, col("#F5E6D3"));
                     topMark(36f, 44f, 2f, 12f, acc);
                     break;
                 case 8: // kucing
@@ -4867,8 +4867,8 @@ public class MainActivity extends Activity {
                     topMark(42f, 44f, -8f, 8f, acc);
                     topMark(48.5f, 51.5f, -8f, 8f, acc);
                     topMark(56f, 58f, -8f, 8f, acc);
-                    frontMark(44f, 46f, 5f, 11f, acc);
-                    frontMarkC(49f, 51f, 5f, 13f, acc);
+                    frontMark(44f, 46f, 4.3f, 7.6f, acc);
+                    frontMarkC(49f, 51f, 4.3f, 7.6f, acc);
                     symBox(27.4f, 28.7f, 12f, 13.6f, -6f, 14f, acc);
                     symBox(27.4f, 28.7f, 18f, 19.6f, -6f, 14f, acc);
                     break;
@@ -4980,7 +4980,7 @@ public class MainActivity extends Activity {
                     frontMark(44f, 46f, 6f, 8f, acc);
                     frontMark(35f, 37f, 10f, 12f, acc);
                     symBox(27.6f, 34f, 25f, 33f, 8f, 20.6f, acc);
-                    frontMarkC(49.4f, 50.6f, 4f, 14f, dk);
+                    frontMarkC(49.4f, 50.6f, 4f, 7.8f, dk);
                     break;
                 case 22: { // banteng
                     int tip = col("#3B2416");
@@ -4991,6 +4991,10 @@ public class MainActivity extends Activity {
                     symBox(27.6f, 34f, 26f, 33f, 8f, 20.6f, acc);
                     break;
                 }
+                case 24: // beruang
+                    symBox(hx0 - 1f, hx0 + 9f, hy0 - 10f, hy0 - 1f, -5f, 5f, main);
+                    symBox(hx0 + 1.5f, hx0 + 6.5f, hy0 - 7.5f, hy0 - 2f, 4f, 5.4f, acc);
+                    break;
                 case 23: // penyu
                     topMark(44f, 56f, -6f, 6f, acc);
                     topMark(36f, 42f, -6f, 6f, shade(acc, 0.88f));
@@ -5001,6 +5005,38 @@ public class MainActivity extends Activity {
                     break;
                 default:
                     break;
+            }
+            face3d(a);
+        }
+
+        // Wajah hewan di dahi tudung (avatar balok): moncong, hidung, mata, kumis.
+        private void face3d(int a) {
+            int muz;
+            int nose = col("#3A2418");
+            boolean whisk = true;
+            switch (a) {
+                case 0: muz = col("#F7E6C4"); nose = col("#5D3A1E"); break;
+                case 1: muz = col("#FFF3DF"); break;
+                case 2: muz = Color.WHITE; whisk = false; break;
+                case 5: muz = col("#FFF1E0"); break;
+                case 6: muz = Color.WHITE; nose = col("#F48FB1"); break;
+                case 7: muz = col("#F5E6D3"); whisk = false; break;
+                case 8: muz = col("#FFF1E0"); nose = col("#F48FB1"); break;
+                case 21: muz = col("#F7EBD8"); whisk = false; break;
+                case 24: muz = col("#E2C6A0"); whisk = false; break;
+                default: return;
+            }
+            int dk = col("#2B1B12");
+            if (a == 2) {
+                symBox(36f, 42f, 6f, 12f, 19.8f, 20.8f, dk);
+            } else {
+                symBox(37.5f, 39.8f, 6f, 8.6f, 19.8f, 20.8f, dk);
+            }
+            addBox(43f, 8.8f, 57f, 14f, 19.7f, 20.9f, muz, muz, muz, 0);
+            addBox(47.8f, 9.6f, 52.2f, 11.8f, 20.8f, 21.8f, nose, nose, nose, 0);
+            if (whisk) {
+                symBox(34.5f, 42.5f, 10.8f, 11.4f, 20.3f, 20.9f, dk);
+                symBox(34.5f, 42.5f, 12.8f, 13.4f, 20.3f, 20.9f, dk);
             }
         }
 
@@ -5689,9 +5725,9 @@ public class MainActivity extends Activity {
             // ---------- 1. di belakang tudung ----------
             if (a == 0) {
                 // singa: surai bergumpal dua lapis + telinga bulat
-                ball(c, 33f, 10f, 5f, acc);
-                ball(c, 67f, 10f, 5f, acc);
-                dot(c, 33f, 10.3f, 2.4f, shade(acc, 1.35f));
+                ball(c, 33f, 10f, 5.8f, acc);
+                ball(c, 67f, 10f, 5.8f, acc);
+                dot(c, 33f, 10.3f, 2.8f, shade(acc, 1.35f));
                 dot(c, 67f, 10.3f, 2.4f, shade(acc, 1.35f));
                 float[] my = {16f, 24f, 32f, 40f};
                 for (int i = 0; i < 4; i++) {
@@ -5705,14 +5741,14 @@ public class MainActivity extends Activity {
                 // harimau: telinga bulat berisi krem, tepi gelap
                 dot(c, 32f, 10f, 5.8f, blk);
                 dot(c, 68f, 10f, 5.8f, blk);
-                ball(c, 32f, 10f, 5f, main);
-                ball(c, 68f, 10f, 5f, main);
+                ball(c, 32f, 10f, 5.8f, main);
+                ball(c, 68f, 10f, 5.8f, main);
                 dot(c, 32f, 10.3f, 2.7f, col("#FFE9C7"));
                 dot(c, 68f, 10.3f, 2.7f, col("#FFE9C7"));
             } else if (a == 2) {
                 // panda: telinga hitam berisi abu
-                ball(c, 32f, 9f, 5.5f, acc);
-                ball(c, 68f, 9f, 5.5f, acc);
+                ball(c, 32f, 9f, 6.3f, acc);
+                ball(c, 68f, 9f, 6.3f, acc);
                 dot(c, 32f, 9.4f, 2.4f, col("#5A5A5A"));
                 dot(c, 68f, 9.4f, 2.4f, col("#5A5A5A"));
             } else if (a == 3) {
@@ -5853,6 +5889,12 @@ public class MainActivity extends Activity {
                 line(c, 78.9f, 3f, 79f, -2f, 3.4f, col("#3B2416"));
                 ball(c, 30f, 21f, 3.4f, main);
                 ball(c, 70f, 21f, 3.4f, main);
+            } else if (a == 24) {
+                // beruang: telinga bulat besar berisi krem
+                ball(c, 32f, 9.5f, 6.2f, main);
+                ball(c, 68f, 9.5f, 6.2f, main);
+                dot(c, 32f, 9.8f, 3.3f, acc);
+                dot(c, 68f, 9.8f, 3.3f, acc);
             } else if (a == 23) {
                 // penyu: sirip depan di sisi
                 rect(c, 21f, 32f, 32f, 44f, 5f, main);
@@ -5876,11 +5918,9 @@ public class MainActivity extends Activity {
             } else if (a == 1) {
                 // harimau (belang tebal di dahi dan pipi, pipi putih)
                 int sc = acc;
-                flat(c, 42f, 9f, 44.6f, 15f, 0.9f, sc);
-                flat(c, 48.8f, 9f, 51.2f, 18f, 0.9f, sc);
-                flat(c, 55.4f, 9f, 58f, 15f, 0.9f, sc);
-                flat(c, 38f, 17f, 41f, 21f, 0.8f, sc);
-                flat(c, 59f, 17f, 62f, 21f, 0.8f, sc);
+                flat(c, 42f, 8.6f, 44.6f, 12.5f, 0.9f, sc);
+                flat(c, 48.8f, 8.6f, 51.2f, 12.5f, 0.9f, sc);
+                flat(c, 55.4f, 8.6f, 58f, 12.5f, 0.9f, sc);
                 flat(c, 30.5f, 25f, 36.2f, 27.4f, 0.7f, sc);
                 flat(c, 30.5f, 31f, 36.2f, 33.4f, 0.7f, sc);
                 flat(c, 30.5f, 37f, 36.2f, 39.4f, 0.7f, sc);
@@ -5921,7 +5961,6 @@ public class MainActivity extends Activity {
                 // rubah: pipi putih + belang putih di dahi
                 tri(c, 30f, 44f, 30f, 34f, 36.5f, 44f, wht);
                 tri(c, 70f, 44f, 70f, 34f, 63.5f, 44f, wht);
-                tri(c, 44f, 23f, 56f, 23f, 50f, 12f, wht);
             } else if (a == 6) {
                 // kelinci: bulu halus di dahi + pipi pink
                 dot(c, 46f, 11f, 2.2f, wht);
@@ -5931,18 +5970,16 @@ public class MainActivity extends Activity {
                 dot(c, 66.7f, 39.5f, 1.6f, col("#F8BBD0"));
             } else if (a == 7) {
                 // anjing: garis putih di dahi + bercak mata kiri
-                flat(c, 47f, 9f, 53f, 23f, 2.5f, col("#F5E6D3"));
+                flat(c, 47f, 8.6f, 53f, 12.5f, 2f, col("#F5E6D3"));
                 flat(c, 30.6f, 14f, 36f, 31f, 2.6f, acc);
                 dot(c, 40f, 17f, 0.9f, shade(main, 0.8f));
                 dot(c, 60f, 15f, 0.9f, shade(main, 0.8f));
             } else if (a == 8) {
                 // kucing: belang M di dahi + kumis di pipi
                 int sc = acc;
-                flat(c, 44f, 9f, 46f, 15f, 0.8f, sc);
-                flat(c, 49f, 9f, 51f, 16f, 0.8f, sc);
-                flat(c, 54f, 9f, 56f, 15f, 0.8f, sc);
-                flat(c, 39f, 17f, 42f, 19f, 0.7f, sc);
-                flat(c, 58f, 17f, 61f, 19f, 0.7f, sc);
+                flat(c, 44f, 8.6f, 46f, 12.5f, 0.8f, sc);
+                flat(c, 49f, 8.6f, 51f, 12.5f, 0.8f, sc);
+                flat(c, 54f, 8.6f, 56f, 12.5f, 0.8f, sc);
                 flat(c, 30.5f, 26f, 35f, 27.6f, 0.6f, sc);
                 flat(c, 65f, 26f, 69.5f, 27.6f, 0.6f, sc);
                 line(c, 30.8f, 36f, 36.3f, 35.2f, 0.5f, wht);
@@ -6087,7 +6124,7 @@ public class MainActivity extends Activity {
                 dot(c, 62f, 18f, 1.3f, acc);
                 dot(c, 41f, 20f, 1f, acc);
                 dot(c, 58.5f, 21f, 1f, acc);
-                line(c, 50f, 9f, 50f, 22f, 0.9f, shade(main, 0.72f));
+                line(c, 50f, 9f, 50f, 12.5f, 0.9f, shade(main, 0.72f));
                 tri(c, 30f, 44f, 30f, 35f, 36.5f, 44f, acc);
                 tri(c, 70f, 44f, 70f, 35f, 63.5f, 44f, acc);
             } else if (a == 22) {
@@ -6111,6 +6148,45 @@ public class MainActivity extends Activity {
                 line(c, 66.8f, 25f, 66.8f, 41f, 0.9f, col("#F5E6A8"));
                 dot(c, 26.5f, 38f, 0.7f, col("#F5E6A8"));
                 dot(c, 73.5f, 38f, 0.7f, col("#F5E6A8"));
+            }
+            face2d(c, a);
+        }
+
+        // Wajah hewan di dahi tudung (kartu 2D): moncong, hidung, mata, kumis.
+        private void face2d(Canvas c, int a) {
+            int muz;
+            int nose = col("#3A2418");
+            boolean whisk = true;
+            switch (a) {
+                case 0: muz = col("#F7E6C4"); nose = col("#5D3A1E"); break;
+                case 1: muz = col("#FFF3DF"); break;
+                case 2: muz = Color.WHITE; whisk = false; break;
+                case 5: muz = col("#FFF1E0"); break;
+                case 6: muz = Color.WHITE; nose = col("#F48FB1"); break;
+                case 7: muz = col("#F5E6D3"); whisk = false; break;
+                case 8: muz = col("#FFF1E0"); nose = col("#F48FB1"); break;
+                case 21: muz = col("#F7EBD8"); whisk = false; break;
+                case 24: muz = col("#E2C6A0"); whisk = false; break;
+                default: return;
+            }
+            int dk = col("#2B1B12");
+            if (a == 2) {
+                flat(c, 36.5f, 9.5f, 43.5f, 17f, 3f, dk);
+                flat(c, 56.5f, 9.5f, 63.5f, 17f, 3f, dk);
+                dot(c, 41.2f, 12.5f, 1.2f, Color.WHITE);
+                dot(c, 58.8f, 12.5f, 1.2f, Color.WHITE);
+            } else {
+                dot(c, 40f, 12f, 1.3f, dk);
+                dot(c, 60f, 12f, 1.3f, dk);
+            }
+            flat(c, 42.5f, 13.2f, 57.5f, 21.5f, 4.5f, muz);
+            tri(c, 47.6f, 15f, 52.4f, 15f, 50f, 18f, nose);
+            line(c, 50f, 18f, 50f, 19.6f, 0.5f, nose);
+            if (whisk) {
+                line(c, 43f, 17.5f, 35.5f, 16f, 0.5f, dk);
+                line(c, 43f, 19.2f, 35.5f, 20.6f, 0.5f, dk);
+                line(c, 57f, 17.5f, 64.5f, 16f, 0.5f, dk);
+                line(c, 57f, 19.2f, 64.5f, 20.6f, 0.5f, dk);
             }
         }
 
