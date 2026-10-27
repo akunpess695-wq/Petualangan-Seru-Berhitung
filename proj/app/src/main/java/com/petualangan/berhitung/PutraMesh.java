@@ -40,9 +40,19 @@ final class PutraMesh {
     static final double[][] NECK = {{64, 12.2, 11.8, 0, -0.3}, {62, 11.3, 10.6, 0, -0.7}, {60, 9.9, 9.0, 0, -1.0}, {58, 9.2, 8.4, 0, -1.8}, {56, 9.5, 8.0, 0, -2.2}, {54, 10.4, 8.3, 0, -1.2}, {52.5, 10.7, 8.3, 0, -0.5}};
     static final double[][] SKIRT = {{31, 10.4, 8.4, 0, -0.2}, {29, 10.7, 8.7, 0, -0.2}, {20, 11.6, 9.4, 0, -0.4}, {10, 12.5, 10.1, 0, -0.7}, {5.2, 12.9, 10.4, 0, -0.8}};
 
+    static final double P_TOP = 0.45;
+    /** profil kepala: elipsoid, tetapi bagian atas lebih penuh (tengkorak lebar di bawah peci): f = cos(th)^p(th). */
+    static double headP(double th) {
+        if (th <= 0) return 1.0;
+        double t = Math.min(1.0, th / 0.6); t = t * t * (3 - 2 * t);
+        return 1.0 - (1.0 - P_TOP) * t;
+    }
+    static double headF(double th) { return Math.pow(Math.max(0, Math.cos(th)), headP(th)); }
     static double onHead(double x, double y, double off) {
-        double u = sq(x / HR[0]) + sq((y - HC[1]) / HR[1]);
-        return HC[2] + HR[2] * Math.sqrt(Math.max(0, 1 - u)) + off;
+        double sn = Math.max(-1, Math.min(1, (y - HC[1]) / HR[1]));
+        double f = Math.max(1e-6, headF(Math.asin(sn)));
+        double u = sq(x / (HR[0] * f));
+        return HC[2] + HR[2] * f * Math.sqrt(Math.max(0, 1 - u)) + off;
     }
     static double sq(double a) { return a * a; }
 
@@ -231,6 +241,34 @@ final class PutraMesh {
         grid(P, colr, true, false, keep);
     }
 
+    /** Kepala/rambut: seperti ellipsoid tetapi profil atas penuh (headF). mask.cut(w, y): true = lubang. */
+    void skull(double[] c, double[] r, double[] colr, int nu, int nv, double th0, MaskFn mask) {
+        double[][][] P = new double[nu][nv][3];
+        double[] PH = new double[nu], TH = new double[nv];
+        for (int i = 0; i < nu; i++) PH[i] = 2 * PI * i / nu;
+        for (int j = 0; j < nv; j++) TH[j] = th0 + (PI / 2 - th0) * j / (nv - 1);
+        for (int i = 0; i < nu; i++)
+            for (int j = 0; j < nv; j++) {
+                double f = headF(TH[j]);
+                P[i][j][0] = c[0] + r[0] * f * Math.sin(PH[i]);
+                P[i][j][1] = c[1] + r[1] * Math.sin(TH[j]);
+                P[i][j][2] = c[2] + r[2] * f * Math.cos(PH[i]);
+            }
+        boolean[][] keep = null;
+        if (mask != null) {
+            keep = new boolean[nu][nv];
+            for (int i = 0; i < nu; i++)
+                for (int j = 0; j < nv; j++) keep[i][j] = true;
+            for (int i = 0; i < nu; i++)
+                for (int j = 0; j < nv - 1; j++) {
+                    double pm = 2 * PI * (i + 0.5) / nu;
+                    double w = ((pm + PI) % (2 * PI)); if (w < 0) w += 2 * PI; w -= PI;
+                    keep[i][j] = !mask.cut(w, (P[i][j][1] + P[i][j + 1][1]) / 2);
+                }
+        }
+        grid(P, colr, true, false, keep);
+    }
+
     /** Bidang datar per segi (low-poly): tiap kotak punya 4 titik sendiri dengan normal rata. P[i][j], i melingkar. */
     private void facet(double[][][] P, double[] colr) {
         int nu = P.length, nv = P[0].length;
@@ -258,19 +296,26 @@ final class PutraMesh {
 
     // ---- rakitan putra ----
     static final double[] EYE = {0.29, 0.15, 0.10}, EYE2 = {0.56, 0.33, 0.20}, PUPIL = {0.10, 0.05, 0.04}, LASH = {0.13, 0.07, 0.05}, LIP = {0.88, 0.31, 0.31};
-    static final double[] HAIR = {0.243, 0.184, 0.141}, PBAG = {0.64, 0.16, 0.18}, PANTS = {0.61, 0.12, 0.18}, CAP = {0.97, 0.97, 0.99};
+    static final double[] HAIR = {0.243, 0.184, 0.141}, PBAG = {0.64, 0.16, 0.18}, PANTS = {0.61, 0.12, 0.18}, CAP = {1.0, 1.0, 1.0};
     static final double[] HH = {13.0, 13.3, 13.0};            // jari-jari cangkang rambut (sedikit di luar kepala)
     static final double HAIR_W = Math.toRadians(66);          // lebar bukaan wajah pada rambut
     static final double[][] PANTSTOP = {{31, 10.4, 8.4, 0, -0.2}, {29, 10.6, 8.6, 0, -0.2}, {26, 10.9, 8.8, 0, -0.2}, {23.5, 11.0, 8.8, 0, -0.2}};
     // peci: {y, rx, rz, cx, cz}, tutup datar di atas, bibir tipis di bawah
-    static final double[][] PECI = {{88.5, 0.0, 0.0, 0, 0.8}, {88.4, 10.0, 10.0, 0, 0.8}, {87.7, 11.6, 11.6, 0, 0.8}, {81.0, 12.6, 12.6, 0, 0.8}, {77.0, 11.2, 11.2, 0, 0.8}, {77.0, 10.3, 10.3, 0, 0.8}};
+    static final double[][] PECI = {{87.5, 0.0, 0.0, 0, 0.8}, {87.45, 11.0, 11.0, 0, 0.8}, {87.0, 11.7, 11.7, 0, 0.8}, {82.8, 12.0, 12.0, 0, 0.8}, {78.6, 11.7, 11.7, 0, 0.8}, {78.0, 11.5, 11.5, 0, 0.8}, {78.0, 10.6, 10.6, 0, 0.8}};
 
-    /** garis rambut (batas bukaan wajah): y di tengah 74,5 dan turun ke 72 di sisi. */
-    static double hairlineY(double w) { return 74.5 - 2.5 * sq(w / HAIR_W); }
+    /** garis rambut (batas bukaan wajah): y di tengah 76,5 dan turun ke 74 di sisi (dahi terlihat, poni tipis di bawah peci). */
+    static double hairlineY(double w) { return 76.5 - 2.5 * sq(w / HAIR_W); }
+    /** tepi bawah rambut: di samping berhenti di y=69,5 (telinga terlihat), makin ke belakang turun ke y=63. */
+    static double lowerY(double aw) {
+        double d1 = Math.toRadians(100), d2 = Math.toRadians(140);
+        if (aw <= d1) return 69.5;
+        if (aw >= d2) return 63.0;
+        return 69.5 - 6.5 * (aw - d1) / (d2 - d1);
+    }
     /** titik di permukaan cangkang rambut pada sudut w (0 = depan) dan tinggi y. */
     static double[] onHair(double w, double y) {
-        double th = Math.asin((y - HC[1]) / HH[1]);
-        return new double[]{HH[0] * Math.cos(th) * Math.sin(w), y, HC[2] + HH[2] * Math.cos(th) * Math.cos(w)};
+        double f = headF(Math.asin((y - HC[1]) / HH[1]));
+        return new double[]{HH[0] * f * Math.sin(w), y, HC[2] + HH[2] * f * Math.cos(w)};
     }
 
     static PutraMesh build() {
@@ -295,7 +340,7 @@ final class PutraMesh {
         double[][] collar = new double[41][];
         for (int i = 0; i < 40; i++) { double t = 2 * PI * i / 40; collar[i] = new double[]{cq[2] + (cq[0] + 0.3) * Math.sin(t), 55.6, cq[3] + (cq[1] + 0.3) * Math.cos(t)}; }
         collar[40] = collar[0];
-        M.tube(collar, rr(41, 1.0, 0.8), WHITE, 10); // kerah
+        M.tube(collar, rr(41, 0.7, 0.6), WHITE, 10); // kerah
         // lengan kemeja panjang
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg;
@@ -318,7 +363,7 @@ final class PutraMesh {
             M.tube(pth, rr(7, 1.35, 0.5), PBAG, 8);
         }
         // kepala + wajah
-        M.ellipsoid(HC, HR, SKIN, 48, 28);
+        M.skull(HC, HR, SKIN, 56, 32, -PI / 2, null);
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg, ex = s * 6.3, ey = 66.6;
             M.decal(ex, ey + 0.2, 2.8, 3.65, 0.40, 0.03, new double[]{0.99, 0.96, 0.93}, 24, 14);
@@ -349,17 +394,27 @@ final class PutraMesh {
         M.tube(arc, rr(7, 0.32, 0.3), LIP, 6); // senyum
         // rambut: cangkang di atas kepala, bukaan wajah dipotong di depan; bagian bawah berhenti di y=63
         final double th0 = Math.asin((63.0 - HC[1]) / HH[1]);
-        M.ellipsoid(HC, HH, HAIR, 144, 64, th0, PI / 2, (w, tm) -> {
-            double y = HC[1] + HH[1] * Math.sin(tm);
-            return Math.abs(w) < HAIR_W && y < hairlineY(w);
-        }, null);
+        M.skull(HC, HH, HAIR, 144, 64, th0, (w, y) -> {
+            double aw = Math.abs(w);
+            return aw < HAIR_W ? y < hairlineY(w) : y < lowerY(aw);
+        });
+        // telinga (terlihat di bawah tepi rambut samping)
+        for (int sg = -1; sg <= 1; sg += 2)
+            M.ellipsoid(new double[]{sg * 12.2, 66.0, 0.6}, new double[]{1.5, 2.8, 2.0}, SKIN, 16, 10);
         // tepi rambut (poni dan cambang) diberi tabung tipis supaya tepi tidak bergerigi
         double[][] fr = new double[17][], frr = new double[17][];
         for (int i = 0; i < 17; i++) { double w = -HAIR_W + 2 * HAIR_W * i / 16; fr[i] = onHair(w, hairlineY(w)); frr[i] = new double[]{0.55, 0.55}; }
         M.tube(fr, frr, HAIR, 8);
         for (int sg = -1; sg <= 1; sg += 2) {
-            double[][] sb = new double[8][], sbr = new double[8][];
-            for (int i = 0; i < 8; i++) { double y = hairlineY(HAIR_W) - (hairlineY(HAIR_W) - 63.2) * i / 7; sb[i] = onHair(sg * HAIR_W, y); sbr[i] = new double[]{0.5, 0.5}; }
+            // tepi cambang: turun lurus dari ujung garis rambut lalu mengikuti tepi bawah ke belakang
+            int nsb = 14;
+            double[][] sb = new double[nsb][], sbr = new double[nsb][];
+            for (int i = 0; i < nsb; i++) {
+                double[] q;
+                if (i < 4) q = onHair(sg * HAIR_W, hairlineY(HAIR_W) - (hairlineY(HAIR_W) - lowerY(HAIR_W)) * i / 3.0);
+                else { double w = HAIR_W + (Math.toRadians(140) - HAIR_W) * (i - 4) / (nsb - 5.0); q = onHair(sg * w, lowerY(w)); }
+                sb[i] = q; sbr[i] = new double[]{0.5, 0.5};
+            }
             M.tube(sb, sbr, HAIR, 8);
         }
         // peci: bidang datar bersegi 14
