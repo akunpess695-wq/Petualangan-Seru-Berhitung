@@ -17,20 +17,25 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 /**
- * Tampilan 3D putri (Tahap E). Pakai: addView(new PutriGLView(ctx)), dan teruskan
+ * Tampilan 3D putra / putri (Tahap E). Pakai: addView(new PutriGLView(ctx, gender)) (0 = putra, 1 = putri), dan teruskan
  * onResume()/onPause() dari Activity. Geser jari = putar. Latar opak putih (setBackgroundRgb untuk mengganti).
  * Tidak mengubah AvatarView lama.
  */
 final class PutriGLView extends GLSurfaceView {
-    private static PutriMesh sMesh; // dibuat sekali, dipakai ulang
+    private static PutriMesh sMesh;     // putri, dibuat sekali, dipakai ulang
+    private static PutraMesh sMeshPutra; // putra
+    private final int gender;            // 0 = putra, 1 = putri
 
     private volatile float yaw = 0f, pitch = 0f; // derajat
     private volatile float bgR = 1f, bgG = 1f, bgB = 1f; // warna latar (default putih = warna kartu)
     private float lastX, lastY;
     private final Renderer renderer = new Renderer();
 
-    PutriGLView(Context ctx) {
+    PutriGLView(Context ctx) { this(ctx, 1); }
+
+    PutriGLView(Context ctx, int gender) {
         super(ctx);
+        this.gender = gender == 0 ? 0 : 1;
         setEGLContextClientVersion(2);
         setEGLConfigChooser(8, 8, 8, 0, 16, 0); // RGB + depth 16
         getHolder().setFormat(PixelFormat.OPAQUE); // latar opak (transparan menghasilkan kotak hitam)
@@ -121,18 +126,28 @@ final class PutriGLView extends GLSurfaceView {
             uMVP = GLES20.glGetUniformLocation(prog, "uMVP");
             uNM = GLES20.glGetUniformLocation(prog, "uNM");
 
-            if (sMesh == null) sMesh = PutriMesh.build();
-            PutriMesh m = sMesh;
-            float[] inter = new float[m.vertCount * 9];
-            for (int i = 0; i < m.vertCount; i++) {
-                System.arraycopy(m.pos, i * 3, inter, i * 9, 3);
-                System.arraycopy(m.nor, i * 3, inter, i * 9 + 3, 3);
-                System.arraycopy(m.col, i * 3, inter, i * 9 + 6, 3);
+            float[] mpos, mnor, mcol;
+            int[] midx;
+            int mvc;
+            if (gender == 0) {
+                if (sMeshPutra == null) sMeshPutra = PutraMesh.build();
+                PutraMesh m = sMeshPutra;
+                mpos = m.pos; mnor = m.nor; mcol = m.col; midx = m.idx; mvc = m.vertCount;
+            } else {
+                if (sMesh == null) sMesh = PutriMesh.build();
+                PutriMesh m = sMesh;
+                mpos = m.pos; mnor = m.nor; mcol = m.col; midx = m.idx; mvc = m.vertCount;
+            }
+            float[] inter = new float[mvc * 9];
+            for (int i = 0; i < mvc; i++) {
+                System.arraycopy(mpos, i * 3, inter, i * 9, 3);
+                System.arraycopy(mnor, i * 3, inter, i * 9 + 3, 3);
+                System.arraycopy(mcol, i * 3, inter, i * 9 + 6, 3);
             }
             FloatBuffer fb = ByteBuffer.allocateDirect(inter.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
             fb.put(inter).position(0);
-            short[] si = new short[m.idx.length];
-            for (int i = 0; i < si.length; i++) si[i] = (short) m.idx[i];
+            short[] si = new short[midx.length];
+            for (int i = 0; i < si.length; i++) si[i] = (short) midx[i];
             ShortBuffer ib = ByteBuffer.allocateDirect(si.length * 2).order(ByteOrder.nativeOrder()).asShortBuffer();
             ib.put(si).position(0);
             idxCount = si.length;

@@ -78,8 +78,8 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.15.0";
-    // Tahap E: putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
+    private static final String APP_VERSION = "6.16.0";
+    // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
     private static final String STATS_KEY = "laporan_v1";
@@ -5837,8 +5837,8 @@ public class MainActivity extends Activity {
 
         LinearLayout pv = card();
         pv.setGravity(Gravity.CENTER_HORIZONTAL);
-        if (USE_PUTRI_GL && genderOf[shopPl] == 1) {
-            putriGL = new PutriGLView(this);
+        if (USE_PUTRI_GL) {
+            putriGL = new PutriGLView(this, genderOf[shopPl]);
             pv.addView(putriGL, new LinearLayout.LayoutParams(dp(250), dp(250)));
         } else {
             putriGL = null;
