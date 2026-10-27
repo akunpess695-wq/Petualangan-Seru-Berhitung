@@ -325,12 +325,15 @@ final class PutraMesh {
 
     /** garis rambut (batas bukaan wajah): y di tengah 74,2 dan turun ke 71,0 di pelipis (dahi dan alis terlihat, poni tipis di bawah peci). */
     static double hairlineY(double w) { return 74.2 - 3.2 * sq(w / HAIR_W); }
-    /** tepi bawah rambut: di samping berhenti di y=69,5 (telinga terlihat), makin ke belakang turun ke y=63. */
+    /** tepi bawah rambut: di samping sampai telinga (menutupi bagian atas telinga, y=EAR_HAIR), makin ke belakang turun ke y=63. */
+    static final double EAR_HAIR = 67.0;
     static double lowerY(double aw) {
-        double d1 = Math.toRadians(100), d2 = Math.toRadians(140);
-        if (aw <= d1) return 69.5;
+        double d1 = Math.toRadians(100), d2 = Math.toRadians(140), a1 = Math.toRadians(88);
         if (aw >= d2) return 63.0;
-        return 69.5 - 6.5 * (aw - d1) / (d2 - d1);
+        if (aw >= d1) return EAR_HAIR - (EAR_HAIR - 63.0) * (aw - d1) / (d2 - d1);
+        if (aw >= a1) return EAR_HAIR;
+        double t = Math.max(0, (aw - HAIR_W) / (a1 - HAIR_W)); t = t * t * (3 - 2 * t);   // cambang miring halus dari pelipis ke telinga
+        return hairlineY(HAIR_W) + (EAR_HAIR - hairlineY(HAIR_W)) * t;
     }
     /** titik di permukaan cangkang rambut pada sudut w (0 = depan) dan tinggi y. */
     static double[] onHair(double w, double y) {
