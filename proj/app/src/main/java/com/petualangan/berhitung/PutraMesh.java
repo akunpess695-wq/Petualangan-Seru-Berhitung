@@ -402,33 +402,33 @@ final class PutraMesh {
         final int headStart = M.bp.size();
         M.skull(HC, HR, SKIN, 56, 32, -PI / 2, null);
         for (int sg = -1; sg <= 1; sg += 2) {
-            double s = sg, ex = s * 6.3, ey = 66.6;
-            M.decal(ex, ey + 0.2, 2.8, 3.65, 0.40, 0.03, new double[]{0.99, 0.96, 0.93}, 24, 14);
-            M.decal(ex, ey - 0.1, 2.65, 3.5, 0.15, 0.43, EYE, 24, 14);
-            M.decal(ex, ey - 1.3, 2.05, 1.7, 0.10, 0.50, EYE2, 20, 10);
-            M.decal(ex, ey, 1.4, 1.95, 0.12, 0.58, PUPIL, 18, 10);
-            M.decal(ex - 0.75, ey + 1.4, 0.8, 0.9, 0.10, 0.70, new double[]{1, 1, 1}, 12, 8);
-            M.decal(ex + 0.95, ey - 1.2, 0.42, 0.45, 0.08, 0.70, new double[]{1, 1, 1}, 10, 6);
+            double s = sg, ex = s * 5.9, ey = 66.6;
+            M.decal(ex, ey + 0.2, 3.15, 3.55, 0.40, 0.03, new double[]{0.99, 0.96, 0.93}, 24, 14);
+            M.decal(ex, ey - 0.1, 2.95, 3.4, 0.15, 0.43, EYE, 24, 14);
+            M.decal(ex, ey - 1.2, 2.3, 1.75, 0.10, 0.50, EYE2, 20, 10);
+            M.decal(ex, ey, 1.55, 2.1, 0.12, 0.58, PUPIL, 18, 10);
+            M.decal(ex - 0.85, ey + 1.5, 0.95, 1.05, 0.10, 0.70, new double[]{1, 1, 1}, 12, 8);
+            M.decal(ex + 1.0, ey - 1.3, 0.45, 0.48, 0.08, 0.70, new double[]{1, 1, 1}, 10, 6);
             int nl = 8;
             double[][] lash = new double[nl][], lrad = new double[nl][];
             for (int i = 0; i < nl; i++) {
                 double u, r;
-                if (i < nl - 1) { u = Math.toRadians(172 - 158.0 * i / (nl - 2)); r = 0.65 * (0.28 + 0.27 * Math.sin(PI * i / (nl - 2))); }
-                else { u = Math.toRadians(8); r = 0.12; }
-                double x = ex + s * (i < nl - 1 ? 2.85 * Math.cos(u) : 3.6), y = ey + 0.2 + (i < nl - 1 ? 3.65 * Math.sin(u) : 1.2);
+                u = Math.toRadians(168 - 156.0 * i / (nl - 1)); r = 0.26 * (0.55 + 0.45 * Math.sin(PI * i / (nl - 1)));  // garis kelopak tipis, tanpa jentikan
+                double x = ex + s * 3.15 * Math.cos(u), y = ey + 0.2 + 3.55 * Math.sin(u);
                 lash[i] = new double[]{x, y, onHead(x, y, 0.4)};
                 lrad[i] = new double[]{r, r};
             }
             M.tube(lash, lrad, LASH, 6); // bulu mata atas tipis
-            M.decal(s * 8.0, 62.0, 2.1, 1.3, 0.30, 0.05, PINK, 18, 10); // pipi
+            M.decal(s * 7.6, 61.8, 1.85, 1.3, 0.22, 0.05, PINK, 18, 10); // pipi (lembut, di bawah sudut luar mata)
             double[][] br = new double[4][], brr = new double[4][];
-            double[] bx = {2.4, 4.4, 7.0, 9.8}, by = {71.0, 71.8, 71.6, 70.4}, bw = {0.65, 0.85, 0.8, 0.45};
+            if (sg == 1) M.decal(0, 62.6, 0.6, 0.45, 0.30, 0.05, new double[]{0.96, 0.78, 0.64}, 12, 8); // hidung kecil, sederhana
+            double[] bx = {3.5, 5.0, 6.8, 8.4}, by = {70.6, 71.4, 71.3, 70.2}, bw = {0.22, 0.34, 0.32, 0.14};
             for (int i = 0; i < 4; i++) { br[i] = new double[]{s * bx[i], by[i], onHead(s * bx[i], by[i], 0.3)}; brr[i] = new double[]{bw[i], bw[i]}; }
-            M.tube(br, brr, HAIR, 8); // alis tebal
+            M.tube(br, brr, HAIR, 8); // alis tipis melengkung
         }
         double[][] arc = new double[7][];
-        for (int i = 0; i < 7; i++) { double x = -3.6 + 7.2 * i / 6, y = 60.0 + 0.16 * x * x; arc[i] = new double[]{x, y, onHead(x, y, 0.3)}; }
-        M.tube(arc, rr(7, 0.30, 0.28), LIP, 6); // senyum
+        for (int i = 0; i < 7; i++) { double x = -2.35 + 4.7 * i / 6, y = 58.8 + 0.25 * x * x; arc[i] = new double[]{x, y, onHead(x, y, 0.3)}; }
+        M.tube(arc, rr(7, 0.27, 0.27), LIP, 6); // senyum kecil
         // rambut: cangkang di atas kepala, bukaan wajah dipotong di depan; bagian bawah berhenti di y=63
         M.cur = P_HAIR;
         M.curShade = SHELL;
@@ -440,7 +440,7 @@ final class PutraMesh {
         // telinga (terlihat di bawah tepi rambut samping)
         M.cur = P_OTHER;
         for (int sg = -1; sg <= 1; sg += 2)
-            M.ellipsoid(new double[]{sg * 12.2, 66.0, 0.6}, new double[]{1.7, 3.0, 2.1}, SKIN, 16, 10);
+            M.ellipsoid(new double[]{sg * 12.2, 65.4, 0.6}, new double[]{1.7, 3.0, 2.1}, SKIN, 16, 10);
         M.cur = P_HAIR;
         M.curShade = constShade(0.9);
         // tepi rambut (poni dan cambang) diberi tabung tipis supaya tepi tidak bergerigi
