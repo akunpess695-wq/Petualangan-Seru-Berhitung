@@ -323,8 +323,8 @@ final class PutraMesh {
     // peci: {y, rx, rz, cx, cz}, tutup datar di atas, bibir tipis di bawah
     static final double[][] PECI = {{89.0, 0.0, 0.0, 0, 0.8}, {88.95, 10.0, 10.0, 0, 0.8}, {88.2, 11.1, 11.1, 0, 0.8}, {82.4, 12.2, 12.2, 0, 0.8}, {75.8, 12.9, 12.9, 0, 0.8}, {75.0, 12.8, 12.8, 0, 0.8}, {75.0, 11.0, 11.0, 0, 0.8}};
 
-    /** garis rambut (batas bukaan wajah): y di tengah 76,5 dan turun ke 74 di sisi (dahi terlihat, poni tipis di bawah peci). */
-    static double hairlineY(double w) { return 73.3 - 3.6 * sq(w / HAIR_W); }
+    /** garis rambut (batas bukaan wajah): y di tengah 74,2 dan turun ke 71,0 di pelipis (dahi dan alis terlihat, poni tipis di bawah peci). */
+    static double hairlineY(double w) { return 74.2 - 3.2 * sq(w / HAIR_W); }
     /** tepi bawah rambut: di samping berhenti di y=69,5 (telinga terlihat), makin ke belakang turun ke y=63. */
     static double lowerY(double aw) {
         double d1 = Math.toRadians(100), d2 = Math.toRadians(140);
@@ -445,7 +445,7 @@ final class PutraMesh {
         M.curShade = constShade(0.9);
         // tepi rambut (poni dan cambang) diberi tabung tipis supaya tepi tidak bergerigi
         double[][] fr = new double[17][], frr = new double[17][];
-        for (int i = 0; i < 17; i++) { double w = -HAIR_W + 2 * HAIR_W * i / 16; fr[i] = onHair(w, hairlineY(w)); frr[i] = new double[]{0.55, 0.55}; }
+        for (int i = 0; i < 17; i++) { double w = -HAIR_W + 2 * HAIR_W * i / 16; fr[i] = onHair(w, hairlineY(w)); frr[i] = new double[]{0.42, 0.42}; }
         M.tube(fr, frr, HAIR, 8);
         for (int sg = -1; sg <= 1; sg += 2) {
             // tepi cambang: turun lurus dari ujung garis rambut lalu mengikuti tepi bawah ke belakang
@@ -658,7 +658,7 @@ final class PutraMesh {
             double aw = Math.abs(w0);
             boolean front = aw < HAIR_W;
             double edge = front ? hairlineY(w0) : lowerY(aw);
-            double y0 = 72.7 + r.nextDouble() * 0.4;
+            double y0 = 75.4 + r.nextDouble() * 0.4;                // berangkat dari bibir peci (y=75), tidak ada jeda
             double yEnd = edge + (front ? -0.2 : 0.4) + r.nextDouble() * (front ? 0.5 : 1.2);
             double drift = (w0 < 0 ? -1 : 1) * (0.05 + 0.16 * r.nextDouble());
             double toneV = (k % 3 == 0) ? 1.10 : (k % 3 == 1 ? 0.90 : 1.0) + (r.nextDouble() - 0.5) * 0.08;
@@ -670,7 +670,7 @@ final class PutraMesh {
             double aw = Math.abs(w0);
             if (aw < HAIR_W) continue;
             double edge = lowerY(aw);
-            lock(w0, 72.6, edge + 0.3, 0.8 + 0.3 * r.nextDouble(), (k % 2 == 0 ? 1 : -1) * 0.10, 0.84 + 0.3 * r.nextDouble(), 6, 0.55);
+            lock(w0, 75.0, edge + 0.3, 0.8 + 0.3 * r.nextDouble(), (k % 2 == 0 ? 1 : -1) * 0.10, 0.84 + 0.3 * r.nextDouble(), 6, 0.55);
         }
         curShade = null;
         cur = P_OTHER;
@@ -781,10 +781,10 @@ final class PutraMesh {
                 double w = -PI + 2 * PI * (c + 0.5 * (row % 2)) / COLS + (r.nextDouble() - 0.5) * 0.08;
                 double aw = Math.abs(w);
                 double edge = aw < HAIR_W ? hairlineY(w) : lowerY(aw);
-                if (y < edge + 0.9) continue;
+                if (y < edge + (aw < HAIR_W ? 0.2 : 0.9)) continue;   // depan: ikal sampai garis rambut agar tidak ada jeda dengan peci
                 double yy = y + (r.nextDouble() - 0.5) * 0.8;
                 if (yy > 81.4) continue;
-                cur = yy <= 72.6 ? P_CURL_LOW : P_HAIR_CURL;
+                cur = yy <= 75.6 ? P_CURL_LOW : P_HAIR_CURL;   // sampai bibir peci: terlihat juga saat peci dipakai
                 curShade = sf;
                 curl(w, yy, 1.0 + 0.3 * r.nextDouble(), 0.86 + 0.28 * r.nextDouble(), 10);
             }
