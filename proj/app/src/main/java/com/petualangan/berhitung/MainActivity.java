@@ -3954,10 +3954,10 @@ public class MainActivity extends Activity {
             {5, "#43A047,#43A047", "Jaket Hijau", 90},
             {5, "#FAFAFA,#212121", "Hoodie Panda", 150},
             {5, "#C9A06B,#C9A06B", "Seragam Pramuka", 120},
-            {6, "#212121", "Rambut Hitam Pendek", 30},
-            {6, "#6D4C41", "Rambut Acak-acakan", 40},
+            {6, "#212121", "Rambut Cepak Hitam", 30},
+            {6, "#8B3A2F", "Rambut Cepak Kemerahan", 40},
             {6, "#5D4037", "Rambut Belah Samping", 50},
-            {6, "#6D4C41", "Rambut Ikal", 80},
+            {6, "#5D4037", "Rambut Ikal Ringan", 80},
             {6, "#A0643C", "Rambut Pendek Rapi", 60},
   {5, "#F8BBD0,#F8BBD0,#AD1457", "Tunik Pink", 80},
   {5, "#B39DDB,#B39DDB,#5E35B1", "Gamis Ungu", 100},
@@ -4047,12 +4047,12 @@ public class MainActivity extends Activity {
 
     /**
      * Gaya rambut 3D putra menurut nomor barang (nomor barang tetap, lihat catatan ITEMS):
-     * 39 Hitam Pendek = crew cut, 40 Acak-acakan = berantakan, 41 Belah Samping, 42 Ikal. 43 Pendek Rapi = bentuk bawaan.
+     * 39 Cepak Hitam dan 40 Cepak Kemerahan = cepak, 41 Belah Samping, 42 Ikal Ringan. 43 Pendek Rapi = bentuk bawaan.
      */
     private static int hairStyleOf(int item) {
         switch (item) {
             case 39: return PutraMesh.STYLE_CREW;
-            case 40: return PutraMesh.STYLE_MESSY;
+            case 40: return PutraMesh.STYLE_CREW;
             case 41: return PutraMesh.STYLE_SIDE;
             case 42: return PutraMesh.STYLE_CURLY;
             default: return PutraMesh.STYLE_DEFAULT;
@@ -4952,12 +4952,7 @@ public class MainActivity extends Activity {
                 int bangC = (girl && curHid < 0) ? col("#F7F7F7") : curHairC; addBox(hx0 + 3f, hy0 + 7f, hx1 - 3f, hy0 + 11f, hz - 0.5f, hz + 0.8f, bangC, bangC, bangC, 0);
                 addEars(animal, hc, col(HOOD_ACC[animal]), hx0, hx1, hy0, hy1);
             } else if (!hijab) {
-                if (curHid == 40) {
-                    for (int k = 0; k < 3; k++) {
-                        float cx = 38f + k * 12f;
-                        addBox(cx - 4f, hy0 - 10f, cx + 4f, hy0 - 1.5f, -6f, 6f, hc, hc, hc, 0);
-                    }
-                } else if (curHid == 41) {
+                if (curHid == 41) {
                     // belah samping: poni besar menyapu dahi ke kiri, sisi kanan pendek
                     addBox(hx0 - m, hy0 + 7f, hx1 - 9f, hy0 + 14f, hz - 1f, hz + m, hc, hc, hc, 0);
                     addBox(hx1 - 9f, hy0 + 7f, hx1 + m, hy0 + 10.5f, hz - 1f, hz + m, hc, hc, hc, 0);
@@ -5436,11 +5431,7 @@ public class MainActivity extends Activity {
             rect(c, 33f, 13f, 67f, 23f, 5f, hairC);
             rect(c, 33f, 13f, 37.5f, 30f, 2f, hairC);
             rect(c, 62.5f, 13f, 67f, 30f, 2f, hairC);
-            if (hid == 40) {
-                tri(c, 36f, 15f, 40f, 6f, 44f, 15f, hairC);
-                tri(c, 45f, 15f, 50f, 5f, 55f, 15f, hairC);
-                tri(c, 56f, 15f, 61f, 7f, 64f, 15f, hairC);
-            } else if (hid == 41) {
+            if (hid == 41) {
                 // belah samping: poni disisir dari garis belah (kanan) menyapu dahi ke kiri
                 path.reset();
                 path.moveTo(fx(33f), fy(9f));

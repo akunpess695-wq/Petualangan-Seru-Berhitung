@@ -713,6 +713,15 @@ final class PutraMesh {
             lock(w0, y0, edge + 0.6 + r.nextDouble() * 1.4 + (u > 0.6 ? 2.0 : 0), 1.1 + 0.3 * r.nextDouble(), dw,
                     (k % 2 == 0) ? 1.05 : 0.92, 8, 0.5);
         }
+        // penutup puncak: untaian dari tengah bidang atas disisir ke kiri (belahan di kanan tengah)
+        for (int k = 0; k < 16; k++) {
+            double w0 = -0.15 - 2.9 * (k + r.nextDouble() * 0.6) / 16;
+            crownLock(w0, 76.5 + r.nextDouble() * 3.0, 1.35 + 0.35 * r.nextDouble(), -0.5, (k % 3 == 0) ? 1.08 : (k % 3 == 1 ? 0.92 : 1.0));
+        }
+        for (int k = 0; k < 5; k++) {
+            double w0 = 0.35 + 1.0 * (k + r.nextDouble() * 0.6) / 5;
+            crownLock(w0, 77.5 + r.nextDouble() * 2.0, 1.2, 0.3, 1.0);
+        }
         // garis belah: alur gelap tipis dari dahi ke belakang
         curShade = constShade(0.38);
         int np = 9;
@@ -727,6 +736,9 @@ final class PutraMesh {
         }
         tone = 1.0;
         tube(path, rad, HAIR, 6);
+        double[][] tp = {{1.1, 82.25, HC[2] + 4.6}, {1.0, 82.5, HC[2] + 1.5}, {0.9, 82.5, HC[2] - 1.5}, {1.0, 82.25, HC[2] - 4.6}};
+        double[][] tr = {{0.4, 0.4}, {0.4, 0.4}, {0.4, 0.4}, {0.4, 0.4}};
+        tube(tp, tr, HAIR, 6);
         curShade = null;
         cur = P_OTHER;
     }
@@ -747,11 +759,11 @@ final class PutraMesh {
             path[k] = new double[]{b[0] + o[0] * lift + e1[0] * c + e2[0] * sn,
                     b[1] + o[1] * lift + e1[1] * c + e2[1] * sn,
                     b[2] + o[2] * lift + e1[2] * c + e2[2] * sn};
-            double rd = 0.80 * (1.0 - 0.55 * t * t);
+            double rd = 0.95 * (1.0 - 0.45 * t * t);
             rad[k] = new double[]{rd, rd};
         }
         tone = toneV;
-        tube(path, rad, HAIR, 6);
+        tube(path, rad, HAIR, 5);
     }
     private void curlyStyle() {
         java.util.Random r = new java.util.Random(77);
@@ -761,9 +773,9 @@ final class PutraMesh {
             double side = n[0] * -0.45 + n[1] * 0.65 + n[2] * 0.62;
             return tone * base * (1.0 + 0.14 * Math.max(0, side));
         };
-        final int COLS = 24;
-        for (int row = 0; row < 8; row++) {
-            double y = 63.5 + row * 2.9;
+        final int COLS = 28;
+        for (int row = 0; row < 10; row++) {
+            double y = 63.5 + row * 2.3;
             if (y > 81.0) y = 81.0;
             for (int c = 0; c < COLS; c++) {
                 double w = -PI + 2 * PI * (c + 0.5 * (row % 2)) / COLS + (r.nextDouble() - 0.5) * 0.08;
@@ -774,18 +786,22 @@ final class PutraMesh {
                 if (yy > 81.4) continue;
                 cur = yy <= 72.6 ? P_CURL_LOW : P_HAIR_CURL;
                 curShade = sf;
-                curl(w, yy, 1.35 + 0.35 * r.nextDouble(), 0.86 + 0.28 * r.nextDouble(), 12);
+                curl(w, yy, 1.0 + 0.3 * r.nextDouble(), 0.86 + 0.28 * r.nextDouble(), 10);
             }
         }
         // puncak kepala: beberapa ikal di bidang atas
         cur = P_HAIR_CURL;
         curShade = sf;
-        for (int k = 0; k < 9; k++) {
-            double a = 2 * PI * k / 9;
-            double[] top = {HC[0] + 4.2 * Math.sin(a), 82.0, HC[2] + 4.2 * Math.cos(a)};
-            curlFlat(top, 1.5 + 0.3 * r.nextDouble(), 0.9 + 0.2 * r.nextDouble());
+        for (int ring = 0; ring < 2; ring++) {
+            int nr = ring == 0 ? 6 : 12;
+            double rr = ring == 0 ? 2.6 : 5.6;
+            for (int k = 0; k < nr; k++) {
+                double a = 2 * PI * (k + 0.5 * ring) / nr;
+                double[] top = {HC[0] + rr * Math.sin(a), 82.0 - 0.3 * ring, HC[2] + rr * Math.cos(a)};
+                curlFlat(top, 1.1 + 0.25 * r.nextDouble(), 0.9 + 0.2 * r.nextDouble());
+            }
         }
-        curlFlat(new double[]{HC[0], 82.2, HC[2]}, 1.7, 1.0);
+        curlFlat(new double[]{HC[0], 82.2, HC[2]}, 1.3, 1.0);
         curShade = null;
         cur = P_OTHER;
     }
@@ -799,11 +815,11 @@ final class PutraMesh {
             double th = ph + t * 2 * PI * 1.35;
             double rr = rho * (1.0 - 0.45 * t);
             path[k] = new double[]{c0[0] + Math.cos(th) * rr, c0[1] + 0.2 + 0.9 * Math.sin(PI * Math.min(1.0, t * 1.1)) + 0.5 * t, c0[2] + Math.sin(th) * rr};
-            double rd = 0.80 * (1.0 - 0.55 * t * t);
+            double rd = 0.95 * (1.0 - 0.45 * t * t);
             rad[k] = new double[]{rd, rd};
         }
         tone = toneV;
-        tube(path, rad, HAIR, 6);
+        tube(path, rad, HAIR, 5);
     }
 
     private void hairStyles() {
@@ -829,31 +845,26 @@ final class PutraMesh {
             tube(sb, sbr, HAIR, 8);
         }
 
-        curShade = STRAND;
-        // 3. Berantakan: jumbai melengkung ke segala arah (acak tetap) + beberapa poni jatuh di dahi
-        cur = P_HAIR_MESSY;
-        java.util.Random rnd = new java.util.Random(11);
-        double[][] mring = {{77.0, 12, 0.2}, {80.0, 6, 0.6}};
-        for (double[] rg : mring) {
-            int n = (int) rg[1];
-            for (int k = 0; k < n; k++) {
-                double w = rg[2] + 2 * PI * k / n + (rnd.nextDouble() - 0.5) * 0.35;
-                double[] b = onHair(w, rg[0] + (rnd.nextDouble() - 0.5) * 1.2);
-                double[] o = outward(b);
-                double[] d = norm3(o[0] * 0.6 + (rnd.nextDouble() - 0.5) * 0.9, 0.7 + rnd.nextDouble() * 0.3, o[2] * 0.6 + (rnd.nextDouble() - 0.5) * 0.9);
-                double[] side = norm3(-d[2], 0, d[0]);
-                double bs = (rnd.nextDouble() - 0.5) * 0.9;
-                strand(b, d, 4.6 + rnd.nextDouble() * 2.2, 2.7, new double[]{side[0] * bs, 0.25 * Math.abs(bs) * -1, side[2] * bs}, 4, HAIR);
-            }
+        // cepak: helai pendek halus yang mengikuti pusaran di puncak, supaya tidak terlihat seperti helm polos
+        curShade = (p, n, i, j, nu, nv) -> {
+            double t = nv > 1 ? (double) j / (nv - 1) : 0;
+            double lit = n[0] * -0.45 + n[1] * 0.65 + n[2] * 0.62;
+            return tone * (0.80 + 0.24 * Math.pow(t, 0.8)) * (1.0 + 0.08 * Math.max(0, lit));
+        };
+        java.util.Random cr = new java.util.Random(91);
+        int NC = 120;
+        for (int k = 0; k < NC; k++) {
+            double w0 = -PI + 2 * PI * (k + cr.nextDouble() * 0.7) / NC;
+            double aw = Math.abs(w0);
+            double edge = aw < HAIR_W ? crewLine(w0) : crewLower(aw);
+            double y0 = Math.min(80.5, edge + 4.0 + cr.nextDouble() * 5.0);
+            double yEnd = edge + 0.2 + cr.nextDouble() * 0.9;
+            double drift = (w0 < 0 ? -1 : 1) * (0.06 + 0.16 * cr.nextDouble());
+            lock(w0, y0, yEnd, 0.62 + 0.18 * cr.nextDouble(), drift, 0.92 + 0.16 * cr.nextDouble(), 6, 0.6);
         }
-        strand(onHair(0.2, 81.3), norm3(0.35, 1, 0.3), 6.0, 3.0, new double[]{0.4, -0.2, 0.2}, 4, HAIR);
-        strand(onHair(-0.5, 80.8), norm3(-0.5, 1, -0.1), 5.2, 2.9, new double[]{-0.3, -0.25, -0.2}, 4, HAIR);
-        for (int k = 0; k < 5; k++) {
-            double w = Math.toRadians(-48 + 24 * k);
-            double[] b = onHair(w, hairlineY(w) + 2.2);
-            double[] d = norm3(Math.sin(w) * 0.7, -0.38, Math.cos(w) * 0.8);
-            double sd = (k % 2 == 0 ? 1 : -1) * 0.35;
-            strand(b, d, 4.2, 1.7, new double[]{Math.cos(w) * sd, 0, -Math.sin(w) * sd}, 4, HAIR);
+        for (int k = 0; k < 18; k++) {
+            double w0 = 2 * PI * (k + cr.nextDouble() * 0.6) / 18;
+            crownLock(w0, 77.5 + cr.nextDouble() * 2.0, 0.9 + 0.2 * cr.nextDouble(), 0.75, (k % 3 == 0) ? 1.06 : (k % 3 == 1 ? 0.92 : 1.0));
         }
         curShade = null;
         cur = P_OTHER;
