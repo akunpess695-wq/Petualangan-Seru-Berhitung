@@ -408,6 +408,18 @@ final class PutriMesh {
         return c;
     }
 
+    /** Indeks segitiga; showHijab=false membuang jilbab dan penutup leher (dipakai bila tudung hewan dipasang). */
+    int[] indexFor(boolean showHijab) {
+        if (showHijab) return idx;
+        int n = 0;
+        for (int t = 0; t < idx.length; t += 3) if (part[idx[t]] != P_HIJAB) n += 3;
+        int[] r = new int[n];
+        int o = 0;
+        for (int t = 0; t < idx.length; t += 3)
+            if (part[idx[t]] != P_HIJAB) { r[o++] = idx[t]; r[o++] = idx[t + 1]; r[o++] = idx[t + 2]; }
+        return r;
+    }
+
     /** Uji mandiri: java PutriMesh.java -> cetak jumlah dan checksum. */
     public static void main(String[] a) {
         PutriMesh m = build();

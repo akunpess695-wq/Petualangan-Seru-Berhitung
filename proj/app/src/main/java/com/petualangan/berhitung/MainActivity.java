@@ -4062,6 +4062,7 @@ public class MainActivity extends Activity {
     /** Pasang pakaian, rambut (putra) / warna jilbab (putri), latar, dan peci milik pemain pl ke tampilan 3D. */
     private void applyLook3D(PutriGLView v, int pl) {
         int ba = eqValid(pl, 5), hr = eqValid(pl, 6), bg = eqValid(pl, 4);
+        v.setHood(avatar[pl] >= 0 && avatar[pl] < NO_HOOD ? avatar[pl] : -1); // tudung hewan 3D (putra dan putri)
         v.setLook(ba >= 0 ? itIcon(ba) : null, hr >= 0 ? itIcon(hr) : null, bg >= 0 ? itIcon(bg) : null,
                 genderOf[pl] != 0 || !peciOff(pl), (genderOf[pl] == 0 && hr >= 0) ? hairStyleOf(hr) : PutraMesh.STYLE_DEFAULT);
     }

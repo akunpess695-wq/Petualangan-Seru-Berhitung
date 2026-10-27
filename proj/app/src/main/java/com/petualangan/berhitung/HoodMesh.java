@@ -1,0 +1,342 @@
+package com.petualangan.berhitung;
+
+import java.util.ArrayList;
+
+/**
+ * Tudung hewan 3D untuk putra DAN putri (12 hewan, nomor sama dengan AVATARS / HOOD_MAIN di MainActivity).
+ * Mesh tambahan: dibuat terpisah dari PutraMesh/PutriMesh, dipasang di kepala yang sama (koordinat akhir
+ * masing-masing mesh), lalu digambar bersama oleh PutriGLView. Tanpa dependensi Android.
+ * Bukaan wajah dinyatakan relatif terhadap kepala (sudut w, tinggi s = -1 dagu .. +1 puncak), jadi
+ * bentuknya sama untuk kedua karakter walau proporsi kepala putra (chibi) dan putri berbeda.
+ */
+final class HoodMesh {
+    static final int COUNT = 12;
+    static final String[] MAIN = {"#F2B24C", "#F28C28", "#FFFFFF", "#9AA5AD", "#5DBB4A", "#E8631C",
+            "#F6EEF3", "#A8744A", "#F2A65A", "#F3EAF7", "#37474F", "#8D6E4B"};
+    static final String[] ACC = {"#B5651D", "#212121", "#212121", "#DDE3E6", "#FFFFFF", "#FFFFFF",
+            "#F8BBD0", "#5D3A1E", "#C77B30", "#F06292", "#FFFFFF", "#E6D5B8"};
+
+    float[] pos, nor, col;
+    int[] idx;
+    int vertCount;
+
+    private final ArrayList<float[]> bp = new ArrayList<>(), bn = new ArrayList<>(), bc = new ArrayList<>();
+    private final ArrayList<int[]> bi = new ArrayList<>();
+    private int voff = 0;
+
+    // pusat kepala dan jari-jari CANGKANG tudung (kepala + tebal T)
+    private static final double T = 2.0;
+    private static final double SB = -0.78;      // tepi bawah tudung (tinggi relatif)
+    private static final double S_OPEN = -0.55;  // di bawah ini bukaan lurus ke bawah (dagu bebas)
+    private static final double PW = Math.toRadians(62);  // setengah lebar bukaan
+    private final boolean putra;
+    private final double cx, cy, cz, RX, RY, RZ;
+    private final double sTop;                   // batas atas bukaan (dahi)
+    private final double k;                      // skala aksesori
+
+    private HoodMesh(int gender) {
+        putra = gender == 0;
+        if (putra) {   // kepala putra setelah scaleFrom(1.2, 1.02, 1.15) dan shortenLegs (-4.06)
+            cx = 0; cy = 56.0 + 12.5 * 1.02 - 4.06; cz = 0.8;
+            RX = 12.6 * 1.2 + T; RY = 12.9 * 1.02 + T; RZ = 12.5 * 1.15 + T;
+            sTop = 0.36;
+        } else {       // kepala putri (tanpa skala)
+            cx = 0; cy = 68.5; cz = 0.8;
+            RX = 12.6 + T; RY = 12.9 + T; RZ = 12.5 + T;
+            sTop = 0.52;                          // alis putri lebih tinggi
+        }
+        k = RX / 17.0;
+    }
+
+    static HoodMesh build(int animal, int gender) {
+        HoodMesh H = new HoodMesh(gender == 0 ? 0 : 1);
+        H.make(animal);
+        H.finish();
+        return H;
+    }
+
+    // ---------------- geometri dasar ----------------
+    private double prof(double th) { return putra ? PutraMesh.headF(th) : Math.max(0, Math.cos(th)); }
+
+    /** Titik di cangkang: sudut w (derajat, 0 = depan), tinggi relatif s, digeser 'out' ke arah luar. */
+    private double[] pt(double wDeg, double s, double out) {
+        s = Math.max(-0.999, Math.min(0.999, s));
+        double w = Math.toRadians(wDeg), f = prof(Math.asin(s));
+        double x = cx + RX * f * Math.sin(w), y = cy + RY * s, z = cz + RZ * f * Math.cos(w);
+        if (out != 0) {
+            double a = (x - cx) / (RX * RX), b = (y - cy) / (RY * RY), c = (z - cz) / (RZ * RZ);
+            double l = Math.sqrt(a * a + b * b + c * c);
+            if (l > 1e-9) { x += out * a / l; y += out * b / l; z += out * c / l; }
+        }
+        return new double[]{x, y, z};
+    }
+    private static double[] add(double[] a, double x, double y, double z) { return new double[]{a[0] + x, a[1] + y, a[2] + z}; }
+    private static double[] cross(double[] a, double[] b) { return new double[]{a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]}; }
+    private static double[] unit(double[] a) { double l = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]); if (l < 1e-12) return new double[]{0, 1, 0}; return new double[]{a[0] / l, a[1] / l, a[2] / l}; }
+    private static double[] sub(double[] a, double[] b) { return new double[]{a[0] - b[0], a[1] - b[1], a[2] - b[2]}; }
+    private static double[] col(String h) { double[] c = PutraMesh.hex(h); return c == null ? new double[]{1, 1, 1} : c; }
+
+    /** Kisi titik G[i][j] -> segitiga. i melingkar bila closedU. keep[i][j] = false membuang sel. */
+    private void grid(double[][][] G, double[] c, boolean closedU, boolean[][] keep) {
+        int nu = G.length, nv = G[0].length;
+        float[] p = new float[nu * nv * 3], n = new float[nu * nv * 3], cl = new float[nu * nv * 3];
+        for (int i = 0; i < nu; i++)
+            for (int j = 0; j < nv; j++) {
+                double[] a = closedU ? G[(i + 1) % nu][j] : G[Math.min(i + 1, nu - 1)][j];
+                double[] b = closedU ? G[(i - 1 + nu) % nu][j] : G[Math.max(i - 1, 0)][j];
+                double[] u = sub(a, b), v = sub(G[i][Math.min(j + 1, nv - 1)], G[i][Math.max(j - 1, 0)]);
+                double[] nn = unit(cross(u, v));
+                int o = (i * nv + j) * 3;
+                for (int m = 0; m < 3; m++) { p[o + m] = (float) G[i][j][m]; n[o + m] = (float) nn[m]; cl[o + m] = (float) c[m]; }
+            }
+        int cu = closedU ? nu : nu - 1;
+        ArrayList<Integer> f = new ArrayList<>();
+        for (int i = 0; i < cu; i++) {
+            int i2 = (i + 1) % nu;
+            for (int j = 0; j < nv - 1; j++) {
+                if (keep != null && !keep[i][j]) continue;
+                int a = voff + i * nv + j, b = voff + i2 * nv + j, c2 = voff + i2 * nv + j + 1, d = voff + i * nv + j + 1;
+                f.add(a); f.add(b); f.add(c2); f.add(a); f.add(c2); f.add(d);
+            }
+        }
+        int[] fi = new int[f.size()];
+        for (int q = 0; q < fi.length; q++) fi[q] = f.get(q);
+        bp.add(p); bn.add(n); bc.add(cl); bi.add(fi);
+        voff += nu * nv;
+    }
+
+    private void ellipsoid(double[] c, double rx, double ry, double rz, double[] colr) {
+        int nu = 14, nv = 9;
+        double[][][] G = new double[nu][nv][3];
+        for (int i = 0; i < nu; i++)
+            for (int j = 0; j < nv; j++) {
+                double ph = 2 * Math.PI * i / nu, th = -Math.PI / 2 + Math.PI * j / (nv - 1);
+                G[i][j] = new double[]{c[0] + rx * Math.cos(th) * Math.sin(ph), c[1] + ry * Math.sin(th), c[2] + rz * Math.cos(th) * Math.cos(ph)};
+            }
+        grid(G, colr, true, null);
+    }
+    private void ball(double[] c, double r, double[] colr) { ellipsoid(c, r, r, r, colr); }
+
+    private void tube(double[][] path, double[] rad, double[] colr, int ns) {
+        int n = path.length;
+        double[][][] G = new double[ns][n][3];
+        for (int j = 0; j < n; j++) {
+            double[] t = unit(sub(path[Math.min(j + 1, n - 1)], path[Math.max(j - 1, 0)]));
+            double[] h = Math.abs(t[2]) > 0.7 ? new double[]{0, 1, 0} : new double[]{0, 0, 1};
+            double[] a = unit(cross(t, h)), b = unit(cross(t, a));
+            for (int i = 0; i < ns; i++) {
+                double ang = 2 * Math.PI * i / ns;
+                for (int m = 0; m < 3; m++) G[i][j][m] = path[j][m] + a[m] * rad[j] * Math.cos(ang) + b[m] * rad[j] * Math.sin(ang);
+            }
+        }
+        grid(G, colr, true, null);
+    }
+    private void cone(double[] base, double[] tip, double r, double[] colr) {
+        tube(new double[][]{base, tip}, new double[]{r, 0.08}, colr, 8);
+    }
+
+    // ---------------- cangkang tudung ----------------
+    private boolean inWindow(double aw, double s) {
+        if (aw >= PW) return false;
+        if (s <= S_OPEN) return true;
+        if (s >= sTop) return false;
+        double q = (s - S_OPEN) / (sTop - S_OPEN);
+        return aw < PW * Math.pow(Math.max(0, 1 - Math.pow(q, 4)), 0.25);
+    }
+
+    private void shell(double[] c) {
+        int nu = 96, nv = 40;
+        double th0 = Math.asin(SB);
+        double[][][] G = new double[nu][nv][3];
+        double[] TH = new double[nv];
+        for (int j = 0; j < nv; j++) TH[j] = th0 + (Math.PI / 2 - th0) * j / (nv - 1);
+        for (int i = 0; i < nu; i++) {
+            double ph = 2 * Math.PI * i / nu;
+            for (int j = 0; j < nv; j++) {
+                double f = prof(TH[j]);
+                G[i][j] = new double[]{cx + RX * f * Math.sin(ph), cy + RY * Math.sin(TH[j]), cz + RZ * f * Math.cos(ph)};
+            }
+        }
+        boolean[][] keep = new boolean[nu][nv];
+        for (int i = 0; i < nu; i++)
+            for (int j = 0; j < nv; j++) {
+                double pm = 2 * Math.PI * (i + 0.5) / nu;
+                double w = ((pm + Math.PI) % (2 * Math.PI)); if (w < 0) w += 2 * Math.PI; w -= Math.PI;
+                double tm = j < nv - 1 ? (TH[j] + TH[j + 1]) / 2 : TH[j];
+                keep[i][j] = !inWindow(Math.abs(w), Math.sin(tm));
+            }
+        grid(G, c, true, keep);
+
+        // bingkai bukaan wajah (tepi tudung yang tebal, rapi menutup tepi bergerigi)
+        ArrayList<double[]> rim = new ArrayList<>();
+        rim.add(pt(-Math.toDegrees(PW), SB, 0));
+        rim.add(pt(-Math.toDegrees(PW), (SB + S_OPEN) / 2, 0));
+        rim.add(pt(-Math.toDegrees(PW), S_OPEN, 0));
+        for (int a = 1; a <= 12; a++) {   // sisi kiri naik ke dahi
+            double q = Math.sin(Math.PI / 2 * a / 12.0);
+            double lim = PW * Math.pow(Math.max(0, 1 - Math.pow(q, 4)), 0.25);
+            rim.add(pt(-Math.toDegrees(lim), S_OPEN + q * (sTop - S_OPEN), 0));
+        }
+        for (int a = 11; a >= 0; a--) {   // sisi kanan turun
+            double q = Math.sin(Math.PI / 2 * a / 12.0);
+            double lim = PW * Math.pow(Math.max(0, 1 - Math.pow(q, 4)), 0.25);
+            rim.add(pt(Math.toDegrees(lim), S_OPEN + q * (sTop - S_OPEN), 0));
+        }
+        rim.add(pt(Math.toDegrees(PW), (SB + S_OPEN) / 2, 0));
+        rim.add(pt(Math.toDegrees(PW), SB, 0));
+        double[][] rp = rim.toArray(new double[0][]);
+        double[] rr = new double[rp.length];
+        java.util.Arrays.fill(rr, 1.25 * k);
+        tube(rp, rr, c, 8);
+
+        // tepi bawah: dari sisi kanan, lewat belakang, ke sisi kiri
+        int nb = 36;
+        double[][] bot = new double[nb][];
+        double[] br = new double[nb];
+        for (int i = 0; i < nb; i++) {
+            double w = Math.toDegrees(PW) + (360 - 2 * Math.toDegrees(PW)) * i / (nb - 1.0);
+            bot[i] = pt(w, SB, 0);
+            br[i] = 1.0 * k;
+        }
+        tube(bot, br, c, 8);
+    }
+
+    // ---------------- aksesori ----------------
+    private void roundEar(double wDeg, double s, double r, double[] outer, double[] inner) {
+        double[] c = pt(wDeg, s, 0.25 * r);
+        ellipsoid(c, r, r, r * 0.75, outer);
+        if (inner != null) ellipsoid(add(c, 0, 0, r * 0.35), r * 0.58, r * 0.58, r * 0.55, inner);
+    }
+    private void pointEar(double wDeg, double s, double h, double wd, double[] outer, double[] inner) {
+        double sg = Math.signum(wDeg);
+        double[] b = pt(wDeg, s, -0.3 * wd);
+        double[] tip = add(b, sg * 0.28 * h, 0.95 * h, -0.1 * h);
+        cone(b, tip, wd, outer);
+        if (inner != null) cone(add(b, 0, 0.1 * h, wd * 0.55), add(b, sg * 0.22 * h, 0.7 * h, wd * 0.2), wd * 0.55, inner);
+    }
+    private void stripeMeridian(double wDeg, double s0, double s1, double[] c) {
+        int n = 6;
+        double[][] p = new double[n][];
+        double[] r = new double[n];
+        for (int i = 0; i < n; i++) { p[i] = pt(wDeg, s0 + (s1 - s0) * i / (n - 1.0), 0.25); r[i] = 0.5 * k; }
+        tube(p, r, c, 5);
+    }
+    private void stripeSide(double sg, double s, double w0, double w1, double[] c) {
+        int n = 6;
+        double[][] p = new double[n][];
+        double[] r = new double[n];
+        for (int i = 0; i < n; i++) { p[i] = pt(sg * (w0 + (w1 - w0) * i / (n - 1.0)), s, 0.25); r[i] = 0.55 * k; }
+        tube(p, r, c, 5);
+    }
+
+    private void make(int a) {
+        if (a < 0 || a >= COUNT) a = 0;
+        double[] main = col(MAIN[a]), acc = col(ACC[a]), white = {1, 1, 1}, inner = col("#FFE0B2");
+        shell(main);
+        for (int sg = -1; sg <= 1; sg += 2) {
+            switch (a) {
+                case 0: // singa: telinga bulat + surai
+                    roundEar(sg * 42, 0.86, 3.6 * k, acc, null);
+                    ball(pt(sg * 84, 0.45, 0.4 * k), 3.4 * k, acc);
+                    ball(pt(sg * 86, 0.0, 0.4 * k), 3.4 * k, acc);
+                    ball(pt(sg * 72, 0.78, 0.4 * k), 3.0 * k, acc);
+                    ball(pt(sg * 80, -0.42, 0.4 * k), 3.0 * k, acc);
+                    break;
+                case 1: // harimau
+                    roundEar(sg * 40, 0.86, 4.2 * k, main, inner);
+                    stripeSide(sg, 0.1, 68, 98, acc);
+                    stripeSide(sg, -0.25, 68, 98, acc);
+                    break;
+                case 2: // panda
+                    roundEar(sg * 44, 0.85, 4.4 * k, acc, null);
+                    ellipsoid(pt(sg * 76, 0.0, 0.3), 2.0 * k, 3.2 * k, 1.4 * k, acc);
+                    break;
+                case 3: // koala
+                    roundEar(sg * 52, 0.75, 5.4 * k, main, acc);
+                    break;
+                case 4: { // katak: mata menonjol di atas
+                    double[] e = pt(sg * 26, 0.84, 1.0 * k);
+                    double[] f = unit(new double[]{0, 0.35, 1});
+                    ball(e, 4.4 * k, main);
+                    ball(add(e, f[0] * 2.9 * k, f[1] * 2.9 * k, f[2] * 2.9 * k), 3.0 * k, white);
+                    ball(add(e, f[0] * 4.7 * k, f[1] * 4.7 * k, f[2] * 4.7 * k), 1.5 * k, new double[]{0.05, 0.05, 0.05});
+                    break;
+                }
+                case 5: // rubah
+                    pointEar(sg * 40, 0.84, 9 * k, 4 * k, main, inner);
+                    ellipsoid(pt(sg * 70, -0.62, 0.3), 3.0 * k, 3.2 * k, 1.5 * k, white);
+                    break;
+                case 6: { // kelinci
+                    double[] b = pt(sg * 28, 0.88, 0);
+                    double[][] p = {b, add(b, sg * 1.5 * k, 6.5 * k, -1 * k), add(b, sg * 3 * k, 13 * k, -2.2 * k)};
+                    tube(p, new double[]{2.6 * k, 2.7 * k, 2.3 * k}, main, 10);
+                    ball(p[2], 2.3 * k, main);
+                    double[][] q = {add(b, sg * 0.2 * k, 1.5 * k, 2.1 * k), add(b, sg * 1.4 * k, 6.7 * k, 1.4 * k), add(b, sg * 2.7 * k, 12 * k, 0.2 * k)};
+                    tube(q, new double[]{1.3 * k, 1.4 * k, 1.1 * k}, acc, 8);
+                    break;
+                }
+                case 7: { // anjing: telinga lipat di samping
+                    double[] c = {cx + sg * (RX + 1.0 * k), cy - 0.05 * RY, cz - 0.5};
+                    ellipsoid(c, 2.4 * k, 7.6 * k, 4.4 * k, acc);
+                    break;
+                }
+                case 8: // kucing
+                    pointEar(sg * 40, 0.84, 8 * k, 3.8 * k, main, acc);
+                    break;
+                case 9: // unicorn: telinga kecil
+                    pointEar(sg * 42, 0.84, 5.5 * k, 3.0 * k, main, col("#F8BBD0"));
+                    break;
+                case 10: // penguin: pipi putih di sisi
+                    ellipsoid(pt(sg * 74, -0.12, 0.3), 1.3 * k, 5.6 * k, 3.4 * k, white);
+                    break;
+                case 11: { // burung hantu: jambul + mata besar
+                    pointEar(sg * 40, 0.86, 8 * k, 3.6 * k, col("#6D4C41"), null);
+                    double[] e = pt(sg * 15, 0.74, 0.6 * k);
+                    ellipsoid(e, 3.9 * k, 3.9 * k, 2.2 * k, white);
+                    ball(add(e, 0, 0, 1.6 * k), 1.8 * k, col("#5D4037"));
+                    break;
+                }
+            }
+        }
+        // aksesori tengah (tidak per sisi)
+        if (a == 1 || a == 8) {
+            double[] sc = a == 1 ? acc : col("#C77B30");
+            stripeMeridian(-11, 0.55, 0.93, sc);
+            stripeMeridian(0, 0.55, 0.97, sc);
+            stripeMeridian(11, 0.55, 0.93, sc);
+        } else if (a == 3) {
+            ellipsoid(pt(0, 0.64, 0.5 * k), 3.0 * k, 1.7 * k, 1.3 * k, col("#455A64"));
+        } else if (a == 9) {
+            double[] b = pt(0, 0.9, 0);
+            cone(add(b, 0, -1 * k, 0), add(b, 0, 11 * k, 2.2 * k), 2.3 * k, col("#FFD54F"));
+            int n = 7;                       // surai merah muda di sisi kanan
+            double[][] p = new double[n][];
+            double[] r = new double[n];
+            for (int i = 0; i < n; i++) { p[i] = pt(84, 0.8 - 1.3 * i / (n - 1.0), 0.8 * k); r[i] = 1.9 * k; }
+            tube(p, r, acc, 7);
+        } else if (a == 10) {
+            double[] b = pt(0, 0.62, 0.2);
+            cone(b, add(b, 0, -1.4 * k, 5.2 * k), 2.5 * k, col("#FFB300"));
+        } else if (a == 11) {
+            double[] b = pt(0, 0.56, 0.2);
+            cone(b, add(b, 0, -1.6 * k, 4.6 * k), 1.8 * k, col("#FFB300"));
+        }
+    }
+
+    private void finish() {
+        int nv = 0, ni = 0;
+        for (float[] a : bp) nv += a.length / 3;
+        for (int[] a : bi) ni += a.length;
+        pos = new float[nv * 3]; nor = new float[nv * 3]; col = new float[nv * 3]; idx = new int[ni];
+        int pv = 0, pi = 0;
+        for (int q = 0; q < bp.size(); q++) {
+            System.arraycopy(bp.get(q), 0, pos, pv, bp.get(q).length);
+            System.arraycopy(bn.get(q), 0, nor, pv, bn.get(q).length);
+            System.arraycopy(bc.get(q), 0, col, pv, bc.get(q).length);
+            pv += bp.get(q).length;
+            System.arraycopy(bi.get(q), 0, idx, pi, bi.get(q).length);
+            pi += bi.get(q).length;
+        }
+        vertCount = nv;
+    }
+}

@@ -27,7 +27,8 @@ final class PutraMesh {
     static final int P_OTHER = 0, P_SHIRT = 1, P_TRIM = 2, P_BUTTON = 3, P_SLEEVE = 4, P_PANTS = 5, P_HAIR = 6, P_PECI = 7,
             P_HAIR_CREW = 8, P_HAIR_SPIKY = 9, P_HAIR_MESSY = 10, P_HAIR_DET = 11, P_HAIR_LOW = 12, P_HAIR_SIDE = 13, P_HAIR_CURL = 14, P_HAIR_CROWN = 15, P_CURL_LOW = 16;
     /** Gaya rambut (terlihat hanya bila peci dilepas). 0 = cangkang rambut bawaan (rapi). */
-    static final int STYLE_DEFAULT = 0, STYLE_CREW = 1, STYLE_SPIKY = 2, STYLE_MESSY = 3, STYLE_SIDE = 4, STYLE_CURLY = 5;
+    static final int STYLE_DEFAULT = 0, STYLE_CREW = 1, STYLE_SPIKY = 2, STYLE_MESSY = 3, STYLE_SIDE = 4, STYLE_CURLY = 5,
+            STYLE_HOOD = 6;   // tudung hewan dipakai: peci dan semua rambut disembunyikan (tudung digambar HoodMesh)
     private int cur = P_OTHER;                         // bagian untuk potongan yang dibuat berikutnya
     private final ArrayList<Integer> bpt = new ArrayList<>();
     byte[] part;                                       // bagian tiap titik (sama panjang dengan vertCount)
@@ -1004,6 +1005,10 @@ final class PutraMesh {
         hide[P_HAIR_CURL] = !(curly && st);
         hide[P_CURL_LOW] = !curly;                           // ikal bagian bawah: terlihat juga di bawah peci
         if (st && style == STYLE_CREW) hide[P_HAIR] = true;
+        if (style == STYLE_HOOD) {                           // tudung hewan: tanpa peci dan tanpa rambut
+            hide[P_PECI] = true;
+            for (int q = P_HAIR; q <= P_CURL_LOW; q++) if (q != P_PECI) hide[q] = true;
+        }
         int n = 0;
         for (int t = 0; t < idx.length; t += 3) if (!hide[part[idx[t]]]) n += 3;
         int[] r = new int[n];

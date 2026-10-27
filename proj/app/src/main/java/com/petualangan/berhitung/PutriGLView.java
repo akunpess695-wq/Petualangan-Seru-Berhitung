@@ -26,12 +26,14 @@ import javax.microedition.khronos.opengles.GL10;
 final class PutriGLView extends GLSurfaceView {
     private static PutriMesh sMesh;     // putri, dibuat sekali, dipakai ulang
     private static PutraMesh sMeshPutra; // putra
+    private static final HoodMesh[][] sHood = new HoodMesh[2][HoodMesh.COUNT]; // tudung per gender dan hewan, dibuat saat dipakai
     private final int gender;            // 0 = putra, 1 = putri
 
     private volatile float yaw = 0f, pitch = 0f; // derajat
     private volatile float bgR = 1f, bgG = 1f, bgB = 1f; // warna latar (default putih = warna kartu)
     private volatile String lookPakaian, lookRambut;          // "badan,lengan[,celana/rok]" dan "#hex" (null = bawaan)
     private volatile boolean showPeci = true;                 // hanya berlaku untuk putra
+    private volatile int hood = -1;                           // nomor tudung hewan (0..11), -1 = tanpa tudung
     private volatile int hairStyle = 0;                       // PutraMesh.STYLE_*; terlihat hanya bila peci dilepas
     private volatile float[] bgGrad;                          // 6 warna rgb + jumlah ruas di [18]; null = latar rata
     private float lastX, lastY;
@@ -59,6 +61,9 @@ final class PutriGLView extends GLSurfaceView {
      * latar = daftar warna dipisah koma, "#4FC3F7,#E1F5FE" (kiri-atas ke kanan-bawah, sama dengan AvatarView), maks 6 warna.
      * Boleh dipanggil sebelum atau sesudah tampil.
      */
+    /** Pasang tudung hewan (0..11) atau lepas (-1). Panggil sebelum setLook, yang memuat ulang mesh. */
+    void setHood(int animal) { hood = (animal >= 0 && animal < HoodMesh.COUNT) ? animal : -1; }
+
     void setLook(String pakaian, String rambut, String latar, boolean peci, int gayaRambut) {
         lookPakaian = pakaian; lookRambut = rambut; showPeci = peci; hairStyle = gayaRambut;
         bgGrad = parseGrad(latar);
@@ -213,19 +218,39 @@ final class PutriGLView extends GLSurfaceView {
             if (gender == 0) {
                 if (sMeshPutra == null) sMeshPutra = PutraMesh.build();
                 PutraMesh m = sMeshPutra;
-                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci, hairStyle); mvc = m.vertCount;
+                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci, hood >= 0 ? PutraMesh.STYLE_HOOD : hairStyle); mvc = m.vertCount;
                 mcol = m.outfitColors(lookPakaian, lookRambut);
             } else {
                 if (sMesh == null) sMesh = PutriMesh.build();
                 PutriMesh m = sMesh;
-                mpos = m.pos; mnor = m.nor; midx = m.idx; mvc = m.vertCount;
+                mpos = m.pos; mnor = m.nor; midx = m.indexFor(hood < 0); mvc = m.vertCount;
                 mcol = m.outfitColors(lookPakaian, lookRambut);
             }
-            float[] inter = new float[mvc * 9];
+            // tudung hewan: titik dan indeksnya ditambahkan di belakang mesh badan (indeks tetap di bawah 65.536)
+            HoodMesh hm = null;
+            final int hd = hood;
+            if (hd >= 0) {
+                if (sHood[gender][hd] == null) sHood[gender][hd] = HoodMesh.build(hd, gender);
+                hm = sHood[gender][hd];
+                if (mvc + hm.vertCount > 65535) hm = null;   // pengaman batas short
+            }
+            int hvc = hm == null ? 0 : hm.vertCount;
+            float[] inter = new float[(mvc + hvc) * 9];
             for (int i = 0; i < mvc; i++) {
                 System.arraycopy(mpos, i * 3, inter, i * 9, 3);
                 System.arraycopy(mnor, i * 3, inter, i * 9 + 3, 3);
                 System.arraycopy(mcol, i * 3, inter, i * 9 + 6, 3);
+            }
+            if (hm != null) {
+                for (int i = 0; i < hvc; i++) {
+                    System.arraycopy(hm.pos, i * 3, inter, (mvc + i) * 9, 3);
+                    System.arraycopy(hm.nor, i * 3, inter, (mvc + i) * 9 + 3, 3);
+                    System.arraycopy(hm.col, i * 3, inter, (mvc + i) * 9 + 6, 3);
+                }
+                int[] all = new int[midx.length + hm.idx.length];
+                System.arraycopy(midx, 0, all, 0, midx.length);
+                for (int i = 0; i < hm.idx.length; i++) all[midx.length + i] = hm.idx[i] + mvc;
+                midx = all;
             }
             FloatBuffer fb = ByteBuffer.allocateDirect(inter.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
             fb.put(inter).position(0);
