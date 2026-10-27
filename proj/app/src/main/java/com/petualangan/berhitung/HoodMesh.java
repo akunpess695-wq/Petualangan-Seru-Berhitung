@@ -3,7 +3,7 @@ package com.petualangan.berhitung;
 import java.util.ArrayList;
 
 /**
- * Tudung hewan 3D untuk putra DAN putri (12 hewan, nomor sama dengan AVATARS / HOOD_MAIN di MainActivity).
+ * Tudung hewan 3D untuk putra DAN putri (putri tetap berhijab: tudung dipakai di atas kubah jilbab) (12 hewan, nomor sama dengan AVATARS / HOOD_MAIN di MainActivity).
  * Mesh tambahan: dibuat terpisah dari PutraMesh/PutriMesh, dipasang di kepala yang sama (koordinat akhir
  * masing-masing mesh), lalu digambar bersama oleh PutriGLView. Tanpa dependensi Android.
  * Bukaan wajah dinyatakan relatif terhadap kepala (sudut w, tinggi s = -1 dagu .. +1 puncak), jadi
@@ -26,30 +26,33 @@ final class HoodMesh {
 
     // pusat kepala dan jari-jari CANGKANG tudung (kepala + tebal T)
     private static final double T = 2.0;
-    private static final double SB = -0.78;      // tepi bawah tudung (tinggi relatif)
-    private static final double S_OPEN = -0.55;  // di bawah ini bukaan lurus ke bawah (dagu bebas)
-    private static final double PW = Math.toRadians(62);  // setengah lebar bukaan
-    private final boolean putra;
+    private final double SB;                     // tepi bawah tudung (tinggi relatif)
+    private final double S_OPEN;                 // di bawah ini bukaan lurus ke bawah (dagu bebas)
+    private final double PW;                     // setengah lebar bukaan
+    private final boolean putra;                 // kepala putra (profil headF)
+    private final boolean hij;                   // putri berhijab: cangkang mengikuti kubah jilbab (PutriMesh.HIJAB)
     private final double cx, cy, cz, RX, RY, RZ;
     private final double sTop;                   // batas atas bukaan (dahi)
     private final double k;                      // skala aksesori
+    private static final double HS = 1.11, HV = 1.09;  // jilbab -> tudung: skala mendatar dan tegak terhadap (0, 70, -3.5)
 
     private HoodMesh(int gender) {
         putra = gender == 0;
+        hij = !putra;
         if (putra) {   // kepala putra setelah scaleFrom(1.2, 1.02, 1.15) dan shortenLegs (-4.06)
             cx = 0; cy = 56.0 + 12.5 * 1.02 - 4.06; cz = 0.8;
             RX = 12.6 * 1.2 + T; RY = 12.9 * 1.02 + T; RZ = 12.5 * 1.15 + T;
-            sTop = 0.36;
-        } else {       // kepala putri (tanpa skala)
-            cx = 0; cy = 68.5; cz = 0.8;
-            RX = 12.6 + T; RY = 12.9 + T; RZ = 12.5 + T;
-            sTop = 0.52;                          // alis putri lebih tinggi
+            sTop = 0.36; SB = -0.78; S_OPEN = -0.55; PW = Math.toRadians(62);
+        } else {       // putri: tudung di atas jilbab (kubah jilbab: pusat (0, 70, -3.5), jari-jari kira-kira 16 x 19,5 x 16,8)
+            cx = 0; cy = 70.0; cz = -3.5;
+            RX = 16.0 * HS; RY = 19.5 * HV; RZ = 16.8 * HS;
+            sTop = 0.46; SB = -0.56; S_OPEN = -0.30; PW = Math.toRadians(56);
         }
         k = RX / 17.0;
     }
 
     static HoodMesh build(int animal, int gender) {
-        HoodMesh H = new HoodMesh(gender == 0 ? 0 : 1);
+        HoodMesh H = new HoodMesh(gender == 0 ? 0 : 1);   // 0 putra, 1 putri (berhijab)
         H.make(animal);
         H.finish();
         return H;
@@ -58,13 +61,22 @@ final class HoodMesh {
     // ---------------- geometri dasar ----------------
     private double prof(double th) { return putra ? PutraMesh.headF(th) : Math.max(0, Math.cos(th)); }
 
+    /** Lingkar cangkang pada tinggi relatif s: {y, jari-jari x, jari-jari z, pusat z}. */
+    private double[] ring(double s) {
+        if (!hij) { double f = prof(Math.asin(s)); return new double[]{cy + RY * s, RX * f, RZ * f, cz}; }
+        double y = cy + RY * s, ys = cy + (y - cy) / HV;     // kembalikan ke tinggi jilbab
+        double[] q = PutriMesh.interp(PutriMesh.HIJAB, ys);
+        return new double[]{y, q[0] * HS, q[1] * HS, q[3]};
+    }
+
     /** Titik di cangkang: sudut w (derajat, 0 = depan), tinggi relatif s, digeser 'out' ke arah luar. */
     private double[] pt(double wDeg, double s, double out) {
         s = Math.max(-0.999, Math.min(0.999, s));
-        double w = Math.toRadians(wDeg), f = prof(Math.asin(s));
-        double x = cx + RX * f * Math.sin(w), y = cy + RY * s, z = cz + RZ * f * Math.cos(w);
+        double w = Math.toRadians(wDeg);
+        double[] g = ring(s);
+        double x = cx + g[1] * Math.sin(w), y = g[0], z = g[3] + g[2] * Math.cos(w);
         if (out != 0) {
-            double a = (x - cx) / (RX * RX), b = (y - cy) / (RY * RY), c = (z - cz) / (RZ * RZ);
+            double a = (x - cx) / (RX * RX), b = (y - cy) / (RY * RY), c = (z - cz) / (RZ * RZ);   // gradien elipsoid pendekatan
             double l = Math.sqrt(a * a + b * b + c * c);
             if (l > 1e-9) { x += out * a / l; y += out * b / l; z += out * c / l; }
         }
@@ -149,12 +161,15 @@ final class HoodMesh {
         double th0 = Math.asin(SB);
         double[][][] G = new double[nu][nv][3];
         double[] TH = new double[nv];
-        for (int j = 0; j < nv; j++) TH[j] = th0 + (Math.PI / 2 - th0) * j / (nv - 1);
+        for (int j = 0; j < nv; j++) {
+            double sj = hij ? SB + (1 - SB) * j / (nv - 1) : Math.sin(th0 + (Math.PI / 2 - th0) * j / (nv - 1));
+            TH[j] = Math.asin(Math.min(1.0, sj));         // TH disimpan sebagai sudut; s = sin(TH)
+        }
         for (int i = 0; i < nu; i++) {
             double ph = 2 * Math.PI * i / nu;
             for (int j = 0; j < nv; j++) {
-                double f = prof(TH[j]);
-                G[i][j] = new double[]{cx + RX * f * Math.sin(ph), cy + RY * Math.sin(TH[j]), cz + RZ * f * Math.cos(ph)};
+                double[] g = ring(Math.min(0.9999, Math.sin(TH[j])));
+                G[i][j] = new double[]{cx + g[1] * Math.sin(ph), g[0], g[3] + g[2] * Math.cos(ph)};
             }
         }
         boolean[][] keep = new boolean[nu][nv];
@@ -162,8 +177,8 @@ final class HoodMesh {
             for (int j = 0; j < nv; j++) {
                 double pm = 2 * Math.PI * (i + 0.5) / nu;
                 double w = ((pm + Math.PI) % (2 * Math.PI)); if (w < 0) w += 2 * Math.PI; w -= Math.PI;
-                double tm = j < nv - 1 ? (TH[j] + TH[j + 1]) / 2 : TH[j];
-                keep[i][j] = !inWindow(Math.abs(w), Math.sin(tm));
+                double sm = j < nv - 1 ? (Math.sin(TH[j]) + Math.sin(TH[j + 1])) / 2 : Math.sin(TH[j]);
+                keep[i][j] = !inWindow(Math.abs(w), sm);
             }
         grid(G, c, true, keep);
 
@@ -202,14 +217,19 @@ final class HoodMesh {
     }
 
     // ---------------- aksesori ----------------
+    /** Titik aksesori: pada kubah jilbab tinggi di atas 0,5 dipadatkan supaya telinga tidak menumpuk di puncak. */
+    private double[] pa(double wDeg, double s, double out) {
+        if (hij) s = s >= 0.8 ? 0.70 + (s - 0.8) * 0.5 : (s >= 0.5 ? 0.54 + (s - 0.5) * 0.53 : s);
+        return pt(wDeg, s, out);
+    }
     private void roundEar(double wDeg, double s, double r, double[] outer, double[] inner) {
-        double[] c = pt(wDeg, s, 0.25 * r);
+        double[] c = pa(wDeg, s, 0.25 * r);
         ellipsoid(c, r, r, r * 0.75, outer);
         if (inner != null) ellipsoid(add(c, 0, 0, r * 0.35), r * 0.58, r * 0.58, r * 0.55, inner);
     }
     private void pointEar(double wDeg, double s, double h, double wd, double[] outer, double[] inner) {
         double sg = Math.signum(wDeg);
-        double[] b = pt(wDeg, s, -0.3 * wd);
+        double[] b = pa(wDeg, s, -0.3 * wd);
         double[] tip = add(b, sg * 0.28 * h, 0.95 * h, -0.1 * h);
         cone(b, tip, wd, outer);
         if (inner != null) cone(add(b, 0, 0.1 * h, wd * 0.55), add(b, sg * 0.22 * h, 0.7 * h, wd * 0.2), wd * 0.55, inner);
@@ -218,29 +238,30 @@ final class HoodMesh {
         int n = 6;
         double[][] p = new double[n][];
         double[] r = new double[n];
-        for (int i = 0; i < n; i++) { p[i] = pt(wDeg, s0 + (s1 - s0) * i / (n - 1.0), 0.25); r[i] = 0.5 * k; }
+        for (int i = 0; i < n; i++) { p[i] = pa(wDeg, s0 + (s1 - s0) * i / (n - 1.0), 0.25); r[i] = 0.5 * k; }
         tube(p, r, c, 5);
     }
     private void stripeSide(double sg, double s, double w0, double w1, double[] c) {
         int n = 6;
         double[][] p = new double[n][];
         double[] r = new double[n];
-        for (int i = 0; i < n; i++) { p[i] = pt(sg * (w0 + (w1 - w0) * i / (n - 1.0)), s, 0.25); r[i] = 0.55 * k; }
+        for (int i = 0; i < n; i++) { p[i] = pa(sg * (w0 + (w1 - w0) * i / (n - 1.0)), s, 0.25); r[i] = 0.55 * k; }
         tube(p, r, c, 5);
     }
 
     private void make(int a) {
         if (a < 0 || a >= COUNT) a = 0;
+        final double ev = hij ? 0.8 : 1.0;   // panjang telinga kelinci
         double[] main = col(MAIN[a]), acc = col(ACC[a]), white = {1, 1, 1}, inner = col("#FFE0B2");
         shell(main);
         for (int sg = -1; sg <= 1; sg += 2) {
             switch (a) {
                 case 0: // singa: telinga bulat + surai
                     roundEar(sg * 42, 0.86, 3.6 * k, acc, null);
-                    ball(pt(sg * 84, 0.45, 0.4 * k), 3.4 * k, acc);
-                    ball(pt(sg * 86, 0.0, 0.4 * k), 3.4 * k, acc);
-                    ball(pt(sg * 72, 0.78, 0.4 * k), 3.0 * k, acc);
-                    ball(pt(sg * 80, -0.42, 0.4 * k), 3.0 * k, acc);
+                    ball(pa(sg * 84, 0.45, 0.4 * k), 3.4 * k, acc);
+                    ball(pa(sg * 86, 0.0, 0.4 * k), 3.4 * k, acc);
+                    ball(pa(sg * 72, 0.78, 0.4 * k), 3.0 * k, acc);
+                    ball(pa(sg * 80, -0.42, 0.4 * k), 3.0 * k, acc);
                     break;
                 case 1: // harimau
                     roundEar(sg * 40, 0.86, 4.2 * k, main, inner);
@@ -249,13 +270,13 @@ final class HoodMesh {
                     break;
                 case 2: // panda
                     roundEar(sg * 44, 0.85, 4.4 * k, acc, null);
-                    ellipsoid(pt(sg * 76, 0.0, 0.3), 2.0 * k, 3.2 * k, 1.4 * k, acc);
+                    ellipsoid(pa(sg * 76, 0.0, 0.3), 2.0 * k, 3.2 * k, 1.4 * k, acc);
                     break;
                 case 3: // koala
                     roundEar(sg * 52, 0.75, 5.4 * k, main, acc);
                     break;
                 case 4: { // katak: mata menonjol di atas
-                    double[] e = pt(sg * 26, 0.84, 1.0 * k);
+                    double[] e = pa(sg * 26, 0.84, 1.0 * k);
                     double[] f = unit(new double[]{0, 0.35, 1});
                     ball(e, 4.4 * k, main);
                     ball(add(e, f[0] * 2.9 * k, f[1] * 2.9 * k, f[2] * 2.9 * k), 3.0 * k, white);
@@ -264,14 +285,14 @@ final class HoodMesh {
                 }
                 case 5: // rubah
                     pointEar(sg * 40, 0.84, 9 * k, 4 * k, main, inner);
-                    ellipsoid(pt(sg * 70, -0.62, 0.3), 3.0 * k, 3.2 * k, 1.5 * k, white);
+                    ellipsoid(pa(sg * 70, -0.62, 0.3), 3.0 * k, 3.2 * k, 1.5 * k, white);
                     break;
                 case 6: { // kelinci
-                    double[] b = pt(sg * 28, 0.88, 0);
-                    double[][] p = {b, add(b, sg * 1.5 * k, 6.5 * k, -1 * k), add(b, sg * 3 * k, 13 * k, -2.2 * k)};
+                    double[] b = pa(sg * 28, 0.88, 0);
+                    double[][] p = {b, add(b, sg * 1.5 * k, 6.5 * k * ev, -1 * k), add(b, sg * 3 * k, 13 * k * ev, -2.2 * k)};
                     tube(p, new double[]{2.6 * k, 2.7 * k, 2.3 * k}, main, 10);
                     ball(p[2], 2.3 * k, main);
-                    double[][] q = {add(b, sg * 0.2 * k, 1.5 * k, 2.1 * k), add(b, sg * 1.4 * k, 6.7 * k, 1.4 * k), add(b, sg * 2.7 * k, 12 * k, 0.2 * k)};
+                    double[][] q = {add(b, sg * 0.2 * k, 1.5 * k, 2.1 * k), add(b, sg * 1.4 * k, 6.7 * k * ev, 1.4 * k), add(b, sg * 2.7 * k, 12 * k * ev, 0.2 * k)};
                     tube(q, new double[]{1.3 * k, 1.4 * k, 1.1 * k}, acc, 8);
                     break;
                 }
@@ -287,11 +308,11 @@ final class HoodMesh {
                     pointEar(sg * 42, 0.84, 5.5 * k, 3.0 * k, main, col("#F8BBD0"));
                     break;
                 case 10: // penguin: pipi putih di sisi
-                    ellipsoid(pt(sg * 74, -0.12, 0.3), 1.3 * k, 5.6 * k, 3.4 * k, white);
+                    ellipsoid(pa(sg * 74, -0.12, 0.3), 1.3 * k, 5.6 * k, 3.4 * k, white);
                     break;
                 case 11: { // burung hantu: jambul + mata besar
                     pointEar(sg * 40, 0.86, 8 * k, 3.6 * k, col("#6D4C41"), null);
-                    double[] e = pt(sg * 15, 0.74, 0.6 * k);
+                    double[] e = pa(sg * 15, 0.74, 0.6 * k);
                     ellipsoid(e, 3.9 * k, 3.9 * k, 2.2 * k, white);
                     ball(add(e, 0, 0, 1.6 * k), 1.8 * k, col("#5D4037"));
                     break;
@@ -305,20 +326,20 @@ final class HoodMesh {
             stripeMeridian(0, 0.55, 0.97, sc);
             stripeMeridian(11, 0.55, 0.93, sc);
         } else if (a == 3) {
-            ellipsoid(pt(0, 0.64, 0.5 * k), 3.0 * k, 1.7 * k, 1.3 * k, col("#455A64"));
+            ellipsoid(pa(0, 0.64, 0.5 * k), 3.0 * k, 1.7 * k, 1.3 * k, col("#455A64"));
         } else if (a == 9) {
-            double[] b = pt(0, 0.9, 0);
+            double[] b = pa(0, 0.9, 0);
             cone(add(b, 0, -1 * k, 0), add(b, 0, 11 * k, 2.2 * k), 2.3 * k, col("#FFD54F"));
             int n = 7;                       // surai merah muda di sisi kanan
             double[][] p = new double[n][];
             double[] r = new double[n];
-            for (int i = 0; i < n; i++) { p[i] = pt(84, 0.8 - 1.3 * i / (n - 1.0), 0.8 * k); r[i] = 1.9 * k; }
+            for (int i = 0; i < n; i++) { p[i] = pa(84, 0.8 - 1.3 * i / (n - 1.0), 0.8 * k); r[i] = 1.9 * k; }
             tube(p, r, acc, 7);
         } else if (a == 10) {
-            double[] b = pt(0, 0.62, 0.2);
+            double[] b = pa(0, 0.62, 0.2);
             cone(b, add(b, 0, -1.4 * k, 5.2 * k), 2.5 * k, col("#FFB300"));
         } else if (a == 11) {
-            double[] b = pt(0, 0.56, 0.2);
+            double[] b = pa(0, 0.56, 0.2);
             cone(b, add(b, 0, -1.6 * k, 4.6 * k), 1.8 * k, col("#FFB300"));
         }
     }
