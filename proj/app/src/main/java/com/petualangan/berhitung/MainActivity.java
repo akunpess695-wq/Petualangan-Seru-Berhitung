@@ -3956,9 +3956,9 @@ public class MainActivity extends Activity {
             {5, "#C9A06B,#C9A06B", "Seragam Pramuka", 120},
             {6, "#212121", "Rambut Hitam Pendek", 30},
             {6, "#6D4C41", "Rambut Acak-acakan", 40},
-            {6, "#F9C74F", "Rambut Pirang Jabrik", 60},
-            {6, "#F06292", "Rambut Pink Panjang", 100},
-            {6, "#B0BEC5", "Rambut Perak Keren", 150},
+            {6, "#5D4037", "Rambut Belah Samping", 50},
+            {6, "#6D4C41", "Rambut Ikal", 80},
+            {6, "#A0643C", "Rambut Pendek Rapi", 60},
   {5, "#F8BBD0,#F8BBD0,#AD1457", "Tunik Pink", 80},
   {5, "#B39DDB,#B39DDB,#5E35B1", "Gamis Ungu", 100},
   {5, "#C9A06B,#C9A06B,#8D6E63", "Pramuka Putri", 120},
@@ -4045,11 +4045,25 @@ public class MainActivity extends Activity {
         return prefs.getBoolean("peciOff" + pl, false);
     }
 
+    /**
+     * Gaya rambut 3D putra menurut nomor barang (nomor barang tetap, lihat catatan ITEMS):
+     * 39 Hitam Pendek = crew cut, 40 Acak-acakan = berantakan, 41 Belah Samping, 42 Ikal. 43 Pendek Rapi = bentuk bawaan.
+     */
+    private static int hairStyleOf(int item) {
+        switch (item) {
+            case 39: return PutraMesh.STYLE_CREW;
+            case 40: return PutraMesh.STYLE_MESSY;
+            case 41: return PutraMesh.STYLE_SIDE;
+            case 42: return PutraMesh.STYLE_CURLY;
+            default: return PutraMesh.STYLE_DEFAULT;
+        }
+    }
+
     /** Pasang pakaian, rambut (putra) / warna jilbab (putri), latar, dan peci milik pemain pl ke tampilan 3D. */
     private void applyLook3D(PutriGLView v, int pl) {
         int ba = eqValid(pl, 5), hr = eqValid(pl, 6), bg = eqValid(pl, 4);
         v.setLook(ba >= 0 ? itIcon(ba) : null, hr >= 0 ? itIcon(hr) : null, bg >= 0 ? itIcon(bg) : null,
-                genderOf[pl] != 0 || !peciOff(pl));
+                genderOf[pl] != 0 || !peciOff(pl), (genderOf[pl] == 0 && hr >= 0) ? hairStyleOf(hr) : PutraMesh.STYLE_DEFAULT);
     }
 
     private GradientDrawable bgDrawable(int i, float radiusPx) {
@@ -4672,10 +4686,6 @@ public class MainActivity extends Activity {
                 c.clipRect(srcPts[0] - 0.5f, srcPts[1], srcPts[4] + 0.5f, srcPts[5]);
             }
             if (kind == 11) {
-                if (curHid == 42) {
-                    rect(c, 31f, 20f, 38f, 58f, 3f, curHairC);
-                    rect(c, 62f, 20f, 69f, 58f, 3f, curHairC);
-                }
             } else if (kind == 1) {
                 if (curHijab) {
                     drawHijabOpening(c, shade(curSkin, flit[i]));
@@ -4925,10 +4935,10 @@ public class MainActivity extends Activity {
             srcRect(33f, 14f, 67f, 46f);
             addBox(hx0 - m, hy0 - m - 1.5f, hx1 + m, hy0 + 7f, -hz - m, hz + m, hc, hc, hc, 0);
             // belakang kepala
-            float backBottom = hood ? hy1 - 6f : hijab ? hy1 + 12f : (curHid == 42 ? hy1 + 8f : hy0 + 24f);
+            float backBottom = hood ? hy1 - 6f : hijab ? hy1 + 12f : hy0 + 24f;
             addBox(hx0 - m, hy0 - m, hx1 + m, backBottom, -hz - m, -hz + 3f, hc, hc, hc, 0);
             // sisi kepala
-            float sideBottom = hood ? hy1 - 10f : hijab ? hy1 + 6f : (curHid == 42 ? hy1 + 8f : hy0 + 14f);
+            float sideBottom = hood ? hy1 - 10f : hijab ? hy1 + 6f : hy0 + 14f;
             float sideZ1 = (hood || hijab) ? hz + m : hz - 7f;
             addBox(hx0 - m, hy0 - m, hx0 + 3f, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
             addBox(hx1 - 3f, hy0 - m, hx1 + m, sideBottom, -hz - m, sideZ1, hc, hc, hc, 0);
@@ -4948,12 +4958,16 @@ public class MainActivity extends Activity {
                         addBox(cx - 4f, hy0 - 10f, cx + 4f, hy0 - 1.5f, -6f, 6f, hc, hc, hc, 0);
                     }
                 } else if (curHid == 41) {
+                    // belah samping: poni besar menyapu dahi ke kiri, sisi kanan pendek
+                    addBox(hx0 - m, hy0 + 7f, hx1 - 9f, hy0 + 14f, hz - 1f, hz + m, hc, hc, hc, 0);
+                    addBox(hx1 - 9f, hy0 + 7f, hx1 + m, hy0 + 10.5f, hz - 1f, hz + m, hc, hc, hc, 0);
+                } else if (curHid == 42) {
+                    // ikal: gumpalan kecil di atas kepala
                     for (int k = 0; k < 4; k++) {
-                        float cx = 36f + k * 10f;
-                        addBox(cx - 3.5f, hy0 - 15f, cx + 3.5f, hy0 - 1.5f, -5f, 5f, hc, hc, hc, 0);
+                        float cx = 37f + k * 8.7f;
+                        addBox(cx - 4f, hy0 - 6.5f, cx + 4f, hy0 - 1.5f, -5.5f, 5.5f, hc, hc, hc, 0);
                     }
-                } else if (curHid == 43) {
-                    addBox(hx0 - m, hy0 + 7f, hx0 + 22f, hy0 + 14f, hz - 1f, hz + m, hc, hc, hc, 0);
+                    addBox(hx0 - m, hy0 + 7f, hx1 + m, hy0 + 12f, hz - 1f, hz + m, hc, hc, hc, 0);
                 } else {
                     addBox(hx0 - m, hy0 + 7f, hx1 + m, hy0 + 12f, hz - 1f, hz + m, hc, hc, hc, 0);
                 }
@@ -5371,10 +5385,6 @@ public class MainActivity extends Activity {
 
             int hid = it[6];
             int hairC = hid >= 0 ? col(itIcon(hid)) : col("#5D4037");
-            if (hid == 42 && gender != 1) {
-                rect(c, 31f, 20f, 38f, 58f, 3f, hairC);
-                rect(c, 62f, 20f, 69f, 58f, 3f, hairC);
-            }
             rect(c, 33f, 14f, 67f, 46f, 6f, skin);
             boolean hijab2d = gender == 1 && !hood;
             if (hijab2d) {
@@ -5431,25 +5441,28 @@ public class MainActivity extends Activity {
                 tri(c, 45f, 15f, 50f, 5f, 55f, 15f, hairC);
                 tri(c, 56f, 15f, 61f, 7f, 64f, 15f, hairC);
             } else if (hid == 41) {
-                tri(c, 35f, 15f, 39f, 3f, 43f, 15f, hairC);
-                tri(c, 42f, 15f, 46f, 1f, 50f, 15f, hairC);
-                tri(c, 49f, 15f, 53f, 2f, 57f, 15f, hairC);
-                tri(c, 56f, 15f, 61f, 4f, 65f, 15f, hairC);
-            } else if (hid == 42) {
-                rect(c, 33f, 13f, 39f, 40f, 2f, hairC);
-                rect(c, 61f, 13f, 67f, 40f, 2f, hairC);
-            } else if (hid == 43) {
+                // belah samping: poni disisir dari garis belah (kanan) menyapu dahi ke kiri
                 path.reset();
-                path.moveTo(fx(33f), fy(13f));
-                path.lineTo(fx(67f), fy(13f));
-                path.lineTo(fx(67f), fy(21f));
-                path.lineTo(fx(53f), fy(27f));
-                path.lineTo(fx(41f), fy(23f));
-                path.lineTo(fx(33f), fy(31f));
+                path.moveTo(fx(33f), fy(9f));
+                path.lineTo(fx(67f), fy(9f));
+                path.lineTo(fx(67f), fy(22f));
+                path.lineTo(fx(57f), fy(19f));
+                path.lineTo(fx(46f), fy(24f));
+                path.lineTo(fx(33f), fy(30f));
                 path.close();
                 p.setStyle(Paint.Style.FILL);
                 p.setColor(hairC);
                 c.drawPath(path, p);
+            } else if (hid == 42) {
+                // ikal: gumpalan bulat kecil di atas kepala
+                for (int k = 0; k < 5; k++) {
+                    ball(c, 37f + k * 6.5f, 12f, 4.2f, hairC);
+                }
+                ball(c, 34.5f, 22f, 3.5f, hairC);
+                ball(c, 65.5f, 22f, 3.5f, hairC);
+            } else if (hid == 43) {
+                // pendek rapi: rapi, poni tipis rata
+                rect(c, 33f, 11f, 67f, 25f, 5f, hairC);
             } else {
                 rect(c, 36f, 22f, 64f, 26f, 1.5f, hairC);
             }
