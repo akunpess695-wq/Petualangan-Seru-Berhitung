@@ -532,12 +532,13 @@ final class PutraMesh {
         double dx = p[0] - HC[0], dz = p[2] - HC[2], y = p[1];
         double w = Math.atan2(dx, dz);
         double u = clamp((y - yLow) / ySpan);
-        double m = 0.64 + 0.42 * Math.pow(u, 0.85);
+        double m = 0.62 + 0.30 * Math.pow(u, 0.85);
         double face = Math.max(0, Math.cos(w + 0.6));                  // sisi menghadap cahaya (kiri-depan)
         double yc = 77.0 + 1.3 * Math.cos(w + 0.6);
         m += 0.30 * Math.pow(face, 1.4) * Math.exp(-sq((y - yc) / 2.3)); // cincin sorot (angel ring)
         m += 0.07 * Math.exp(-sq((y - 76.0) / 2.6)) * Math.max(0, -Math.cos(w + 0.6)); // pantulan lembut sisi lawan
-        double st = streak(w, y);
+        double fade = 1.0 - smooth(77.0, 80.5, y);                     // di puncak kepala goresan memudar (hindari pola sunburst)
+        double st = streak(w, y) * fade;
         m *= 1.0 + 0.10 * st;
         double k = 0.20 * st;                                          // goyang normal sepanjang busur
         double tx = Math.cos(w), tz = -Math.sin(w);
@@ -553,17 +554,41 @@ final class PutraMesh {
         return tone * (0.68 + 0.50 * Math.pow(t, 0.8));
     };
     /** untaian rambut yang menempel di permukaan cangkang (bagian P_HAIR_DET): memberi volume berlapis. */
-    private void lock(double w0, double y0, double yEnd, double r0, double drift, double toneV, int pts) {
+    private void lock(double w0, double y0, double yEnd, double r0, double drift, double toneV, int pts) { lock(w0, y0, yEnd, r0, drift, toneV, pts, 0.42); }
+    private void lock(double w0, double y0, double yEnd, double r0, double drift, double toneV, int pts, double root) {
         double[][] path = new double[pts][], rad = new double[pts][];
         for (int k = 0; k < pts; k++) {
             double t = (double) k / (pts - 1);
             double y = Math.min(81.4, y0 + (yEnd - y0) * Math.pow(t, 0.85));
             double w = w0 + drift * Math.pow(t, 1.4);
             double[] b = onHair(w, y), o = outward(b);
-            double env = Math.min(1.0, 0.42 + t * 5.0) * (1.0 - 0.62 * Math.pow(t, 2.4));  // akar tipis, tengah gemuk, ujung runcing
+            double env = Math.min(1.0, root + t * 5.0) * (1.0 - 0.62 * Math.pow(t, 2.4));  // akar tipis, tengah gemuk, ujung runcing
             double r = Math.max(0.12, r0 * env);
             double off = 0.18 + 0.30 * r;                                  // sebagian terbenam di cangkang
             path[k] = new double[]{b[0] + o[0] * off, b[1] + o[1] * off, b[2] + o[2] * off};
+            rad[k] = new double[]{r, r};
+        }
+        tone = toneV;
+        tube(path, rad, HAIR, 6);
+    }
+    /** untaian pusaran: berangkat dari titik pusat bidang atas (rata), melewati tepi bidang atas, lalu turun mengikuti cangkang. */
+    private void crownLock(double w0, double yEnd, double r0, double drift, double toneV) {
+        int pts = 9;
+        double[][] path = new double[pts][], rad = new double[pts][];
+        double[] top = onHair(w0 + 0.15 * drift, 81.3);
+        for (int k = 0; k < pts; k++) {
+            double t = (double) k / (pts - 1);
+            double r = Math.max(0.12, r0 * Math.min(1.0, 0.8 + t * 4.0) * (1.0 - 0.6 * Math.pow(t, 2.4)));
+            if (k == 0) path[k] = new double[]{HC[0] + 0.8, 82.1, HC[2] - 0.8};
+            else if (k == 1) path[k] = new double[]{HC[0] + 0.8 + (top[0] - HC[0] - 0.8) * 0.55, 82.3, HC[2] - 0.8 + (top[2] - HC[2] + 0.8) * 0.55};
+            else {
+                double u = (double) (k - 2) / (pts - 3);
+                double y = Math.min(81.3, 81.3 + (yEnd - 81.3) * Math.pow(u, 0.9));
+                double w = w0 + drift * (0.15 + 0.85 * Math.pow(u, 1.3));
+                double[] b = onHair(w, y), o = outward(b);
+                double off = 0.18 + 0.30 * r + (k == 2 ? 0.5 : 0);
+                path[k] = new double[]{b[0] + o[0] * off, b[1] + o[1] * off, b[2] + o[2] * off};
+            }
             rad[k] = new double[]{r, r};
         }
         tone = toneV;
@@ -585,10 +610,17 @@ final class PutraMesh {
             // tepi bawah di sudut ini (garis rambut di depan, tepi cambang di samping/belakang) + sedikit di atasnya
             double edge = aw < HAIR_W ? hairlineY(w0) : lowerY(aw);
             double yEnd = edge + 0.5 + r.nextDouble() * 1.4;
-            double y0 = 79.8 + r.nextDouble() * 1.4;
+            double y0 = 76.0 + r.nextDouble() * 2.8;
             double drift = (w0 < 0 ? -1 : 1) * (0.10 + 0.30 * r.nextDouble());       // disisir menjauhi pusaran
             double toneV = (k % 3 == 0) ? 1.10 : (k % 3 == 1 ? 0.90 : 1.0) + (r.nextDouble() - 0.5) * 0.08;
             lock(w0, y0, yEnd, 1.05 + 0.40 * r.nextDouble(), drift, toneV, 9);
+        }
+        // pusaran di puncak: untaian keluar dari satu titik, melengkung searah jarum jam, menutup bidang atas kepala
+        for (int k = 0; k < 30; k++) {
+            double w0 = 2 * PI * (k + r.nextDouble() * 0.6) / 30;
+            double yEnd = 74.5 + r.nextDouble() * 3.5;
+            double tn = (k % 3 == 0) ? 1.08 : (k % 3 == 1 ? 0.9 : 1.0);
+            crownLock(w0, yEnd, 1.5 + 0.5 * r.nextDouble(), 0.75, tn);
         }
         // helai pendek berlapis lebih rendah: menutup celah dan memberi kesan tebal di sisi dan belakang
         for (int k = 0; k < 28; k++) {
