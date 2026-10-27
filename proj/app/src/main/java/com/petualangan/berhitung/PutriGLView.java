@@ -32,6 +32,7 @@ final class PutriGLView extends GLSurfaceView {
     private volatile float bgR = 1f, bgG = 1f, bgB = 1f; // warna latar (default putih = warna kartu)
     private volatile String lookPakaian, lookRambut;          // "badan,lengan[,celana/rok]" dan "#hex" (null = bawaan)
     private volatile boolean showPeci = true;                 // hanya berlaku untuk putra
+    private volatile int hairStyle = 0;                       // PutraMesh.STYLE_*; terlihat hanya bila peci dilepas
     private volatile float[] bgGrad;                          // 6 warna rgb + jumlah ruas di [18]; null = latar rata
     private float lastX, lastY;
     private final Renderer renderer = new Renderer();
@@ -54,12 +55,12 @@ final class PutriGLView extends GLSurfaceView {
     }
 
     /**
-     * Pakaian, rambut (putra) / warna jilbab (putri), peci (putra), dan latar gradasi. Semua boleh null / default.
+     * Pakaian, rambut (putra) / warna jilbab (putri), peci dan gaya rambut (putra), dan latar gradasi. Semua boleh null / default.
      * latar = daftar warna dipisah koma, "#4FC3F7,#E1F5FE" (kiri-atas ke kanan-bawah, sama dengan AvatarView), maks 6 warna.
      * Boleh dipanggil sebelum atau sesudah tampil.
      */
-    void setLook(String pakaian, String rambut, String latar, boolean peci) {
-        lookPakaian = pakaian; lookRambut = rambut; showPeci = peci;
+    void setLook(String pakaian, String rambut, String latar, boolean peci, int gayaRambut) {
+        lookPakaian = pakaian; lookRambut = rambut; showPeci = peci; hairStyle = gayaRambut;
         bgGrad = parseGrad(latar);
         if (renderer.ready) queueEvent(renderer::uploadMesh);
         requestRender();
@@ -212,7 +213,7 @@ final class PutriGLView extends GLSurfaceView {
             if (gender == 0) {
                 if (sMeshPutra == null) sMeshPutra = PutraMesh.build();
                 PutraMesh m = sMeshPutra;
-                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci); mvc = m.vertCount;
+                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci, hairStyle); mvc = m.vertCount;
                 mcol = m.outfitColors(lookPakaian, lookRambut);
             } else {
                 if (sMesh == null) sMesh = PutriMesh.build();
