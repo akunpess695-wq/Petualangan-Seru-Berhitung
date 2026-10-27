@@ -3882,6 +3882,7 @@ public class MainActivity extends Activity {
                         for (int sl = 0; sl < 7; sl++) {
                             ed.remove("eq" + pl + "_" + sl);
                         }
+                        ed.remove("peciOff" + pl);
                     }
                     ed.apply();
                     dialogAdmin();
@@ -4031,6 +4032,24 @@ public class MainActivity extends Activity {
 
     private int eq(int pl, int slot) {
         return prefs.getInt("eq" + pl + "_" + slot, -1);
+    }
+
+    /** Barang yang sah dipakai pemain pl di slot (dimiliki, slot dan gender cocok), atau -1. */
+    private int eqValid(int pl, int slot) {
+        int e = eq(pl, slot);
+        return (e >= 0 && e < ITEMS.length && itSlot(e) == slot && owns(e) && itFits(e, genderOf[pl])) ? e : -1;
+    }
+
+    /** Peci putra: bawaan dipakai; pemain boleh melepasnya lewat tombol di Toko Avatar (gratis, tersimpan per pemain). */
+    private boolean peciOff(int pl) {
+        return prefs.getBoolean("peciOff" + pl, false);
+    }
+
+    /** Pasang pakaian, rambut (putra) / warna jilbab (putri), latar, dan peci milik pemain pl ke tampilan 3D. */
+    private void applyLook3D(PutriGLView v, int pl) {
+        int ba = eqValid(pl, 5), hr = eqValid(pl, 6), bg = eqValid(pl, 4);
+        v.setLook(ba >= 0 ? itIcon(ba) : null, hr >= 0 ? itIcon(hr) : null, bg >= 0 ? itIcon(bg) : null,
+                genderOf[pl] != 0 || !peciOff(pl));
     }
 
     private GradientDrawable bgDrawable(int i, float radiusPx) {
@@ -5839,6 +5858,7 @@ public class MainActivity extends Activity {
         pv.setGravity(Gravity.CENTER_HORIZONTAL);
         if (USE_PUTRI_GL) {
             putriGL = new PutriGLView(this, genderOf[shopPl]);
+            applyLook3D(putriGL, shopPl);
             pv.addView(putriGL, new LinearLayout.LayoutParams(dp(250), dp(250)));
         } else {
             putriGL = null;
@@ -5860,6 +5880,19 @@ public class MainActivity extends Activity {
             gr.addView(gt, weight(g == 0 ? 0 : 4, 0));
         }
         pv.addView(gr, lp(dp(44), 8));
+        if (USE_PUTRI_GL && genderOf[shopPl] == 0) {
+            final boolean peciLepas = peciOff(shopPl);
+            TextView pc = text(peciLepas ? "\uD83E\uDDE2 Peci: Lepas" : "\uD83E\uDDE2 Peci: Pakai", 14,
+                    peciLepas ? DARK : Color.WHITE, true);
+            pc.setGravity(Gravity.CENTER);
+            pc.setBackground(box(peciLepas ? GRAY : GREEN, 16));
+            pc.setOnClickListener(v -> {
+                prefs.edit().putBoolean("peciOff" + shopPl, !peciLepas).apply();
+                sfx(SFX_OK);
+                showToko();
+            });
+            pv.addView(pc, lp(dp(44), 8));
+        }
         pv.addView(text(names[shopPl], 16, DARK, true), lp(WRAP, 8));
         pv.addView(text("Ketuk barang untuk membeli, ketuk lagi untuk memakai atau melepas", 12, DARK, false),
                 lp(WRAP, 2));

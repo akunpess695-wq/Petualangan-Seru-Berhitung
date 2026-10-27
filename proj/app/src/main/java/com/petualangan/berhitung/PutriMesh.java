@@ -22,6 +22,12 @@ final class PutriMesh {
     private final ArrayList<int[]> bi = new ArrayList<>();
     private int voff = 0;
 
+    // ---- penanda bagian (lihat PutraMesh): baju, lengan, rok, jilbab ----
+    static final int P_OTHER = 0, P_SHIRT = 1, P_SLEEVE = 2, P_SKIRT = 3, P_HIJAB = 4;
+    private int cur = P_OTHER;
+    private final ArrayList<Integer> bpt = new ArrayList<>();
+    byte[] part;
+
     static final double PI = Math.PI;
     static final double[] WHITE = {0.95, 0.95, 0.98}, SKIN = {1.0, 0.847, 0.694}, MAR = {0.64, 0.12, 0.18},
             BAG = {0.75, 0.14, 0.16}, SHOE = {0.11, 0.11, 0.12}, BROWN = {0.31, 0.19, 0.14},
@@ -116,7 +122,7 @@ final class PutriMesh {
         }
         int[] fi = new int[F.size()];
         for (int k = 0; k < fi.length; k++) fi[k] = F.get(k) + voff;
-        bp.add(fp); bn.add(fn); bc.add(fc); bi.add(fi);
+        bp.add(fp); bn.add(fn); bc.add(fc); bi.add(fi); bpt.add(cur);
         voff += nu * nv;
     }
     private static void add(ArrayList<Integer> f, int a, int b, int c) { f.add(a); f.add(b); f.add(c); }
@@ -243,6 +249,7 @@ final class PutriMesh {
             M.ellipsoid(new double[]{s * 5.0, 0.5, -0.3}, new double[]{4.3, 4.5, 7.3}, SHOE, 28, 14, 0, PI / 2, null, null);
             M.ellipsoid(new double[]{s * 5.0, 0.5, -0.3}, new double[]{4.3, 0.5, 7.3}, SHOE, 28, 6, -PI / 2, 0, null, null);
         }
+        M.cur = P_SKIRT;
         // rok lipit kotak, agak melebar di bawah
         M.loft(SKIRT, MAR, 112, 22, (ph, y) -> {
             double t = Math.abs(((ph * 16 / (2 * PI)) % 1.0) - 0.5) * 2;
@@ -250,18 +257,22 @@ final class PutriMesh {
             return 1 + amp * (t - 0.5) * 2;
         }, null);
         // baju
+        M.cur = P_SHIRT;
         M.loft(TORSO, WHITE, 48, 16, null, null);
         // lengan: lurus ke bawah, sedikit melebar di manset
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg;
+            M.cur = P_SLEEVE;
             double[][] path = {{s * 10.8, 48.5, -0.6}, {s * 12.4, 42, -1.2}, {s * 13.8, 36, -1.8}, {s * 15.0, 30.0, -2.0}};
             double[] rd = {3.9, 3.8, 3.7, 3.9};
             double[][] rad = new double[4][];
             for (int i = 0; i < 4; i++) rad[i] = new double[]{rd[i], rd[i]};
             M.tube(path, rad, WHITE, 16);
             M.ellipsoid(new double[]{s * 10.8, 48.5, -0.6}, new double[]{3.9, 3.9, 3.9}, WHITE, 16, 10);
+            M.cur = P_OTHER;
             M.ellipsoid(new double[]{s * 15.0, 26.6, -0.4}, new double[]{2.7, 4.0, 2.5}, SKIN, 18, 12);
         }
+        M.cur = P_OTHER;
         // tas: badan + saku depan + kancing
         M.superbox(new double[]{0, 38.5, -12.7}, new double[]{10.9, 12.5, 4.1}, BAG, 0.32, 36, 20);
         M.superbox(new double[]{0, 35.3, -17.3}, new double[]{7.6, 5.3, 1.0}, BAG, 0.30, 36, 20);
@@ -310,6 +321,7 @@ final class PutriMesh {
         }
         M.tube(arc, rr(7, 0.32, 0.3), LIP, 6); // senyum tipis
 
+        M.cur = P_HIJAB;
         M.loft(NECK, HIJ, 48, 14, null, null); // penutup leher putih
         // jilbab: satu cangkang (kubah -> bahu -> ujung V depan dan belakang), bukaan wajah dipotong
         final double yc = 68.3, hh = 12.4, pw = Math.toRadians(47);
@@ -341,8 +353,10 @@ final class PutriMesh {
         for (float[] a : bp) nv += a.length / 3;
         for (int[] a : bi) ni += a.length;
         pos = new float[nv * 3]; nor = new float[nv * 3]; col = new float[nv * 3]; idx = new int[ni];
+        part = new byte[nv];
         int pv = 0, pi = 0;
         for (int k = 0; k < bp.size(); k++) {
+            java.util.Arrays.fill(part, pv / 3, (pv + bp.get(k).length) / 3, (byte) (int) bpt.get(k));
             System.arraycopy(bp.get(k), 0, pos, pv, bp.get(k).length);
             System.arraycopy(bn.get(k), 0, nor, pv, bn.get(k).length);
             System.arraycopy(bc.get(k), 0, col, pv, bc.get(k).length);
@@ -351,6 +365,47 @@ final class PutriMesh {
             pi += bi.get(k).length;
         }
         vertCount = nv; triCount = ni / 3;
+    }
+
+
+    // ---- pakaian / jilbab per tampilan (mesh bersama TIDAK diubah) ----
+    /** "#RRGGBB" -> {r,g,b} 0..1, atau null bila bukan warna sah. */
+    static double[] hex(String h) {
+        if (h == null) return null;
+        h = h.trim();
+        if (h.length() != 7 || h.charAt(0) != '#') return null;
+        try {
+            int v = Integer.parseInt(h.substring(1), 16);
+            return new double[]{((v >> 16) & 255) / 255.0, ((v >> 8) & 255) / 255.0, (v & 255) / 255.0};
+        } catch (NumberFormatException e) { return null; }
+    }
+    /**
+     * Salinan warna titik. pakaian = "badan,lengan[,rok]" (null = bawaan), jilbab = "#hex" (null = bawaan).
+     * Mengembalikan array BARU supaya warna satu pemain tidak bocor ke pemain lain.
+     */
+    float[] outfitColors(String pakaian, String jilbab) {
+        float[] c = col.clone();
+        double[] body = null, arm = null, skirt = null;
+        if (pakaian != null) {
+            String[] p = pakaian.split(",");
+            if (p.length > 0) body = hex(p[0]);
+            if (p.length > 1) arm = hex(p[1]);
+            if (p.length > 2) skirt = hex(p[2]);
+            if (arm == null) arm = body;
+        }
+        double[] hij = hex(jilbab);
+        for (int i = 0; i < vertCount; i++) {
+            double[] k = null;
+            switch (part[i]) {
+                case P_SHIRT: k = body; break;
+                case P_SLEEVE: k = arm; break;
+                case P_SKIRT: k = skirt; break;
+                case P_HIJAB: k = hij; break;
+                default: break;
+            }
+            if (k != null) { c[i * 3] = (float) k[0]; c[i * 3 + 1] = (float) k[1]; c[i * 3 + 2] = (float) k[2]; }
+        }
+        return c;
     }
 
     /** Uji mandiri: java PutriMesh.java -> cetak jumlah dan checksum. */

@@ -1,6 +1,7 @@
 package com.petualangan.berhitung;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
@@ -18,7 +19,8 @@ import javax.microedition.khronos.opengles.GL10;
 
 /**
  * Tampilan 3D putra / putri (Tahap E). Pakai: addView(new PutriGLView(ctx, gender)) (0 = putra, 1 = putri), dan teruskan
- * onResume()/onPause() dari Activity. Geser jari = putar. Latar opak putih (setBackgroundRgb untuk mengganti).
+ * onResume()/onPause() dari Activity. Geser jari = putar. Latar opak putih; setBackgroundRgb = warna rata, setLook = pakaian/rambut(jilbab)/peci/latar gradasi.
+ * Warna dan peci diterapkan pada SALINAN per tampilan, mesh Putra/Putri yang static tidak pernah diubah (tidak bocor antar pemain).
  * Tidak mengubah AvatarView lama.
  */
 final class PutriGLView extends GLSurfaceView {
@@ -28,6 +30,9 @@ final class PutriGLView extends GLSurfaceView {
 
     private volatile float yaw = 0f, pitch = 0f; // derajat
     private volatile float bgR = 1f, bgG = 1f, bgB = 1f; // warna latar (default putih = warna kartu)
+    private volatile String lookPakaian, lookRambut;          // "badan,lengan[,celana/rok]" dan "#hex" (null = bawaan)
+    private volatile boolean showPeci = true;                 // hanya berlaku untuk putra
+    private volatile float[] bgGrad;                          // 6 warna rgb + jumlah ruas di [18]; null = latar rata
     private float lastX, lastY;
     private final Renderer renderer = new Renderer();
 
@@ -46,6 +51,42 @@ final class PutriGLView extends GLSurfaceView {
     /** Warna latar (0xRRGGBB); harus sama dengan kartu induk karena tampilan ini opak. Panggil sebelum tampil. */
     void setBackgroundRgb(int rgb) {
         bgR = ((rgb >> 16) & 255) / 255f; bgG = ((rgb >> 8) & 255) / 255f; bgB = (rgb & 255) / 255f;
+    }
+
+    /**
+     * Pakaian, rambut (putra) / warna jilbab (putri), peci (putra), dan latar gradasi. Semua boleh null / default.
+     * latar = daftar warna dipisah koma, "#4FC3F7,#E1F5FE" (kiri-atas ke kanan-bawah, sama dengan AvatarView), maks 6 warna.
+     * Boleh dipanggil sebelum atau sesudah tampil.
+     */
+    void setLook(String pakaian, String rambut, String latar, boolean peci) {
+        lookPakaian = pakaian; lookRambut = rambut; showPeci = peci;
+        bgGrad = parseGrad(latar);
+        if (renderer.ready) queueEvent(renderer::uploadMesh);
+        requestRender();
+    }
+
+    private static float[] parseGrad(String latar) {
+        if (latar == null || latar.trim().isEmpty()) return null;
+        String[] cs = latar.split(",");
+        int n = Math.min(cs.length, 6);
+        float[] g = new float[19];
+        int ok = 0;
+        for (int i = 0; i < n; i++) {
+            try {
+                int c = Color.parseColor(cs[i].trim());
+                g[ok * 3] = Color.red(c) / 255f; g[ok * 3 + 1] = Color.green(c) / 255f; g[ok * 3 + 2] = Color.blue(c) / 255f;
+                ok++;
+            } catch (IllegalArgumentException e) { /* warna rusak dilewati */ }
+        }
+        if (ok == 0) return null;
+        if (ok == 1) { // satu warna = latar rata
+            for (int k = 1; k < 6; k++) { g[k * 3] = g[0]; g[k * 3 + 1] = g[1]; g[k * 3 + 2] = g[2]; }
+            g[18] = 1f;
+            return g;
+        }
+        for (int k = ok; k < 6; k++) { g[k * 3] = g[(ok - 1) * 3]; g[k * 3 + 1] = g[(ok - 1) * 3 + 1]; g[k * 3 + 2] = g[(ok - 1) * 3 + 2]; }
+        g[18] = ok - 1;
+        return g;
     }
 
     void setAngles(float yawDeg, float pitchDeg) {
@@ -108,8 +149,33 @@ final class PutriGLView extends GLSurfaceView {
             "  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);\n" +
             "}\n";
 
+    // Latar gradasi: bidang penuh di belakang avatar. t = 0 di kiri-atas, 1 di kanan-bawah; hingga 6 warna.
+    private static final String BG_VS =
+            "attribute vec2 aP;\n" +
+            "varying float vT;\n" +
+            "void main(){\n" +
+            "  gl_Position = vec4(aP, 0.0, 1.0);\n" +
+            "  vT = ((aP.x * 0.5 + 0.5) + (0.5 - aP.y * 0.5)) * 0.5;\n" +
+            "}\n";
+    private static final String BG_FS =
+            "precision mediump float;\n" +
+            "varying float vT;\n" +
+            "uniform vec3 uC[6];\n" +
+            "uniform float uSeg;\n" +
+            "void main(){\n" +
+            "  float t = clamp(vT, 0.0, 1.0) * uSeg;\n" +
+            "  vec3 c = uC[0];\n" +
+            "  for (int i = 0; i < 5; i++) {\n" +
+            "    if (float(i) < uSeg && t >= float(i)) c = mix(uC[i], uC[i + 1], clamp(t - float(i), 0.0, 1.0));\n" +
+            "  }\n" +
+            "  gl_FragColor = vec4(c, 1.0);\n" +
+            "}\n";
+
     private final class Renderer implements GLSurfaceView.Renderer {
         private int prog, vbo, ibo, idxCount;
+        private int bgProg, bgP, bgC, bgSeg;
+        private FloatBuffer bgQuad;
+        volatile boolean ready;
         private int aPos, aNor, aCol, uMVP, uNM;
         private final float[] proj = new float[16], model = new float[16], view = new float[16];
         private final float[] mv = new float[16], mvp = new float[16], nm = new float[9];
@@ -126,17 +192,33 @@ final class PutriGLView extends GLSurfaceView {
             uMVP = GLES20.glGetUniformLocation(prog, "uMVP");
             uNM = GLES20.glGetUniformLocation(prog, "uNM");
 
+            bgProg = link(compile(GLES20.GL_VERTEX_SHADER, BG_VS), compile(GLES20.GL_FRAGMENT_SHADER, BG_FS));
+            bgP = GLES20.glGetAttribLocation(bgProg, "aP");
+            bgC = GLES20.glGetUniformLocation(bgProg, "uC");
+            if (bgC < 0) bgC = GLES20.glGetUniformLocation(bgProg, "uC[0]"); // sebagian driver hanya mengenal nama elemen
+            bgSeg = GLES20.glGetUniformLocation(bgProg, "uSeg");
+            bgQuad = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+            bgQuad.put(new float[]{-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f}).position(0);
+            vbo = 0; ibo = 0;
+            uploadMesh();
+            ready = true;
+        }
+
+        /** Susun ulang buffer GPU dari mesh bersama + salinan warna/indeks untuk tampilan ini. Dipanggil di thread GL. */
+        void uploadMesh() {
             float[] mpos, mnor, mcol;
             int[] midx;
             int mvc;
             if (gender == 0) {
                 if (sMeshPutra == null) sMeshPutra = PutraMesh.build();
                 PutraMesh m = sMeshPutra;
-                mpos = m.pos; mnor = m.nor; mcol = m.col; midx = m.idx; mvc = m.vertCount;
+                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci); mvc = m.vertCount;
+                mcol = m.outfitColors(lookPakaian, lookRambut);
             } else {
                 if (sMesh == null) sMesh = PutriMesh.build();
                 PutriMesh m = sMesh;
-                mpos = m.pos; mnor = m.nor; mcol = m.col; midx = m.idx; mvc = m.vertCount;
+                mpos = m.pos; mnor = m.nor; midx = m.idx; mvc = m.vertCount;
+                mcol = m.outfitColors(lookPakaian, lookRambut);
             }
             float[] inter = new float[mvc * 9];
             for (int i = 0; i < mvc; i++) {
@@ -152,6 +234,7 @@ final class PutriGLView extends GLSurfaceView {
             ib.put(si).position(0);
             idxCount = si.length;
 
+            if (vbo != 0) GLES20.glDeleteBuffers(2, new int[]{vbo, ibo}, 0);
             int[] b = new int[2];
             GLES20.glGenBuffers(2, b, 0);
             vbo = b[0]; ibo = b[1];
@@ -174,7 +257,21 @@ final class PutriGLView extends GLSurfaceView {
 
         @Override
         public void onDrawFrame(GL10 gl) {
+            GLES20.glClearColor(bgR, bgG, bgB, 1f);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+            float[] g = bgGrad;
+            if (g != null) {
+                GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+                GLES20.glUseProgram(bgProg);
+                GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
+                GLES20.glUniform3fv(bgC, 6, g, 0);
+                GLES20.glUniform1f(bgSeg, g[18]);
+                GLES20.glEnableVertexAttribArray(bgP);
+                GLES20.glVertexAttribPointer(bgP, 2, GLES20.GL_FLOAT, false, 0, bgQuad);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+                GLES20.glDisableVertexAttribArray(bgP);
+                GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+            }
             Matrix.setIdentityM(model, 0);
             Matrix.rotateM(model, 0, pitch, 1f, 0f, 0f);
             Matrix.rotateM(model, 0, yaw, 0f, 1f, 0f);
