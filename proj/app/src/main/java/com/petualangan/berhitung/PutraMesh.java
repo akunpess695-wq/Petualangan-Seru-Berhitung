@@ -23,8 +23,8 @@ final class PutraMesh {
     private int voff = 0;
 
     static final double PI = Math.PI;
-    static final double[] WHITE = {0.95, 0.95, 0.98}, SKIN = {1.0, 0.847, 0.694}, MAR = {0.64, 0.12, 0.18},
-            BAG = {0.75, 0.14, 0.16}, SHOE = {0.11, 0.11, 0.12}, BROWN = {0.31, 0.19, 0.14},
+    static final double[] WHITE = {0.99, 0.99, 1.0}, SKIN = {1.0, 0.878, 0.702}, MAR = {0.64, 0.12, 0.18},
+            BAG = {0.75, 0.14, 0.16}, SHOE = {0.106, 0.106, 0.106}, BROWN = {0.31, 0.19, 0.14},
             PINK = {1.0, 0.72, 0.70}, HIJ = {0.93, 0.93, 0.97};
     static final double[] HC = {0, 68.5, 0.8}, HR = {12.6, 12.9, 12.5};
     // tabel: {y, rx, rz, cx, cz}
@@ -296,15 +296,15 @@ final class PutraMesh {
 
     // ---- rakitan putra ----
     static final double[] EYE = {0.29, 0.15, 0.10}, EYE2 = {0.56, 0.33, 0.20}, PUPIL = {0.10, 0.05, 0.04}, LASH = {0.13, 0.07, 0.05}, LIP = {0.88, 0.31, 0.31};
-    static final double[] HAIR = {0.243, 0.184, 0.141}, PBAG = {0.64, 0.16, 0.18}, PANTS = {0.61, 0.12, 0.18}, CAP = {1.0, 1.0, 1.0};
+    static final double[] HAIR = {0.357, 0.227, 0.180}, PBAG = {0.80, 0.18, 0.18}, PANTS = {0.608, 0.118, 0.176}, CAP = {1.0, 1.0, 1.0}, SOLE = {0.96, 0.96, 0.96};
     static final double[] HH = {13.0, 13.3, 13.0};            // jari-jari cangkang rambut (sedikit di luar kepala)
     static final double HAIR_W = Math.toRadians(66);          // lebar bukaan wajah pada rambut
     static final double[][] PANTSTOP = {{31, 10.4, 8.4, 0, -0.2}, {29, 10.6, 8.6, 0, -0.2}, {26, 10.9, 8.8, 0, -0.2}, {23.5, 11.0, 8.8, 0, -0.2}};
     // peci: {y, rx, rz, cx, cz}, tutup datar di atas, bibir tipis di bawah
-    static final double[][] PECI = {{87.5, 0.0, 0.0, 0, 0.8}, {87.45, 11.0, 11.0, 0, 0.8}, {87.0, 11.7, 11.7, 0, 0.8}, {82.8, 12.0, 12.0, 0, 0.8}, {78.6, 11.7, 11.7, 0, 0.8}, {78.0, 11.5, 11.5, 0, 0.8}, {78.0, 10.6, 10.6, 0, 0.8}};
+    static final double[][] PECI = {{90.2, 0.0, 0.0, 0, 0.8}, {90.15, 10.0, 10.0, 0, 0.8}, {89.4, 11.1, 11.1, 0, 0.8}, {83.6, 11.9, 11.9, 0, 0.8}, {76.9, 12.3, 12.3, 0, 0.8}, {76.2, 12.15, 12.15, 0, 0.8}, {76.2, 11.2, 11.2, 0, 0.8}};
 
     /** garis rambut (batas bukaan wajah): y di tengah 76,5 dan turun ke 74 di sisi (dahi terlihat, poni tipis di bawah peci). */
-    static double hairlineY(double w) { return 76.5 - 2.5 * sq(w / HAIR_W); }
+    static double hairlineY(double w) { return 74.6 - 3.4 * sq(w / HAIR_W); }
     /** tepi bawah rambut: di samping berhenti di y=69,5 (telinga terlihat), makin ke belakang turun ke y=63. */
     static double lowerY(double aw) {
         double d1 = Math.toRadians(100), d2 = Math.toRadians(140);
@@ -323,12 +323,12 @@ final class PutraMesh {
         // sepatu + kaki celana (celana panjang lurus, ujung menutup bagian atas sepatu)
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg;
-            M.ellipsoid(new double[]{s * 5.2, 0.5, -0.3}, new double[]{4.6, 4.5, 7.5}, SHOE, 28, 14, 0, PI / 2, null, null);
-            M.ellipsoid(new double[]{s * 5.2, 0.5, -0.3}, new double[]{4.6, 0.5, 7.5}, SHOE, 28, 6, -PI / 2, 0, null, null);
-            double[][] lp = {{s * 5.2, 24, 0}, {s * 5.2, 14, 0}, {s * 5.2, 4.6, 0}};
-            double[][] lr = {{5.3, 7.0}, {5.4, 7.0}, {5.8, 7.2}};
+            M.ellipsoid(new double[]{s * 5.8, 0.5, -0.3}, new double[]{4.8, 4.5, 7.5}, SHOE, 28, 14, 0, PI / 2, null, null);
+            M.ellipsoid(new double[]{s * 5.8, 0.6, -0.3}, new double[]{4.8, 0.6, 7.5}, SOLE, 28, 6, -PI / 2, 0, null, null);
+            double[][] lp = {{s * 5.6, 24, 0}, {s * 5.7, 14, 0}, {s * 5.8, 4.6, 0}};
+            double[][] lr = {{5.5, 7.2}, {6.0, 7.4}, {6.8, 7.6}};
             M.tube(lp, lr, PANTS, 24);
-            M.ellipsoid(new double[]{s * 5.2, 4.6, 0}, new double[]{5.8, 2.0, 7.2}, PANTS, 24, 8, -PI / 2, 0, null, null); // tutup ujung kaki celana
+            M.ellipsoid(new double[]{s * 5.8, 4.6, 0}, new double[]{6.8, 2.0, 7.6}, PANTS, 24, 8, -PI / 2, 0, null, null); // tutup ujung kaki celana
         }
         // pinggul celana + penutup selangkangan (supaya tidak ada rongga dari bawah)
         M.loft(PANTSTOP, PANTS, 56, 12, null, null);
@@ -363,6 +363,7 @@ final class PutraMesh {
             M.tube(pth, rr(7, 1.35, 0.5), PBAG, 8);
         }
         // kepala + wajah
+        final int headStart = M.bp.size();
         M.skull(HC, HR, SKIN, 56, 32, -PI / 2, null);
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg, ex = s * 6.3, ey = 66.6;
@@ -385,13 +386,13 @@ final class PutraMesh {
             M.tube(lash, lrad, LASH, 6); // bulu mata atas tipis
             M.decal(s * 8.2, 61.9, 2.6, 1.6, 0.30, 0.05, PINK, 18, 10); // pipi
             double[][] br = new double[4][], brr = new double[4][];
-            double[] bx = {2.4, 4.4, 7.0, 9.8}, by = {72.0, 72.8, 72.6, 71.4}, bw = {0.65, 0.85, 0.8, 0.45};
+            double[] bx = {2.4, 4.4, 7.0, 9.8}, by = {71.5, 72.3, 72.1, 70.9}, bw = {0.65, 0.85, 0.8, 0.45};
             for (int i = 0; i < 4; i++) { br[i] = new double[]{s * bx[i], by[i], onHead(s * bx[i], by[i], 0.3)}; brr[i] = new double[]{bw[i], bw[i]}; }
             M.tube(br, brr, HAIR, 8); // alis tebal
         }
         double[][] arc = new double[7][];
-        for (int i = 0; i < 7; i++) { double x = -2.9 + 5.8 * i / 6, y = 60.4 + 0.1 * x * x; arc[i] = new double[]{x, y, onHead(x, y, 0.3)}; }
-        M.tube(arc, rr(7, 0.32, 0.3), LIP, 6); // senyum
+        for (int i = 0; i < 7; i++) { double x = -3.6 + 7.2 * i / 6, y = 60.0 + 0.16 * x * x; arc[i] = new double[]{x, y, onHead(x, y, 0.3)}; }
+        M.tube(arc, rr(7, 0.38, 0.34), LIP, 6); // senyum
         // rambut: cangkang di atas kepala, bukaan wajah dipotong di depan; bagian bawah berhenti di y=63
         final double th0 = Math.asin((63.0 - HC[1]) / HH[1]);
         M.skull(HC, HH, HAIR, 144, 64, th0, (w, y) -> {
@@ -400,7 +401,7 @@ final class PutraMesh {
         });
         // telinga (terlihat di bawah tepi rambut samping)
         for (int sg = -1; sg <= 1; sg += 2)
-            M.ellipsoid(new double[]{sg * 12.2, 66.0, 0.6}, new double[]{1.5, 2.8, 2.0}, SKIN, 16, 10);
+            M.ellipsoid(new double[]{sg * 12.2, 66.0, 0.6}, new double[]{1.7, 3.0, 2.1}, SKIN, 16, 10);
         // tepi rambut (poni dan cambang) diberi tabung tipis supaya tepi tidak bergerigi
         double[][] fr = new double[17][], frr = new double[17][];
         for (int i = 0; i < 17; i++) { double w = -HAIR_W + 2 * HAIR_W * i / 16; fr[i] = onHair(w, hairlineY(w)); frr[i] = new double[]{0.55, 0.55}; }
@@ -417,8 +418,8 @@ final class PutraMesh {
             }
             M.tube(sb, sbr, HAIR, 8);
         }
-        // peci: bidang datar bersegi 14
-        int ns = 14;
+        // peci: bidang datar bersegi 12
+        int ns = 12;
         double[][][] pp = new double[ns][PECI.length][3];
         for (int i = 0; i < ns; i++) {
             double ph = 2 * PI * (i + 0.5) / ns;
@@ -429,11 +430,28 @@ final class PutraMesh {
             }
         }
         M.facet(pp, CAP);
+        M.scaleFrom(headStart, 1.25, 0.95, 1.18, 0, 56.0, 0.8); // kepala chibi: lebih lebar, sedikit lebih pendek
         M.finish();
         return M;
     }
     private static double clamp(double a) { return a < 0 ? 0 : (a > 1 ? 1 : a); }
     private static double tz(double x, double y) { double[] q = interp(TORSO, y); return q[1] * Math.sqrt(Math.max(0, 1 - sq(x / q[0]))); }
+
+    /** Skala non-seragam untuk semua bagian yang dibuat sejak indeks 'from' (kepala), dengan pivot (px,py,pz). */
+    private void scaleFrom(int from, double sx, double sy, double sz, double px, double py, double pz) {
+        for (int k = from; k < bp.size(); k++) {
+            float[] p = bp.get(k), n = bn.get(k);
+            for (int i = 0; i < p.length; i += 3) {
+                p[i] = (float) (px + (p[i] - px) * sx);
+                p[i + 1] = (float) (py + (p[i + 1] - py) * sy);
+                p[i + 2] = (float) (pz + (p[i + 2] - pz) * sz);
+                double a = n[i] / sx, b = n[i + 1] / sy, c = n[i + 2] / sz;
+                double l = Math.sqrt(a * a + b * b + c * c);
+                if (l < 1e-9) l = 1;
+                n[i] = (float) (a / l); n[i + 1] = (float) (b / l); n[i + 2] = (float) (c / l);
+            }
+        }
+    }
 
     private void finish() {
         int nv = 0, ni = 0;
