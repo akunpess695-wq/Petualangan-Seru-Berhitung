@@ -10,11 +10,13 @@ import java.util.ArrayList;
  * bentuknya sama untuk kedua karakter walau proporsi kepala putra (chibi) dan putri berbeda.
  */
 final class HoodMesh {
-    static final int COUNT = 12;
+    static final int COUNT = 24;   // 0..11 hewan lama, 12 = (tanpa tudung, tidak dipakai), 13..23 hewan Nusantara
     static final String[] MAIN = {"#F2B24C", "#F28C28", "#FFFFFF", "#9AA5AD", "#5DBB4A", "#E8631C",
-            "#F6EEF3", "#A8744A", "#F2A65A", "#F3EAF7", "#37474F", "#8D6E4B"};
+            "#F6EEF3", "#A8744A", "#F2A65A", "#F3EAF7", "#37474F", "#8D6E4B", "#000000",
+            "#C4571F", "#6E7F4A", "#8C8A93", "#7D7F82", "#F2B705", "#8A6B4F", "#C98A4B", "#6B4A2E", "#C98F52", "#5B3A29", "#4E8B5A"};
     static final String[] ACC = {"#B5651D", "#212121", "#212121", "#DDE3E6", "#FFFFFF", "#FFFFFF",
-            "#F8BBD0", "#5D3A1E", "#C77B30", "#F06292", "#FFFFFF", "#E6D5B8"};
+            "#F8BBD0", "#5D3A1E", "#C77B30", "#F06292", "#FFFFFF", "#E6D5B8", "#000000",
+            "#8A3A14", "#3F4A2A", "#E3B7B0", "#C9C3B0", "#0F8F5B", "#E8B8A8", "#F0DDBA", "#F1E3C4", "#F7EBD8", "#F3EAD7", "#C79A3B"};
 
     float[] pos, nor, col;
     int[] idx;
@@ -249,11 +251,182 @@ final class HoodMesh {
         tube(p, r, c, 5);
     }
 
+    private static double[] sh(double[] c, double f) {
+        return new double[]{Math.min(1, c[0] * f), Math.min(1, c[1] * f), Math.min(1, c[2] * f)};
+    }
+    /** Pita melintang di muka tudung dari sudut w0 ke w1 pada tinggi s. */
+    private void band(double s, double w0, double w1, double r, double[] c) {
+        int n = 9;
+        double[][] p = new double[n][];
+        double[] rr = new double[n];
+        for (int i = 0; i < n; i++) { p[i] = pa(w0 + (w1 - w0) * i / (n - 1.0), s, 0.3 * k); rr[i] = r; }
+        tube(p, rr, c, 5);
+    }
+    private void nusantara(int a, double[] main, double[] acc) {
+        final double[] white = {1, 1, 1}, dark = {0.13, 0.13, 0.13};
+        final double dm = 0.62;
+        final double PWd = Math.toDegrees(PW);
+        for (int sg = -1; sg <= 1; sg += 2) {
+            switch (a) {
+                case 13: { // orangutan: rambut panjang menjuntai + bantalan pipi
+                    ellipsoid(add(pa(sg * 88, -0.1, 0.4 * k), sg * 0.8 * k, 0, 0), 2.8 * k, 9.5 * k, 5.2 * k, main);
+                    ellipsoid(add(pa(sg * 93, -0.45, 0.4 * k), sg * 1.2 * k, 0, 0), 2.2 * k, 6.5 * k, 3.6 * k, acc);
+                    ball(pa(sg * 28, 0.9, 0.8 * k), 4.2 * k, main);
+                    ellipsoid(pt(sg * (PWd - 6), -0.02, 0.8 * k), 2.3 * k, 3.8 * k, 2.2 * k, col("#D9A66E"));
+                    stripeMeridian(sg * 13, 0.55, 0.95, acc);
+                    break;
+                }
+                case 14: { // komodo: tonjolan tanduk + bintik kuning
+                    pointEar(sg * 45, 0.84, 4.5 * k, 2.2 * k, acc, null);
+                    ball(pa(sg * 80, 0.12, 0.3 * k), 1.1 * k, col("#D4C25A"));
+                    ball(pa(sg * 84, -0.2, 0.3 * k), 1.1 * k, col("#D4C25A"));
+                    for (int q = 0; q < 3; q++) {
+                        ellipsoid(pa(sg * (10 + q * 14), 0.6 + 0.07 * (q % 2), 0.3 * k), 1.5 * k, 1.1 * k, 0.8 * k, acc);
+                        ellipsoid(pa(sg * (17 + q * 14), 0.78, 0.3 * k), 1.4 * k, 1.0 * k, 0.8 * k, acc);
+                    }
+                    break;
+                }
+                case 15: { // gajah: telinga lebar + gading
+                    double[] c = add(pa(sg * 84, 0.3, 0.3 * k), sg * 2.4 * k, 0, 0);
+                    ellipsoid(add(c, 0, 0, 1.2 * k), 3.2 * k, 8.2 * k, 7.0 * k, main);
+                    ellipsoid(add(c, sg * 2.2 * k, 0, 1.8 * k), 1.3 * k, 6.0 * k, 5.0 * k, acc);
+                    double[] b = pt(sg * (PWd + 3), -0.5, 0.4 * k);
+                    cone(b, add(b, sg * 0.6 * k, -4.6 * k, 3.6 * k), 1.3 * k, col("#FFF8E1"));
+                    break;
+                }
+                case 16: { // badak jawa: telinga kecil + lipatan kulit
+                    roundEar(sg * 42, 0.86, 3.0 * k, main, acc);
+                    stripeSide(sg, 0.1, 68, 98, sh(main, dm));
+                    stripeSide(sg, -0.25, 68, 98, sh(main, dm));
+                    stripeSide(sg, 0.52, 8, 52, sh(main, dm));
+                    break;
+                }
+                case 17: { // cenderawasih: bulu rumbai di sisi + pita ekor melengkung
+                    ellipsoid(add(pa(sg * 88, -0.05, 0.4 * k), sg * 0.8 * k, 0, 0), 2.2 * k, 9.5 * k, 4.6 * k, col("#E8891C"));
+                    ellipsoid(add(pa(sg * 92, -0.4, 0.4 * k), sg * 1.2 * k, 0, 0), 1.8 * k, 6.5 * k, 3.2 * k, col("#FFB300"));
+                    double[] p0 = pa(sg * 10, 0.9, 0.2 * k);
+                    double[][] p = {p0, add(p0, sg * 2 * k, 3 * k, -3 * k), add(p0, sg * 4 * k, 6 * k, -8 * k), add(p0, sg * 6 * k, 7 * k, -14 * k)};
+                    tube(p, new double[]{0.8 * k, 0.8 * k, 0.7 * k, 0.5 * k}, acc, 5);
+                    ball(p[3], 1.5 * k, acc);
+                    break;
+                }
+                case 18: { // tarsius: telinga besar + mata raksasa
+                    double[] c = add(pa(sg * 66, 0.72, 0), sg * 3.5 * k, 1.5 * k, 0);
+                    ellipsoid(c, 3.0 * k, 7.0 * k, 5.6 * k, main);
+                    ellipsoid(add(c, sg * 0.8 * k, 0, 1.4 * k), 2.2 * k, 5.2 * k, 3.8 * k, acc);
+                    double[] e = pa(sg * 22, 0.7, 0.8 * k);
+                    ball(e, 4.4 * k, col("#FFD866"));
+                    ball(add(e, 0, 0.3 * k, 3.4 * k), 2.6 * k, col("#3E2723"));
+                    ball(add(e, -sg * 0.6 * k, 1.2 * k, 5.3 * k), 0.7 * k, white);
+                    break;
+                }
+                case 19: { // bekantan: jubah bulu krem + telinga kecil
+                    ellipsoid(add(pa(sg * 86, -0.1, 0.4 * k), sg * 0.8 * k, 0, 0), 2.8 * k, 8.5 * k, 5.4 * k, acc);
+                    roundEar(sg * 60, 0.62, 2.4 * k, main, null);
+                    break;
+                }
+                case 20: { // elang jawa: jambul samping + garis krem di sisi
+                    double[] b = pa(sg * 14, 0.88, 0.2 * k);
+                    cone(b, add(b, sg * 3 * k, 8 * k, -4 * k), 1.9 * k, col("#2B1D12"));
+                    stripeSide(sg, 0.15, 68, 98, acc);
+                    stripeSide(sg, -0.1, 68, 98, acc);
+                    stripeSide(sg, -0.35, 68, 98, acc);
+                    stripeSide(sg, sTop + 0.03, 8, 52, col("#2B1D12"));
+                    break;
+                }
+                case 21: { // kancil: telinga tegak panjang + bercak + pipi putih
+                    pointEar(sg * 34, 0.86, 11 * k, 3.2 * k, main, col("#FFD9C4"));
+                    ellipsoid(pa(sg * 70, -0.55, 0.3), 3.0 * k, 3.2 * k, 1.5 * k, acc);
+                    ball(pa(sg * 18, 0.7, 0.3 * k), 0.95 * k, acc);
+                    ball(pa(sg * 34, 0.6, 0.3 * k), 0.95 * k, acc);
+                    ball(pa(sg * 8, 0.86, 0.3 * k), 0.9 * k, acc);
+                    ball(pa(sg * 44, 0.78, 0.3 * k), 0.9 * k, acc);
+                    break;
+                }
+                case 22: { // banteng: tanduk melengkung + telinga + pipi putih
+                    double[] b = pa(sg * 62, 0.8, 0);
+                    double[][] p = {b, add(b, sg * 5 * k, 0.5 * k, 0), add(b, sg * 9 * k, 3 * k, 0.2 * k),
+                            add(b, sg * 10.5 * k, 6.5 * k, 0.5 * k), add(b, sg * 9.5 * k, 9.5 * k, 1 * k)};
+                    tube(p, new double[]{2.1 * k, 1.9 * k, 1.5 * k, 1.1 * k, 0.6 * k}, acc, 7);
+                    ball(p[4], 0.9 * k, col("#3B2416"));
+                    ellipsoid(add(pa(sg * 80, 0.52, 0.4 * k), sg * 2 * k, 0, 0), 4.0 * k, 1.6 * k, 2.4 * k, main);
+                    ellipsoid(pa(sg * 70, -0.5, 0.3), 2.6 * k, 3.4 * k, 1.6 * k, acc);
+                    ball(pa(sg * 20, 0.94, 0.5 * k), 2.6 * k, col("#3B2416"));
+                    break;
+                }
+                case 23: { // penyu: sirip + garis krem di sisi
+                    double[] c = add(pa(sg * 84, -0.42, 0.3 * k), sg * 2.5 * k, 0, 0.5 * k);
+                    ellipsoid(c, 2.2 * k, 4.6 * k, 3.4 * k, sh(main, 1.18));
+                    stripeSide(sg, 0.05, 66, 98, col("#F5E6A8"));
+                    stripeSide(sg, -0.2, 66, 98, col("#F5E6A8"));
+                    ellipsoid(pa(sg * 26, 0.68, 0.2 * k), 3.6 * k, 3.0 * k, 1.0 * k, sh(acc, 0.9));
+                    break;
+                }
+            }
+        }
+        switch (a) { // aksesori tengah
+            case 13: stripeMeridian(0, 0.58, 0.97, acc); ball(pa(0, 0.97, 0.8 * k), 4.6 * k, main); break;
+            case 14: {
+                for (int q = 0; q < 5; q++) {
+                    double[] b = pa(0, 0.5 + q * 0.12, 0.1 * k);
+                    cone(b, add(b, 0, 3.4 * k, -1.2 * k), 1.1 * k, sh(acc, 1.3));
+                }
+                break;
+            }
+            case 15: { // belalai di dahi
+                double[] b = pa(0, 0.92, 0.5 * k), p1 = pa(0, 0.72, 1.6 * k), p2 = pa(0, sTop + 0.14, 2.4 * k);
+                double[][] p = {b, p1, p2, add(p2, 0, -1.8 * k, 1.0 * k)};
+                tube(p, new double[]{2.5 * k, 2.3 * k, 2.0 * k, 1.7 * k}, sh(main, 0.95), 8);
+                ball(p[3], 1.8 * k, sh(main, 0.95));
+                break;
+            }
+            case 16: { // satu cula
+                double[] b = pa(0, 0.72, 0.3 * k);
+                ellipsoid(b, 3.6 * k, 1.8 * k, 3.2 * k, sh(main, 0.7));
+                cone(add(b, 0, -0.4 * k, 0), add(b, 0, 9.5 * k, 3.0 * k), 2.7 * k, acc);
+                break;
+            }
+            case 17: { // paruh biru, leher hijau, pita oranye tengah
+                double[] b = pa(0, sTop + 0.16, 0.3 * k);
+                cone(b, add(b, 0, -1.0 * k, 5.0 * k), 1.9 * k, col("#9CC8D8"));
+                band(sTop + 0.07, -52, 52, 1.2 * k, acc);
+                double[] p0 = pa(0, 0.92, 0.2 * k);
+                double[][] p = {p0, add(p0, 0, 4 * k, -3 * k), add(p0, 0, 7 * k, -8 * k), add(p0, 0, 8 * k, -14 * k)};
+                tube(p, new double[]{0.8 * k, 0.8 * k, 0.7 * k, 0.5 * k}, col("#FF8F00"), 5);
+                ball(p[3], 1.5 * k, col("#FF8F00"));
+                break;
+            }
+            case 19: { // hidung besar menjuntai
+                double[] c = add(pa(0, sTop + 0.12, 1.2 * k), 0, 0, 1.0 * k);
+                ellipsoid(c, 3.0 * k, 4.6 * k, 3.5 * k, col("#E8A47C"));
+                ball(add(c, -1.1 * k, -2.6 * k, 2.8 * k), 0.7 * k, sh(main, 0.5));
+                ball(add(c, 1.1 * k, -2.6 * k, 2.8 * k), 0.7 * k, sh(main, 0.5));
+                break;
+            }
+            case 20: { // jambul tengah + paruh bengkok
+                double[] c = pa(0, 0.9, 0.2 * k);
+                cone(c, add(c, 0, 11 * k, -6 * k), 2.3 * k, col("#2B1D12"));
+                double[] b = pa(0, sTop + 0.2, 0.3 * k);
+                cone(b, add(b, 0, -4.2 * k, 4.6 * k), 3.0 * k, col("#E8B923"));
+                cone(add(b, 0, -3.6 * k, 4.0 * k), add(b, 0, -6.6 * k, 3.4 * k), 1.3 * k, col("#37474F"));
+                break;
+            }
+            case 21: stripeMeridian(0, 0.5, 0.95, sh(main, 0.72)); break;
+            case 22: break;
+            case 23: { // perisai sisik
+                ellipsoid(pa(0, 0.74, 0.2 * k), 5.2 * k, 3.8 * k, 1.1 * k, acc);
+                ellipsoid(pa(0, 0.96, 0.2 * k), 6.0 * k, 2.0 * k, 6.0 * k, sh(acc, 0.92));
+                break;
+            }
+        }
+    }
+
     private void make(int a) {
-        if (a < 0 || a >= COUNT) a = 0;
+        if (a < 0 || a >= COUNT || a == 12) a = 0;
         final double ev = hij ? 0.8 : 1.0;   // panjang telinga kelinci
         double[] main = col(MAIN[a]), acc = col(ACC[a]), white = {1, 1, 1}, inner = col("#FFE0B2");
         shell(main);
+        if (a >= 13) { nusantara(a, main, acc); return; }
         for (int sg = -1; sg <= 1; sg += 2) {
             switch (a) {
                 case 0: // singa: telinga bulat + surai

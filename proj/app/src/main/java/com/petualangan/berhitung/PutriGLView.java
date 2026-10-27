@@ -62,7 +62,7 @@ final class PutriGLView extends GLSurfaceView {
      * Boleh dipanggil sebelum atau sesudah tampil.
      */
     /** Pasang tudung hewan (0..11) atau lepas (-1). Panggil sebelum setLook, yang memuat ulang mesh. */
-    void setHood(int animal) { hood = (animal >= 0 && animal < HoodMesh.COUNT) ? animal : -1; }
+    void setHood(int animal) { hood = (animal >= 0 && animal < HoodMesh.COUNT && animal != 12) ? animal : -1; }
 
     void setLook(String pakaian, String rambut, String latar, boolean peci, int gayaRambut) {
         lookPakaian = pakaian; lookRambut = rambut; showPeci = peci; hairStyle = gayaRambut;

@@ -4065,7 +4065,7 @@ public class MainActivity extends Activity {
     /** Pasang pakaian, rambut (putra) / warna jilbab (putri), latar, dan peci milik pemain pl ke tampilan 3D. */
     private void applyLook3D(PutriGLView v, int pl) {
         int ba = eqValid(pl, 5), hr = eqValid(pl, 6), bg = eqValid(pl, 4);
-        v.setHood(avatar[pl] >= 0 && avatar[pl] < GL_HOODS ? avatar[pl] : -1); // tudung hewan 3D (putra dan putri)
+        v.setHood(isHood(avatar[pl]) ? avatar[pl] : -1); // tudung hewan 3D (putra dan putri)
         v.setLook(ba >= 0 ? itIcon(ba) : null, hr >= 0 ? itIcon(hr) : null, bg >= 0 ? itIcon(bg) : null,
                 genderOf[pl] != 0 || !peciOff(pl), (genderOf[pl] == 0 && hr >= 0) ? hairStyleOf(hr) : PutraMesh.STYLE_DEFAULT);
     }
@@ -4099,9 +4099,6 @@ public class MainActivity extends Activity {
     // Urutan kotak di toko: hewan lama, hewan Nusantara, lalu "tanpa tudung" selalu di kotak terakhir.
     private static final int[] HOOD_ORDER = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
             13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 12};
-    // Jumlah tudung yang sudah punya mesh GL (HoodMesh). Hewan 13..23 baru ada di kartu 2D dan avatar balok.
-    private static final int GL_HOODS = 12;
-
     private static boolean isHood(int a) {
         return a >= 0 && a < AVATARS.length && a != NO_HOOD;
     }
