@@ -1587,8 +1587,15 @@ public class MainActivity extends Activity {
         GradientDrawable lg = box(Color.WHITE, 26);
         lg.setStroke(dp(3), Color.parseColor("#FFD54F"));
         logo.setBackground(lg);
-        logo.setElevation(dp(8));
-        glow(logo, Color.parseColor("#FFB300"));
+        logo.setElevation(dp(4));
+        final float logoRad = dp(26);
+        logo.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, Outline o) {
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), logoRad);
+            }
+        });
+        logo.setClipToOutline(true);
         LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(88), dp(88));
         logoLp.rightMargin = dp(14);
         hero.addView(logo, logoLp);
@@ -1637,7 +1644,7 @@ public class MainActivity extends Activity {
             sgBg.setStroke(dp(sg == 0 ? 3 : 1),
                     sg == 0 ? Color.argb(130, 255, 255, 255) : Color.argb(50, 96, 125, 139));
             seg.setBackground(sgBg);
-            seg.setElevation(dp(sg == 0 ? 9 : 4));
+            seg.setElevation(dp(4));
             if (sg == 0) {
                 glow(seg, KELAS_COLOR[kelas]);
             }
@@ -1768,11 +1775,8 @@ public class MainActivity extends Activity {
 
     /** Bayangan berwarna (Android 9 ke atas); di HP lama bayangan biasa. */
     private void glow(View v, int color) {
-        if (android.os.Build.VERSION.SDK_INT >= 28) {
-            int soft = Color.argb(120, Color.red(color), Color.green(color), Color.blue(color));
-            v.setOutlineSpotShadowColor(soft);
-            v.setOutlineAmbientShadowColor(Color.argb(40, Color.red(color), Color.green(color), Color.blue(color)));
-        }
+        // Sengaja kosong: bayangan berwarna membuat kartu tampak pucat di sebagian HP (Xiaomi/MIUI).
+        // Bayangan bawaan sistem dipakai saja.
     }
 
     private void loopWhileAttached(final View v, final android.animation.Animator an) {
@@ -1794,8 +1798,7 @@ public class MainActivity extends Activity {
     private void premium(View t, int color, int radDp, long delay) {
         final PremiumTile d = new PremiumTile(color, radDp);
         t.setBackground(d);
-        t.setElevation(dp(10));
-        glow(t, color);
+        t.setElevation(dp(6));
         final ValueAnimator va = ValueAnimator.ofFloat(0f, 3.2f);
         va.setDuration(5200);
         va.setStartDelay(delay);
