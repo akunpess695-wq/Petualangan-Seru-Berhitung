@@ -1240,6 +1240,7 @@ public class MainActivity extends Activity {
         @Override
         public void getOutline(Outline outline) {
             outline.setRoundRect(getBounds(), dp(32));
+            outline.setAlpha(1f);
         }
 
         @Override
@@ -1295,6 +1296,7 @@ public class MainActivity extends Activity {
         @Override
         public void getOutline(Outline outline) {
             outline.setRoundRect(getBounds(), dp(22));
+            outline.setAlpha(1f);
         }
 
         @Override
@@ -1767,8 +1769,9 @@ public class MainActivity extends Activity {
     /** Bayangan berwarna (Android 9 ke atas); di HP lama bayangan biasa. */
     private void glow(View v, int color) {
         if (android.os.Build.VERSION.SDK_INT >= 28) {
-            v.setOutlineSpotShadowColor(color);
-            v.setOutlineAmbientShadowColor(color);
+            int soft = Color.argb(120, Color.red(color), Color.green(color), Color.blue(color));
+            v.setOutlineSpotShadowColor(soft);
+            v.setOutlineAmbientShadowColor(Color.argb(40, Color.red(color), Color.green(color), Color.blue(color)));
         }
     }
 
@@ -1866,9 +1869,9 @@ public class MainActivity extends Activity {
             cv.save();
             cv.clipPath(clip);
             p.setShader(new LinearGradient(0f, rf.top, 0f, rf.top + h * 0.5f,
-                    Color.argb(92, 255, 255, 255), Color.argb(6, 255, 255, 255), Shader.TileMode.CLAMP));
-            cv.drawOval(new RectF(rf.left - w * 0.15f, rf.top - h * 0.85f, rf.right + w * 0.15f,
-                    rf.top + h * 0.5f), p);
+                    Color.argb(58, 255, 255, 255), Color.argb(0, 255, 255, 255), Shader.TileMode.CLAMP));
+            cv.drawOval(new RectF(rf.left - w * 0.15f, rf.top - h * 0.9f, rf.right + w * 0.15f,
+                    rf.top + h * 0.38f), p);
             p.setShader(null);
             p.setColor(Color.argb(34, 255, 255, 255));
             cv.drawCircle(rf.right - dp(16), rf.bottom - dp(6), dp(58), p);
@@ -1904,6 +1907,7 @@ public class MainActivity extends Activity {
         @Override
         public void getOutline(Outline outline) {
             outline.setRoundRect(getBounds(), dp(radDp));
+            outline.setAlpha(1f);
         }
 
         @Override
