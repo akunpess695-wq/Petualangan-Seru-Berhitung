@@ -1103,6 +1103,141 @@ public class MainActivity extends Activity {
     }
 
     // Kotak berwarna dengan lingkaran lembut sebagai hiasan
+    private static int mixColor(int a, int b, float t) {
+        return Color.argb(255,
+                (int) (Color.red(a) + (Color.red(b) - Color.red(a)) * t),
+                (int) (Color.green(a) + (Color.green(b) - Color.green(a)) * t),
+                (int) (Color.blue(a) + (Color.blue(b) - Color.blue(a)) * t));
+    }
+
+    /** Sentuhan menekan: sedikit mengecil lalu memantul kembali; klik tetap jalan. */
+    private void pressable(View v) {
+        v.setOnTouchListener((x, e) -> {
+            int act = e.getActionMasked();
+            if (act == MotionEvent.ACTION_DOWN) {
+                x.animate().setStartDelay(0).scaleX(0.97f).scaleY(0.97f).setDuration(80)
+                        .setInterpolator(new DecelerateInterpolator()).start();
+            } else if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) {
+                x.animate().setStartDelay(0).scaleX(1f).scaleY(1f).setDuration(180)
+                        .setInterpolator(new OvershootInterpolator(2f)).start();
+            }
+            return false;
+        });
+    }
+
+    /** Anak-anak kolom muncul bergantian dari bawah (kesan halus saat menu dibuka). */
+    private void animateIn(LinearLayout col) {
+        for (int i = 0; i < col.getChildCount(); i++) {
+            View ch = col.getChildAt(i);
+            ch.setAlpha(0f);
+            ch.setTranslationY(dp(18));
+            ch.animate().alpha(1f).translationY(0f).setStartDelay(60L + i * 55L).setDuration(320)
+                    .setInterpolator(new DecelerateInterpolator()).start();
+        }
+    }
+
+    /** Judul bagian dengan garis tipis di kiri dan kanan. */
+    private LinearLayout sectionTitle(String s) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        int lineC = Color.argb(46, 78, 52, 46);
+        View l1 = new View(this);
+        l1.setBackground(box(lineC, 2));
+        View l2 = new View(this);
+        l2.setBackground(box(lineC, 2));
+        LinearLayout.LayoutParams a = new LinearLayout.LayoutParams(0, dp(2), 1f);
+        a.rightMargin = dp(12);
+        LinearLayout.LayoutParams b = new LinearLayout.LayoutParams(0, dp(2), 1f);
+        b.leftMargin = dp(12);
+        row.addView(l1, a);
+        row.addView(text(s, 16, DARK, true), new LinearLayout.LayoutParams(WRAP, WRAP));
+        row.addView(l2, b);
+        return row;
+    }
+
+    /** Kartu putih kecil: ikon berwarna dalam lingkaran dan satu label. */
+    private LinearLayout miniCard(String icon, String label, int accent) {
+        LinearLayout t = new LinearLayout(this);
+        t.setOrientation(LinearLayout.HORIZONTAL);
+        t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setPadding(dp(10), 0, dp(10), 0);
+        t.setBackground(box(Color.WHITE, 24));
+        t.setElevation(dp(4));
+        TextView ic = text(icon, 18, Color.WHITE, false);
+        ic.setBackground(box(accent, 18));
+        LinearLayout.LayoutParams icp = new LinearLayout.LayoutParams(dp(36), dp(36));
+        icp.rightMargin = dp(8);
+        t.addView(ic, icp);
+        TextView n = text(label, 12, DARK, true);
+        n.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        n.setMaxLines(2);
+        t.addView(n, new LinearLayout.LayoutParams(0, WRAP, 1f));
+        t.setClickable(true);
+        t.setFocusable(true);
+        pressable(t);
+        return t;
+    }
+
+    /** Spanduk judul menu: gradasi zamrud ke langit, cahaya dari atas, lingkaran kaca, kilau emas, garis tepi tipis. */
+    private class HeroDrawable extends Drawable {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        @Override
+        public void draw(Canvas cv) {
+            RectF rf = new RectF(getBounds());
+            float rad = dp(32);
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new LinearGradient(rf.left, rf.top, rf.right, rf.bottom,
+                    new int[]{Color.parseColor("#0B7A4B"), Color.parseColor("#16A0A8"), Color.parseColor("#3BB7F2")},
+                    new float[]{0f, 0.55f, 1f}, Shader.TileMode.CLAMP));
+            cv.drawRoundRect(rf, rad, rad, p);
+            p.setShader(null);
+            Path clip = new Path();
+            clip.addRoundRect(rf, rad, rad, Path.Direction.CW);
+            cv.save();
+            cv.clipPath(clip);
+            p.setShader(new LinearGradient(0f, rf.top, 0f, rf.top + rf.height() * 0.5f,
+                    Color.argb(64, 255, 255, 255), Color.argb(0, 255, 255, 255), Shader.TileMode.CLAMP));
+            cv.drawRect(rf.left, rf.top, rf.right, rf.top + rf.height() * 0.5f, p);
+            p.setShader(null);
+            p.setColor(Color.argb(34, 255, 255, 255));
+            cv.drawCircle(rf.right - dp(10), rf.top + dp(30), dp(120), p);
+            p.setColor(Color.argb(26, 255, 255, 255));
+            cv.drawCircle(rf.left - dp(10), rf.bottom - dp(10), dp(100), p);
+            p.setColor(Color.argb(60, 255, 235, 150));
+            cv.drawCircle(rf.left + dp(48), rf.top + dp(40), dp(9), p);
+            cv.drawCircle(rf.right - dp(54), rf.bottom - dp(46), dp(6), p);
+            cv.drawCircle(rf.right - dp(86), rf.top + dp(26), dp(4), p);
+            cv.restore();
+            RectF in = new RectF(rf);
+            in.inset(1f, 1f);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1, dp(1)));
+            p.setColor(Color.argb(90, 255, 255, 255));
+            cv.drawRoundRect(in, rad, rad, p);
+            p.setStyle(Paint.Style.FILL);
+        }
+
+        @Override
+        public void getOutline(Outline outline) {
+            outline.setRoundRect(getBounds(), dp(32));
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+        }
+
+        @Override
+        public void setColorFilter(ColorFilter cf) {
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+    }
+
     private class TileDrawable extends Drawable {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final int base;
@@ -1116,8 +1251,10 @@ public class MainActivity extends Activity {
             RectF rf = new RectF(getBounds());
             float rad = dp(22);
             p.setStyle(Paint.Style.FILL);
-            p.setColor(base);
+            p.setShader(new LinearGradient(rf.left, rf.top, rf.right, rf.bottom,
+                    mixColor(base, Color.WHITE, 0.14f), mixColor(base, Color.BLACK, 0.16f), Shader.TileMode.CLAMP));
             cv.drawRoundRect(rf, rad, rad, p);
+            p.setShader(null);
             Path clip = new Path();
             clip.addRoundRect(rf, rad, rad, Path.Direction.CW);
             cv.save();
@@ -1128,6 +1265,13 @@ public class MainActivity extends Activity {
             cv.drawCircle(rf.right - dp(76), rf.bottom + dp(6), dp(40), p);
             cv.drawCircle(rf.left + dp(10), rf.bottom - dp(2), dp(28), p);
             cv.restore();
+            RectF in = new RectF(rf);
+            in.inset(1f, 1f);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1, dp(1)));
+            p.setColor(Color.argb(70, 255, 255, 255));
+            cv.drawRoundRect(in, rad, rad, p);
+            p.setStyle(Paint.Style.FILL);
         }
 
         @Override
@@ -1386,22 +1530,32 @@ public class MainActivity extends Activity {
         dspLp.leftMargin = dp(10);
         bar.addView(dsp, dspLp);
         bar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+        TextView coin = text("\uD83D\uDCB0 " + coins(), 15, Color.WHITE, true);
+        GradientDrawable cg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.parseColor("#FFB300"), Color.parseColor("#FB8C00")});
+        cg.setCornerRadius(dp(22));
+        cg.setStroke(dp(2), Color.argb(150, 255, 255, 255));
+        coin.setBackground(cg);
+        coin.setPadding(dp(14), dp(7), dp(14), dp(7));
+        coin.setElevation(dp(3));
+        coin.setOnClickListener(v -> showToko());
+        pressable(coin);
+        LinearLayout.LayoutParams coinLp = new LinearLayout.LayoutParams(WRAP, WRAP);
+        coinLp.rightMargin = dp(10);
+        bar.addView(coin, coinLp);
         AvatarView avb = avatarView(0, 1);
         avb.setElevation(dp(3));
         avb.setOnClickListener(v -> showToko());
         bar.addView(avb, new LinearLayout.LayoutParams(dp(52), dp(52)));
         c.addView(bar, lp(WRAP, 0));
 
-        // Spanduk judul
+        // Spanduk judul (premium: gradasi tiga warna, lingkaran kaca, kilau emas, cincin cahaya di logo)
         LinearLayout hero = new LinearLayout(this);
         hero.setOrientation(LinearLayout.VERTICAL);
         hero.setGravity(Gravity.CENTER_HORIZONTAL);
-        hero.setPadding(dp(16), dp(20), dp(16), dp(20));
-        GradientDrawable hg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.parseColor("#2E7D32"), Color.parseColor("#29B6F6")});
-        hg.setCornerRadius(dp(32));
-        hero.setBackground(hg);
-        hero.setElevation(dp(6));
+        hero.setPadding(dp(16), dp(22), dp(16), dp(22));
+        hero.setBackground(new HeroDrawable());
+        hero.setElevation(dp(8));
         hero.setOnLongClickListener(v -> {
             openAdmin();
             return true;
@@ -1409,52 +1563,75 @@ public class MainActivity extends Activity {
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.logo);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        logo.setPadding(dp(6), dp(6), dp(6), dp(6));
-        logo.setBackground(box(Color.WHITE, 24));
-        logo.setElevation(dp(4));
-        hero.addView(logo, new LinearLayout.LayoutParams(dp(96), dp(96)));
-        hero.addView(text(APP_NAME, 26, Color.WHITE, true), lp(WRAP, 10));
-        TextView alam = text("\uD83C\uDF33 SD ALAM \uD83C\uDF3F", 20, Color.WHITE, true);
-        alam.setBackground(box(Color.argb(70, 255, 255, 255), 20));
-        alam.setPadding(dp(16), dp(4), dp(16), dp(4));
-        hero.addView(alam, lpw(8));
-        hero.addView(text("Muhammadiyah Kandangan", 14, Color.WHITE, true), lp(WRAP, 6));
-        hero.addView(text("Ayo belajar bersama alam!", 14,
-                Color.parseColor("#E8F5E9"), false), lp(WRAP, 4));
-        hero.addView(text("\uD83C\uDF31 \uD83C\uDF3B \uD83E\uDD8B \uD83C\uDF33 \uD83C\uDF43", 20,
-                Color.WHITE, false), lp(WRAP, 6));
-        c.addView(hero, lp(WRAP, 10));
+        logo.setPadding(dp(8), dp(8), dp(8), dp(8));
+        GradientDrawable lg = box(Color.WHITE, 28);
+        lg.setStroke(dp(3), Color.argb(120, 255, 255, 255));
+        logo.setBackground(lg);
+        logo.setElevation(dp(6));
+        hero.addView(logo, new LinearLayout.LayoutParams(dp(104), dp(104)));
+        TextView ttl = text(APP_NAME, 28, Color.WHITE, true);
+        ttl.setLetterSpacing(0.02f);
+        ttl.setShadowLayer(dp(3), 0f, dp(2), Color.argb(90, 0, 0, 0));
+        hero.addView(ttl, lp(WRAP, 12));
+        TextView alam = text("\uD83C\uDF33 SD ALAM \uD83C\uDF3F", 18, Color.WHITE, true);
+        GradientDrawable ag = box(Color.argb(60, 255, 255, 255), 20);
+        ag.setStroke(dp(1), Color.argb(120, 255, 255, 255));
+        alam.setBackground(ag);
+        alam.setLetterSpacing(0.08f);
+        alam.setPadding(dp(18), dp(5), dp(18), dp(5));
+        hero.addView(alam, lpw(10));
+        View sep = new View(this);
+        sep.setBackground(box(Color.argb(110, 255, 255, 255), 2));
+        LinearLayout.LayoutParams sepLp = new LinearLayout.LayoutParams(dp(44), dp(3));
+        sepLp.topMargin = dp(12);
+        hero.addView(sep, sepLp);
+        hero.addView(text("Muhammadiyah Kandangan", 14, Color.WHITE, true), lp(WRAP, 10));
+        hero.addView(text("Ayo belajar bersama alam!", 13,
+                Color.parseColor("#E8F5E9"), false), lp(WRAP, 2));
+        hero.addView(text("\uD83C\uDF31 \uD83C\uDF3B \uD83E\uDD8B \uD83C\uDF33 \uD83C\uDF43", 18,
+                Color.WHITE, false), lp(WRAP, 8));
+        c.addView(hero, lp(WRAP, 12));
 
-        // Tiga tombol pengaturan: kelas, pemain, waktu
+        // Kelas, pemain, waktu: satu bilah segmen putih (kelas disorot dengan warna kelasnya)
         LinearLayout opt = new LinearLayout(this);
         opt.setOrientation(LinearLayout.HORIZONTAL);
-        Button bk = button("\uD83C\uDF93 " + KELAS_NAMES[kelas], KELAS_COLOR[kelas], 13);
-        flat(bk);
-        bk.setElevation(dp(3));
-        bk.setOnClickListener(v -> dialogKelas());
-        opt.addView(bk, weight(0, 4));
-        Button bp = button("\uD83D\uDC65 " + (np == 1 ? "Sendiri" : np + " pemain"), Color.WHITE, 13);
-        bp.setTextColor(DARK);
-        flat(bp);
-        bp.setElevation(dp(3));
-        bp.setOnClickListener(v -> dialogPemain());
-        opt.addView(bp, weight(4, 4));
-        Button bw = button("\u23F1\uFE0F " + (timed ? secsNow() + " detik" : "Bebas"), Color.WHITE, 13);
-        bw.setTextColor(DARK);
-        flat(bw);
-        bw.setElevation(dp(3));
-        bw.setOnClickListener(v -> dialogWaktu());
-        opt.addView(bw, weight(4, 0));
+        opt.setGravity(Gravity.CENTER_VERTICAL);
+        opt.setPadding(dp(5), dp(5), dp(5), dp(5));
+        opt.setBackground(box(Color.WHITE, 28));
+        opt.setElevation(dp(4));
+        String[] segTxt = {"\uD83C\uDF93 " + KELAS_NAMES[kelas],
+                "\uD83D\uDC65 " + (np == 1 ? "Sendiri" : np + " pemain"),
+                "\u23F1\uFE0F " + (timed ? secsNow() + " detik" : "Bebas")};
+        for (int sgi = 0; sgi < 3; sgi++) {
+            final int sg = sgi;
+            TextView seg = text(segTxt[sg], 13, sg == 0 ? Color.WHITE : DARK, true);
+            seg.setGravity(Gravity.CENTER);
+            if (sg == 0) {
+                seg.setBackground(box(KELAS_COLOR[kelas], 22));
+            }
+            seg.setOnClickListener(v -> {
+                sfx(SFX_TAP);
+                if (sg == 0) {
+                    dialogKelas();
+                } else if (sg == 1) {
+                    dialogPemain();
+                } else {
+                    dialogWaktu();
+                }
+            });
+            opt.addView(seg, new LinearLayout.LayoutParams(0, MATCH, 1f));
+        }
         c.addView(opt, lp(dp(54), 16));
 
-        // Pilihan nyawa: ada nyawa atau belajar santai
-        Button bn = button(relaxed ? "\uD83D\uDC9A Belajar santai \u2022 tanpa nyawa"
-                : "\u2764\uFE0F Ada nyawa", Color.WHITE, 14);
-        bn.setTextColor(DARK);
-        flat(bn);
+        // Pilihan nyawa: ada nyawa atau belajar santai (kapsul kecil di tengah)
+        TextView bn = text(relaxed ? "\uD83D\uDC9A Belajar santai \u2022 tanpa nyawa"
+                : "\u2764\uFE0F Ada nyawa", 13, DARK, true);
+        bn.setBackground(box(Color.WHITE, 20));
+        bn.setPadding(dp(18), dp(9), dp(18), dp(9));
         bn.setElevation(dp(3));
         bn.setOnClickListener(v -> dialogNyawa());
-        c.addView(bn, lp(dp(46), 10));
+        pressable(bn);
+        c.addView(bn, lpw(12));
 
         // Peta Petualangan
         LinearLayout mp = subjectTile("\uD83D\uDDFA\uFE0F", "Peta Petualangan", advSummary(), GREEN);
@@ -1462,7 +1639,7 @@ public class MainActivity extends Activity {
         rt.addView(mp, lp(dp(96), wide ? 0 : 18));
 
         // Pilih pelajaran
-        rt.addView(text("Pilih pelajaran", 16, DARK, true), lp(WRAP, wide ? 16 : 20));
+        rt.addView(sectionTitle("Pilih pelajaran"), lp(WRAP, wide ? 16 : 20));
         for (int s = 0; s < 3; s++) {
             final int sj = s;
             int n = countBank(s, kelas);
@@ -1487,37 +1664,32 @@ public class MainActivity extends Activity {
             rt.addView(t, lp(dp(96), 14));
         }
 
-        // Toko Avatar
-        Button tk = button("\uD83D\uDECD\uFE0F Toko Avatar \u2022 \uD83D\uDCB0 " + coins() + " koin", PINK, 15);
-        flat(tk);
-        tk.setElevation(dp(3));
+        // Toko Avatar (kartu merah muda dengan koin)
+        LinearLayout tk = subjectTile("\uD83D\uDECD\uFE0F", "Toko Avatar",
+                "\uD83D\uDCB0 " + coins() + " koin \u2022 ganti penampilan", PINK);
         tk.setOnClickListener(v -> showToko());
-        c.addView(tk, lp(dp(54), 18));
+        c.addView(tk, lp(dp(84), 18));
 
-        // Soal dari guru dan rekor skor, sebaris
+        // Soal dari guru dan rekor skor, sebaris (kartu putih dengan ikon berwarna)
         LinearLayout foot = new LinearLayout(this);
         foot.setOrientation(LinearLayout.HORIZONTAL);
-        Button gr = button((hasPin() ? "\uD83D\uDD12" : "\uD83D\uDCDA") + " Soal Guru", Color.WHITE, 14);
-        gr.setTextColor(DARK);
-        flat(gr);
-        gr.setElevation(dp(3));
+        LinearLayout gr = miniCard(hasPin() ? "\uD83D\uDD12" : "\uD83D\uDCDA", "Soal Guru", Color.parseColor("#5C6BC0"));
         gr.setOnClickListener(v -> openGuru());
-        foot.addView(gr, weight(0, 4));
-        Button rk = button("\uD83C\uDFC5 Rekor & Lencana", Color.WHITE, 13);
-        rk.setTextColor(DARK);
-        flat(rk);
-        rk.setElevation(dp(3));
-        foot.addView(rk, weight(4, 0));
-        c.addView(foot, lp(dp(54), 22));
+        foot.addView(gr, weight(0, 5));
+        LinearLayout rk = miniCard("\uD83C\uDFC5", "Rekor & Lencana", Color.parseColor("#F9A825"));
         rk.setOnClickListener(v -> showRekor());
+        foot.addView(rk, weight(5, 0));
+        c.addView(foot, lp(dp(58), 22));
 
         c.setFocusableInTouchMode(true);
         c.requestFocus();
         if (wide) {
             wrapTwo(c, cr);
+            animateIn(cr);
         } else {
             wrap(c);
         }
+        animateIn(c);
     }
 
     // ---------- Rekor skor tertinggi (disimpan di HP ini) ----------
@@ -2081,8 +2253,13 @@ public class MainActivity extends Activity {
         col.addView(n, new LinearLayout.LayoutParams(WRAP, WRAP));
         col.addView(s, new LinearLayout.LayoutParams(WRAP, WRAP));
         t.addView(col, new LinearLayout.LayoutParams(0, WRAP, 1f));
+        TextView go = text("\u203A", 26, Color.WHITE, true);
+        go.setBackground(box(Color.argb(60, 255, 255, 255), 17));
+        go.setGravity(Gravity.CENTER);
+        t.addView(go, new LinearLayout.LayoutParams(dp(34), dp(34)));
         t.setClickable(true);
         t.setFocusable(true);
+        pressable(t);
         return t;
     }
 
