@@ -1788,7 +1788,25 @@ public class MainActivity extends Activity {
     private void premium(View t, int color, int radDp, long delay) {
         final PremiumTile d = new PremiumTile(color, radDp);
         t.setBackground(d);
-        t.setElevation(dp(6));
+        // Elevasi sistem DIMATIKAN: renderer bayangan (MIUI) menggambar persegi terang di dalam kartu
+        // (inset = radius sudut). Bayangan digambar sendiri di PremiumTile.draw().
+        t.setElevation(0f);
+        t.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View x) {
+                // Bayangan sendiri digambar di luar batas view, jadi induk tidak boleh memotongnya.
+                android.view.ViewParent pp = x.getParent();
+                for (int i = 0; i < 3 && pp instanceof ViewGroup; i++) {
+                    ViewGroup g = (ViewGroup) pp;
+                    g.setClipChildren(false);
+                    pp = g.getParent();
+                }
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View x) {
+            }
+        });
         final ValueAnimator va = ValueAnimator.ofFloat(0f, 3.2f);
         va.setDuration(5200);
         va.setStartDelay(delay);
@@ -1852,6 +1870,17 @@ public class MainActivity extends Activity {
             float w = rf.width();
             float h = rf.height();
             p.setStyle(Paint.Style.FILL);
+            p.setShader(null);
+            // Bayangan lembut buatan sendiri (berlapis, tanpa blur) di bawah dan sekitar kartu.
+            int shadowBase = mixColor(base, Color.BLACK, 0.55f);
+            for (int i = 9; i >= 1; i--) {
+                float g = dp(1) * i * 0.9f;
+                p.setColor(Color.argb(9 + (9 - i) * 2, Color.red(shadowBase), Color.green(shadowBase),
+                        Color.blue(shadowBase)));
+                RectF sr = new RectF(rf.left - g * 0.6f, rf.top - g * 0.15f + dp(2),
+                        rf.right + g * 0.6f, rf.bottom + g + dp(2));
+                cv.drawRoundRect(sr, rad + g * 0.6f, rad + g * 0.6f, p);
+            }
             p.setShader(new LinearGradient(rf.left, rf.top, rf.right, rf.bottom,
                     new int[]{mixColor(base, Color.WHITE, 0.26f), base, mixColor(base, Color.BLACK, 0.24f)},
                     new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP));
