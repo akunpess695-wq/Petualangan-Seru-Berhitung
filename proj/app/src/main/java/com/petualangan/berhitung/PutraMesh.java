@@ -436,33 +436,13 @@ final class PutraMesh {
         // rambut: cangkang di atas kepala, bukaan wajah dipotong di depan; bagian bawah berhenti di y=63
         M.cur = P_HAIR;
         M.curShade = SHELL;
-        final double th0 = Math.asin((63.0 - HC[1]) / HH[1]);
-        M.skull(HC, HH, HAIR, 144, 64, th0, (w, y) -> {
-            double aw = Math.abs(w);
-            return aw < HAIR_W ? y < hairlineY(w) : y < lowerY(aw);
-        });
+        M.fittedShell(false, 0.0, 90, 60, 48);
         // telinga (terlihat di bawah tepi rambut samping)
         M.cur = P_OTHER;
         for (int sg = -1; sg <= 1; sg += 2)
             M.ellipsoid(new double[]{sg * 12.2, 65.4, 0.6}, new double[]{1.7, 3.0, 2.1}, SKIN, 16, 10);
         M.cur = P_HAIR;
-        M.curShade = constShade(1.0);
-        // tepi rambut (poni dan cambang) diberi tabung tipis supaya tepi tidak bergerigi
-        double[][] fr = new double[17][], frr = new double[17][];
-        for (int i = 0; i < 17; i++) { double w = -HAIR_W + 2 * HAIR_W * i / 16; fr[i] = onHair(w, hairlineY(w)); frr[i] = new double[]{0.26, 0.26}; }
-        M.tube(fr, frr, HAIR, 6);
-        for (int sg = -1; sg <= 1; sg += 2) {
-            // tepi cambang: turun lurus dari ujung garis rambut lalu mengikuti tepi bawah ke belakang
-            int nsb = 14;
-            double[][] sb = new double[nsb][], sbr = new double[nsb][];
-            for (int i = 0; i < nsb; i++) {
-                double[] q;
-                if (i < 4) q = onHair(sg * HAIR_W, hairlineY(HAIR_W) - (hairlineY(HAIR_W) - lowerY(HAIR_W)) * i / 3.0);
-                else { double w = HAIR_W + (Math.toRadians(140) - HAIR_W) * (i - 4) / (nsb - 5.0); q = onHair(sg * w, lowerY(w)); }
-                sb[i] = q; sbr[i] = new double[]{0.32, 0.32};
-            }
-            M.tube(sb, sbr, HAIR, 6);
-        }
+        M.hemTubes(false);
         M.curShade = null;
         // peci: bidang datar bersegi 12
         M.cur = P_PECI;
@@ -710,50 +690,82 @@ final class PutraMesh {
     private void bulgeShell(int part, double amp) { bulgeShell(part, amp, 0.0); }
     private void bulgeShell(int part, double amp, final double raise) {
         cur = part; bulgeAmp = amp; curShade = SHELL;
-        final int nu = 88, nv = 48;
-        double th0 = Math.asin((63.0 - HC[1]) / HH[1]);
-        double[][][] P = new double[nu][nv][3];
-        double[][] Y0 = new double[nu][nv];
-        for (int i = 0; i < nu; i++) {
-            double ph = 2 * PI * i / nu, w = ph > PI ? ph - 2 * PI : ph;
-            for (int j = 0; j < nv; j++) {
-                double th = th0 + (PI / 2 - th0) * j / (nv - 1.0), f = headF(th), y = HC[1] + HH[1] * Math.sin(th);
-                double[] b = {HC[0] + HH[0] * f * Math.sin(ph), y, HC[2] + HH[2] * f * Math.cos(ph)};
-                double[] o = outward(b);
-                double d = bulge(w, y);
-                P[i][j] = new double[]{b[0] + o[0] * d, b[1] + o[1] * d, b[2] + o[2] * d};
-                Y0[i][j] = y;
-            }
-        }
-        boolean[][] keep = new boolean[nu][nv];
-        for (int i = 0; i < nu; i++)
-            for (int j = 0; j < nv; j++) {
-                keep[i][j] = true;
-                if (j == nv - 1) continue;
-                double pm = 2 * PI * (i + 0.5) / nu, w = pm > PI ? pm - 2 * PI : pm, aw = Math.abs(w), y = (Y0[i][j] + Y0[i][j + 1]) / 2;
-                keep[i][j] = !(aw < HAIR_W ? y < hairlineY(w) + raiseOf(w, raise) : y < lowerY(aw));
-            }
-        grid(P, HAIR, true, false, keep);
-        // tepi tabung supaya garis rambut dan cambang tidak bergerigi
-        curShade = constShade(1.0);
-        double[][] fr = new double[17][], frr = new double[17][];
-        for (int i = 0; i < 17; i++) {
-            double w = -HAIR_W + 2 * HAIR_W * i / 16; double[] b = onHair(w, hairlineY(w) + raiseOf(w, raise)), o = outward(b);
-            fr[i] = new double[]{b[0] + o[0] * 0.3, b[1] + o[1] * 0.3, b[2] + o[2] * 0.3}; frr[i] = new double[]{0.5, 0.5};
-        }
-        tone = 1.0; tube(fr, frr, HAIR, 6);
-        for (int sg = -1; sg <= 1; sg += 2) {
-            int nsb = 14; double[][] sb = new double[nsb][], sbr = new double[nsb][];
-            for (int i = 0; i < nsb; i++) {
-                double[] q;
-                if (i < 4) q = onHair(sg * HAIR_W, hairlineY(HAIR_W) - (hairlineY(HAIR_W) - lowerY(HAIR_W)) * i / 3.0);
-                else { double w = HAIR_W + (Math.toRadians(140) - HAIR_W) * (i - 4) / (nsb - 5.0); q = onHair(sg * w, lowerY(w)); }
-                double[] o = outward(q);
-                sb[i] = new double[]{q[0] + o[0] * 0.3, q[1] + o[1] * 0.3, q[2] + o[2] * 0.3}; sbr[i] = new double[]{0.55, 0.55};
-            }
-            tube(sb, sbr, HAIR, 6);
-        }
+        fittedShell(true, raise, 70, 46, 36);
+        hemTubes(true);
         curShade = CLP;
+    }
+    /** anak rambut di garis rambut: ujung-ujung tipis yang turun ke dahi dengan lebar dan kedalaman acak (satu kali dibuat, tetap sama tiap build). */
+    private static final double[][] FRINGE = makeFringe();
+    private static double[][] makeFringe() {
+        java.util.Random r = new java.util.Random(5);
+        java.util.ArrayList<double[]> L = new java.util.ArrayList<>();
+        double w = -HAIR_W + 0.04;
+        while (w < HAIR_W - 0.12) {
+            double hw = 0.075 + 0.085 * r.nextDouble();
+            double depth = r.nextDouble() < 0.28 ? 0.0 : 0.30 + 0.70 * r.nextDouble();   // sebagian celah dibiarkan rata
+            L.add(new double[]{w + hw, hw, depth});
+            w += 2 * hw * (0.85 + 0.45 * r.nextDouble());
+        }
+        return L.toArray(new double[0][]);
+    }
+    /** seberapa jauh (satuan) ujung anak rambut turun di bawah garis rambut pada sudut w. */
+    private static double fringe(double w) {
+        double aw = Math.abs(w);
+        if (aw >= HAIR_W) return 0.0;
+        double best = 0.0;
+        for (double[] f : FRINGE) {
+            double d = Math.abs(w - f[0]) / f[1];
+            if (d < 1.0) best = Math.max(best, f[2] * Math.pow(1.0 - d, 1.3));
+        }
+        return best * (1.0 - smooth(HAIR_W - 0.40, HAIR_W, aw));
+    }
+    /** tepi bawah cangkang di sudut w: garis rambut di depan (dinaikkan di kanan bila raise > 0, mengecil halus ke pelipis, ujung anak rambut di bawahnya), tepi cambang di samping/belakang. */
+    private static double shellEdge(double w, double raise) {
+        double aw = Math.abs(w);
+        return edgeY(w) + raiseOf(w, raise) * (1.0 - smooth(HAIR_W - 0.30, HAIR_W + 0.05, aw)) - fringe(w);
+    }
+    /**
+     * Cangkang rambut yang tepi bawahnya PAS mengikuti garis rambut: tiap kolom mulai tepat di shellEdge, jadi tidak ada
+     * tepi bergerigi dan tidak perlu tabung penutup di dahi (tabung itulah yang tampak seperti bando).
+     */
+    private void fittedShell(boolean bulged, double raise, int nFront, int nBack, int nv) {
+        // kolom rapat di depan (|w| <= 1,3: garis rambut dengan anak rambut), jarang di belakang; w naik dari -1,3 mengelilingi kepala
+        final double wf = 1.3;
+        int nu = nFront + nBack;
+        double[] W = new double[nu];
+        for (int i = 0; i < nFront; i++) W[i] = -wf + 2 * wf * i / nFront;
+        double back = 2 * PI - 2 * wf;
+        for (int i = 0; i < nBack; i++) W[nFront + i] = wf + back * i / nBack;
+        double[][][] P = new double[nu][nv][3];
+        for (int i = 0; i < nu; i++) {
+            double ph = W[i], w = ph > PI ? ph - 2 * PI : ph;
+            double thb = Math.asin((shellEdge(w, raise) - HC[1]) / HH[1]);
+            for (int j = 0; j < nv; j++) {
+                double th = thb + (PI / 2 - thb) * j / (nv - 1.0), f = headF(th), y = HC[1] + HH[1] * Math.sin(th);
+                double[] b = {HC[0] + HH[0] * f * Math.sin(ph), y, HC[2] + HH[2] * f * Math.cos(ph)};
+                double d = bulged ? bulge(w, y) : 0.0;
+                double[] o = outward(b);
+                P[i][j] = new double[]{b[0] + o[0] * d, b[1] + o[1] * d, b[2] + o[2] * d};
+            }
+        }
+        grid(P, HAIR, true, false, null);
+    }
+    /** tabung tepi cambang (samping dan belakang) saja; di depan (garis rambut) TIDAK ada tabung, dan tabung mengecil ke nol di pelipis. */
+    private void hemTubes(boolean bulged) {
+        curShade = constShade(1.0);
+        double rMax = bulged ? 0.55 : 0.32, off = bulged ? 0.3 : 0.0;
+        double w0 = HAIR_W + 0.05, w1 = Math.toRadians(140);
+        for (int sg = -1; sg <= 1; sg += 2) {
+            int n = 14;
+            double[][] sb = new double[n][], sbr = new double[n][];
+            for (int i = 0; i < n; i++) {
+                double w = w0 + (w1 - w0) * i / (n - 1.0);
+                double[] q = onHair(sg * w, lowerY(w)), o = outward(q);
+                double rr = Math.max(0.02, rMax * smooth(0.0, 0.7, w - w0));
+                sb[i] = new double[]{q[0] + o[0] * off, q[1] + o[1] * off, q[2] + o[2] * off}; sbr[i] = new double[]{rr, rr};
+            }
+            tone = 1.0; tube(sb, sbr, HAIR, 6);
+        }
     }
     /**
      * Satu gumpalan: pita lebar dan cembung, mulai di denah (sx,sz) pada tutup kepala, melewati B=(wB,yB), turun ke ujung E=(wE,yE).
