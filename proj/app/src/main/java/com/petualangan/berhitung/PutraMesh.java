@@ -25,7 +25,7 @@ final class PutraMesh {
     // ---- penanda bagian: tiap potongan geometri diberi nomor bagian supaya warnanya bisa diganti / disembunyikan
     // per tampilan tanpa mengubah mesh bersama (static di PutriGLView). ----
     static final int P_OTHER = 0, P_SHIRT = 1, P_TRIM = 2, P_BUTTON = 3, P_SLEEVE = 4, P_PANTS = 5, P_HAIR = 6, P_PECI = 7,
-            P_HAIR_CREW = 8, P_HAIR_SPIKY = 9, P_HAIR_MESSY = 10, P_HAIR_DET = 11, P_HAIR_LOW = 12, P_HAIR_SIDE = 13, P_HAIR_CURL = 14, P_HAIR_CROWN = 15, P_CURL_LOW = 16;
+            P_HAIR_CREW = 8, P_HAIR_SPIKY = 9, P_HAIR_MESSY = 10, P_HAIR_DET = 11, P_HAIR_LOW = 12, P_HAIR_SIDE = 13, P_HAIR_CURL = 14, P_HAIR_CROWN = 15, P_CURL_LOW = 16, P_HAIR_BANG = 17;
     /** Gaya rambut (terlihat hanya bila peci dilepas). 0 = cangkang rambut bawaan (rapi). */
     static final int STYLE_DEFAULT = 0, STYLE_CREW = 1, STYLE_SPIKY = 2, STYLE_MESSY = 3, STYLE_SIDE = 4, STYLE_CURLY = 5,
             STYLE_HOOD = 6;   // tudung hewan dipakai: peci dan semua rambut disembunyikan (tudung digambar HoodMesh)
@@ -446,11 +446,11 @@ final class PutraMesh {
         for (int sg = -1; sg <= 1; sg += 2)
             M.ellipsoid(new double[]{sg * 12.2, 65.4, 0.6}, new double[]{1.7, 3.0, 2.1}, SKIN, 16, 10);
         M.cur = P_HAIR;
-        M.curShade = constShade(0.9);
+        M.curShade = constShade(1.0);
         // tepi rambut (poni dan cambang) diberi tabung tipis supaya tepi tidak bergerigi
         double[][] fr = new double[17][], frr = new double[17][];
-        for (int i = 0; i < 17; i++) { double w = -HAIR_W + 2 * HAIR_W * i / 16; fr[i] = onHair(w, hairlineY(w)); frr[i] = new double[]{0.42, 0.42}; }
-        M.tube(fr, frr, HAIR, 8);
+        for (int i = 0; i < 17; i++) { double w = -HAIR_W + 2 * HAIR_W * i / 16; fr[i] = onHair(w, hairlineY(w)); frr[i] = new double[]{0.26, 0.26}; }
+        M.tube(fr, frr, HAIR, 6);
         for (int sg = -1; sg <= 1; sg += 2) {
             // tepi cambang: turun lurus dari ujung garis rambut lalu mengikuti tepi bawah ke belakang
             int nsb = 14;
@@ -459,9 +459,9 @@ final class PutraMesh {
                 double[] q;
                 if (i < 4) q = onHair(sg * HAIR_W, hairlineY(HAIR_W) - (hairlineY(HAIR_W) - lowerY(HAIR_W)) * i / 3.0);
                 else { double w = HAIR_W + (Math.toRadians(140) - HAIR_W) * (i - 4) / (nsb - 5.0); q = onHair(sg * w, lowerY(w)); }
-                sb[i] = q; sbr[i] = new double[]{0.5, 0.5};
+                sb[i] = q; sbr[i] = new double[]{0.32, 0.32};
             }
-            M.tube(sb, sbr, HAIR, 8);
+            M.tube(sb, sbr, HAIR, 6);
         }
         M.curShade = null;
         // peci: bidang datar bersegi 12
@@ -601,43 +601,147 @@ final class PutraMesh {
         tone = toneV;
         tube(path, rad, HAIR, 6);
     }
+    // ---- pita rambut (ribbon): helai datar tipis yang menempel di cangkang; ~27 titik per helai (tabung lama 42-54) ----
+    /** sorot cincin (angel ring) pada titik p: sama dengan suku cincin di shellShade, tanpa goresan. */
+    private static double ringTerm(double[] p) {
+        double dx = p[0] - HC[0], dz = p[2] - HC[2], y = p[1];
+        double w = Math.atan2(dx, dz);
+        double face = Math.max(0, Math.cos(w + 0.6));
+        double yc = 77.0 + 1.3 * Math.cos(w + 0.6);
+        return 0.30 * Math.pow(face, 1.4) * Math.exp(-sq((y - yc) / 2.3))
+                + 0.07 * Math.exp(-sq((y - 76.0) / 2.6)) * Math.max(0, -Math.cos(w + 0.6));
+    }
+    /** pewarnaan helai: akar gelap -> ujung terang, tengah pita sedikit lebih terang, nada beda tiap helai, sorot cincin. */
+    private final ShadeFn RIB = (p, n, i, j, nu, nv) -> {
+        double t = nv > 1 ? (double) j / (nv - 1) : 0;
+        double mid = nu > 1 ? 1.0 - Math.abs(2.0 * i / (nu - 1) - 1.0) : 1.0;
+        double u = clamp((p[1] - 64.0) / 18.0);
+        double base = 0.62 + 0.32 * Math.pow(u, 0.85);
+        double root = 0.86 + 0.24 * Math.pow(t, 0.7);
+        return tone * base * root * (0.93 + 0.12 * mid) + 0.85 * ringTerm(p);
+    };
+    /** titik di cangkang rambut dari koordinat denah (x,z) (untuk tutup kepala): tinggi dicari dari profil headF. */
+    private static double[] capPt(double x, double z) {
+        double rho = Math.sqrt(sq(x / HH[0]) + sq((z - HC[2]) / HH[2]));
+        rho = Math.min(rho, 0.985);
+        double lo = 0, hi = PI / 2;
+        for (int k = 0; k < 30; k++) { double m = 0.5 * (lo + hi); if (headF(m) > rho) lo = m; else hi = m; }
+        return new double[]{x, HC[1] + HH[1] * Math.sin(0.5 * (lo + hi)), z};
+    }
+    /** pita sepanjang 'path': hw = setengah lebar tiap titik, lift = tinggi tengah (penampang cembung), cols kolom melintang. */
+    private void ribbon(double[][] path, double[] hw, double[] lift, int cols, double[] colr) {
+        int n = path.length;
+        double[][][] P = new double[cols][n][3];
+        for (int k = 0; k < n; k++) {
+            double[] g = k == 0 ? sub(path[1], path[0]) : (k == n - 1 ? sub(path[n - 1], path[n - 2]) : sub(path[k + 1], path[k - 1]));
+            double[] t = unit(g), o = outward(path[k]);
+            double[] e = unit(cross(t, o)), o2 = unit(cross(e, t));
+            for (int c = 0; c < cols; c++) {
+                double u = cols == 1 ? 0 : 2.0 * c / (cols - 1) - 1.0;
+                double up = lift[k] * (1 - u * u);
+                for (int m = 0; m < 3; m++) P[c][k][m] = path[k][m] + e[m] * u * hw[k] + o2[m] * up;
+            }
+        }
+        grid(P, colr, false, false, null);
+    }
+    /**
+     * Satu helai mengalir: mulai di denah (sx,sz) pada tutup kepala, melewati titik B=(wB,yB) di cangkang,
+     * lalu turun ke ujung E=(wE,yE). bend = lengkung samping pada tutup; off = jarak dari cangkang; tipLift = ujung terangkat.
+     */
+    private void flowLock(double sx, double sz, double wB, double yB, double wE, double yE,
+                          double hwMax, double bend, double toneV, double off, double tipLift) {
+        flowLock(sx, sz, wB, yB, wE, yE, hwMax, bend, toneV, off, tipLift, 2.1, 0.0);
+    }
+    private void flowLock(double sx, double sz, double wB, double yB, double wE, double yE,
+                          double hwMax, double bend, double toneV, double off, double tipLift, double tailP, double wave) {
+        final int n1 = 5, n2 = 4, n = n1 + n2;
+        double[] B = onHair(wB, yB);
+        double dx = B[0] - sx, dz = B[2] - sz, len = Math.sqrt(dx * dx + dz * dz) + 1e-9;
+        double[][] path = new double[n][], hw = new double[n][];
+        double[] hww = new double[n], lift = new double[n];
+        for (int k = 0; k < n; k++) {
+            double[] q;
+            if (k < n1) {
+                double s = (double) k / (n1 - 1);
+                if (k == n1 - 1) q = B;
+                else {
+                    double px = sx + dx * Math.pow(s, 0.95) + (-dz / len) * bend * Math.sin(PI * s);
+                    double pz = sz + dz * Math.pow(s, 0.95) + (dx / len) * bend * Math.sin(PI * s);
+                    q = capPt(px, pz);
+                }
+            } else {
+                double t = (double) (k - n1 + 1) / n2;
+                q = onHair(wB + (wE - wB) * (t * t * (3 - 2 * t) * 0.35 + 0.65 * t) + wave * Math.sin(PI * t * 1.6), yB + (yE - yB) * Math.pow(t, 0.9));
+            }
+            double tt = (double) k / (n - 1);
+            double env = (0.45 + 0.55 * smooth(0.0, 0.22, tt)) * (1.0 - 0.90 * Math.pow(tt, tailP));
+            hww[k] = Math.max(0.07, hwMax * env);
+            lift[k] = 0.12 + 0.28 * hww[k];
+            double[] o = outward(q);
+            double of = off + hww[k] * 0.25 + tipLift * tt * tt * tt;
+            path[k] = new double[]{q[0] + o[0] * of, q[1] + o[1] * of, q[2] + o[2] * of};
+        }
+        tone = toneV;
+        ribbon(path, hww, lift, 3, HAIR);
+    }
+    /** tepi bawah rambut di sudut w (garis rambut di depan, tepi cambang di samping/belakang). */
+    private static double edgeY(double w) { double aw = Math.abs(w); return aw < HAIR_W ? hairlineY(w) : lowerY(aw); }
+    private static double jit(java.util.Random r, double a, double b) { return a + (b - a) * r.nextDouble(); }
+    private static double toneOf(int k, java.util.Random r) { return ((k % 3 == 0) ? 1.10 : (k % 3 == 1 ? 0.90 : 1.0)) + (r.nextDouble() - 0.5) * 0.10; }
+
+    // ---- gaya 1: Pendek Rapi (acuan no. 1): mengalir dari pusaran di belakang puncak, poni jatuh menyamping di dahi ----
     private void detail() {
-        cur = P_HAIR_DET;
-        curShade = (p, n, i, j, nu, nv) -> {
-            double t = nv > 1 ? (double) j / (nv - 1) : 0;
-            double base = 0.72 + 0.30 * Math.pow(t, 0.7);                 // akar lebih gelap, ujung lebih terang
-            double side = n[0] * -0.45 + n[1] * 0.65 + n[2] * 0.62;      // sisi menghadap cahaya sedikit lebih terang
-            return tone * base * (1.0 + 0.10 * Math.max(0, side));
-        };
         java.util.Random r = new java.util.Random(23);
-        int N = 76;
-        for (int k = 0; k < N; k++) {
-            double w0 = -PI + 2 * PI * (k + r.nextDouble() * 0.7) / N;
-            double aw = Math.abs(w0);
-            // tepi bawah di sudut ini (garis rambut di depan, tepi cambang di samping/belakang) + sedikit di atasnya
-            double edge = aw < HAIR_W ? hairlineY(w0) : lowerY(aw);
-            double yEnd = edge + 0.5 + r.nextDouble() * 1.4;
-            double y0 = 76.0 + r.nextDouble() * 2.8;
-            double drift = (w0 < 0 ? -1 : 1) * (0.10 + 0.30 * r.nextDouble());       // disisir menjauhi pusaran
-            double toneV = (k % 3 == 0) ? 1.10 : (k % 3 == 1 ? 0.90 : 1.0) + (r.nextDouble() - 0.5) * 0.08;
-            lock(w0, y0, yEnd, 1.05 + 0.40 * r.nextDouble(), drift, toneV, 9);
-        }
-        cur = P_HAIR_CROWN;
-        // pusaran di puncak: untaian keluar dari satu titik, melengkung searah jarum jam, menutup bidang atas kepala
-        for (int k = 0; k < 30; k++) {
-            double w0 = 2 * PI * (k + r.nextDouble() * 0.6) / 30;
-            double yEnd = 74.5 + r.nextDouble() * 3.5;
-            double tn = (k % 3 == 0) ? 1.08 : (k % 3 == 1 ? 0.9 : 1.0);
-            crownLock(w0, yEnd, 1.5 + 0.5 * r.nextDouble(), 0.75, tn);
-        }
+        final double xw = 1.1, zw = HC[2] - 4.2;                // pusaran
+        curShade = RIB;
+        // lapis dalam: helai panjang dari pusaran ke tepi bawah di sekeliling kepala
         cur = P_HAIR_DET;
-        // helai pendek berlapis lebih rendah: menutup celah dan memberi kesan tebal di sisi dan belakang
-        for (int k = 0; k < 28; k++) {
-            double w0 = -PI + 2 * PI * (k + 0.35 + r.nextDouble() * 0.3) / 28;
-            double aw = Math.abs(w0);
-            double edge = aw < HAIR_W ? hairlineY(w0) : lowerY(aw);
-            double ys = Math.min(78.0, edge + 7.5 + r.nextDouble() * 2.0);
-            lock(w0, ys, edge + 0.4, 0.95 + 0.3 * r.nextDouble(), (k % 2 == 0 ? 1 : -1) * 0.12, 0.84 + 0.3 * r.nextDouble(), 7);
+        int N = 150;
+        for (int k = 0; k < N; k++) {
+            double wE = -PI + 2 * PI * (k + r.nextDouble() * 0.8) / N;
+            if (Math.abs(wE) < 0.55) continue;                  // bagian depan tengah diisi poni
+            double yE = edgeY(wE) + jit(r, 0.2, 1.6);
+            double dr = (wE < 0 ? -1 : 1) * jit(r, 0.02, 0.16);
+            double wB = wE + dr;
+            double yB = Math.max(yE + 0.8, jit(r, 75.4, 77.0));
+            double d = Math.hypot(onHair(wB, yB)[0] - xw, onHair(wB, yB)[2] - zw), s0 = Math.min(0.5, 1.2 / d);
+            double[] Bp = onHair(wB, yB);
+            double sx = xw + (Bp[0] - xw) * s0 * jit(r, 0.3, 1.0), sz = zw + (Bp[2] - zw) * s0 * jit(r, 0.3, 1.0);
+            flowLock(sx, sz, wB, yB, wE, yE, jit(r, 0.58, 0.80), ((k / 4) % 2 == 0 ? 1 : -1) * jit(r, 0.2, 0.7), toneOf(k, r), jit(r, 0.20, 0.45), 0.25, 3.2, ((k / 3) % 2 == 0 ? 1 : -1) * jit(r, 0.01, 0.045));
+        }
+        // lapis luar: helai lebih pendek dan terang, berhenti di atas tepi: memberi kesan berlapis
+        for (int k = 0; k < 64; k++) {
+            double wE = -PI + 2 * PI * (k + 0.25 + r.nextDouble() * 0.5) / 64;
+            if (Math.abs(wE) < 0.55) continue;
+            double yE = edgeY(wE) + jit(r, 2.6, 5.0);
+            double wB = wE + (wE < 0 ? -1 : 1) * jit(r, 0.02, 0.12);
+            double yB = Math.max(yE + 0.8, jit(r, 77.0, 78.8));
+            double[] Bp = onHair(wB, yB);
+            double sx = xw + (Bp[0] - xw) * 0.28, sz = zw + (Bp[2] - zw) * 0.28;
+            flowLock(sx, sz, wB, yB, wE, yE, jit(r, 0.65, 0.90), ((k / 2) % 2 == 0 ? 1 : -1) * jit(r, 0.2, 0.7), 1.0 + jit(r, -0.05, 0.16), jit(r, 0.50, 0.80), 0.4, 3.0, (k % 2 == 0 ? 1 : -1) * jit(r, 0.01, 0.05));
+        }
+        // pusaran: helai pendek melingkar di sekitar titik pusaran
+        cur = P_HAIR_CROWN;
+        for (int k = 0; k < 22; k++) {
+            double a = 2 * PI * (k + r.nextDouble() * 0.6) / 22;
+            double rr = jit(r, 1.0, 1.6);
+            double sx = xw + Math.cos(a) * 0.5, sz = zw + Math.sin(a) * 0.5;
+            double ex = xw + Math.cos(a + 0.5) * (rr + 4.5), ez = zw + Math.sin(a + 0.5) * (rr + 4.5);
+            double wB = Math.atan2(ex - HC[0], ez - HC[2]);
+            flowLock(sx, sz, wB, 79.6 + r.nextDouble() * 0.4, wB + 0.12, 77.2 + r.nextDouble() * 1.4,
+                    jit(r, 0.55, 0.75), 0.6, 0.95 + jit(r, 0, 0.18), jit(r, 0.75, 0.95), 0.3);
+        }
+        // poni: helai dari puncak depan jatuh ke dahi, disisir ke kanan (+x), ujung runcing dan sedikit terangkat
+        cur = P_HAIR_BANG;
+        int NB = 18;
+        for (int k = 0; k < NB; k++) {
+            double u = (k + r.nextDouble() * 0.5) / NB;          // 0 = kiri layar, 1 = kanan layar
+            double wS = -0.78 + 1.62 * u;
+            double wE = wS + jit(r, 0.12, 0.40);                  // disisir ke +x
+            double yE = Math.max(Math.abs(wE) < 0.8 ? 72.5 : hairlineY(wE) - 0.6, hairlineY(wE) - jit(r, 0.9, 2.1));
+            double[] top = onHair(wS, 80.2);
+            flowLock(top[0] * 0.8, (top[2] - HC[2]) * 0.8 + HC[2] - 1.0, wS + 0.08, 76.4, wE, yE,
+                    jit(r, 0.95, 1.30), (u < 0.5 ? 1 : -1) * jit(r, 0.1, 0.5), toneOf(k, r), jit(r, 0.95, 1.30), jit(r, 0.35, 0.9), 4.0, jit(r, -0.05, 0.05));
         }
         curShade = null;
         cur = P_OTHER;
@@ -680,150 +784,153 @@ final class PutraMesh {
         cur = P_OTHER;
     }
 
-    // ---- gaya Belah Samping (acuan: lembar gaya rambut SD, no. 2) ----
+    // ---- gaya 2: Belah Samping (acuan no. 2): jambul besar disisir dari garis belah ke kiri (-x), sisi kanan pendek ----
     private void sideStyle() {
         cur = P_HAIR_SIDE;
-        curShade = (p, n, i, j, nu, nv) -> {
-            double t = nv > 1 ? (double) j / (nv - 1) : 0;
-            double base = 0.70 + 0.34 * Math.pow(t, 0.75);
-            double side = n[0] * -0.45 + n[1] * 0.65 + n[2] * 0.62;
-            return tone * base * (1.0 + 0.12 * Math.max(0, side));
-        };
+        curShade = RIB;
         java.util.Random r = new java.util.Random(31);
-        final double partW = 0.34;                        // garis belah sedikit di sebelah kanan tengah
-        // jambul besar disisir dari garis belah ke sisi kiri (-x): menyapu dahi dan turun di pelipis
-        int nb = 34;
+        final double qx0 = 1.3, qz0 = HC[2] + 9.0, qx1 = 2.1, qz1 = HC[2] - 8.0;   // garis belah di denah: depan -> belakang
+        final double xw = 1.6, zw = HC[2] - 4.6;
+        // jambul kiri: helai lebar dari garis belah, menyapu dahi dan pelipis, makin ke belakang makin jauh ke belakang-kiri
+        int nb = 62;
         for (int k = 0; k < nb; k++) {
-            double u = (k + r.nextDouble() * 0.6) / nb;          // 0 = depan, 1 = belakang di sepanjang garis belah
-            double y0 = 75.3 + 6.3 * Math.pow(Math.min(1.0, u * 1.25), 0.8);
-            double w0 = partW * (1 - 0.4 * u) + (u > 0.55 ? (u - 0.55) * 1.6 : 0);   // garis belah melengkung ke belakang
-            double dw = -(0.85 + 1.15 * r.nextDouble() + 0.9 * u);
-            double wEnd = w0 + dw;
-            double aw = Math.abs(wEnd);
-            double edge = aw < HAIR_W ? hairlineY(wEnd) : lowerY(aw);
-            double yEnd = edge + 0.3 + r.nextDouble() * 1.8 + (u > 0.6 ? 2.0 : 0);
-            double toneV = (k % 3 == 0) ? 1.10 : (k % 3 == 1 ? 0.90 : 1.0) + (r.nextDouble() - 0.5) * 0.08;
-            lock(w0, y0, yEnd, 1.25 + 0.5 * r.nextDouble(), dw, toneV, 9, 0.5);
+            double u = (k + r.nextDouble() * 0.7) / nb;
+            double sx = qx0 + (qx1 - qx0) * u, sz = qz0 + (qz1 - qz0) * u;
+            double wE = Math.max(-PI + 0.05, -(0.22 + 2.85 * u + jit(r, 0.0, 0.16)));
+            double yE = edgeY(wE) + jit(r, 0.2, 1.8) + (u > 0.6 ? 1.5 : 0.0);
+            if (Math.abs(wE) < 0.9) yE = Math.max(yE, 72.6 + 0.9 * (1 - Math.abs(wE) / 0.9)) ;   // dahi/alis tetap terlihat
+            double wB = wE * (0.40 + 0.60 * Math.min(1.0, u * 2.2)) - jit(r, 0.02, 0.10);       // depan: menyilang dahi dulu
+            double yB = Math.max(yE + 1.0, jit(r, 76.2, 77.4));
+            flowLock(sx, sz, wB, yB, wE, yE, jit(r, 0.80, 1.15), ((k / 3) % 2 == 0 ? 1 : -1) * jit(r, 0.2, 0.8), toneOf(k, r),
+                    jit(r, 0.30, 0.60), jit(r, 0.2, 0.7), 3.0, ((k / 2) % 2 == 0 ? 1 : -1) * jit(r, 0.01, 0.05));
         }
-        // sisi kecil (kanan, +x): pendek, disisir sedikit ke kanan
-        for (int k = 0; k < 12; k++) {
-            double u = (k + r.nextDouble() * 0.6) / 12;
-            double y0 = 75.8 + 5.2 * Math.pow(Math.min(1.0, u * 1.2), 0.8);
-            double w0 = partW * (1 - 0.4 * u) + (u > 0.55 ? (u - 0.55) * 1.6 : 0);
-            double dw = 0.35 + 0.55 * r.nextDouble();
-            double wEnd = w0 + dw;
-            double aw = Math.abs(wEnd);
-            double edge = aw < HAIR_W ? hairlineY(wEnd) : lowerY(aw);
-            lock(w0, y0, edge + 0.6 + r.nextDouble() * 1.4 + (u > 0.6 ? 2.0 : 0), 1.1 + 0.3 * r.nextDouble(), dw,
-                    (k % 2 == 0) ? 1.05 : 0.92, 8, 0.5);
+        // lapis luar kiri: helai pendek terang yang berhenti di atas tepi
+        for (int k = 0; k < 24; k++) {
+            double u = (k + r.nextDouble() * 0.7) / 24;
+            double sx = qx0 + (qx1 - qx0) * u, sz = qz0 + (qz1 - qz0) * u;
+            double wE = Math.max(-PI + 0.05, -(1.05 + 2.0 * u + jit(r, 0.0, 0.15)));
+            double yE = edgeY(wE) + jit(r, 2.2, 4.4);
+            double wB = wE - jit(r, 0.04, 0.14);
+            double yB = Math.max(yE + 1.0, jit(r, 77.4, 79.0));
+            flowLock(sx, sz, wB, yB, wE, yE, jit(r, 0.85, 1.20), ((k / 2) % 2 == 0 ? 1 : -1) * jit(r, 0.2, 0.7), 1.02 + jit(r, 0.0, 0.16),
+                    jit(r, 0.70, 1.00), 0.5, 3.0, (k % 2 == 0 ? 1 : -1) * jit(r, 0.01, 0.05));
         }
-        // penutup puncak: untaian dari tengah bidang atas disisir ke kiri (belahan di kanan tengah)
-        for (int k = 0; k < 16; k++) {
-            double w0 = -0.15 - 2.9 * (k + r.nextDouble() * 0.6) / 16;
-            crownLock(w0, 76.5 + r.nextDouble() * 3.0, 1.35 + 0.35 * r.nextDouble(), -0.5, (k % 3 == 0) ? 1.08 : (k % 3 == 1 ? 0.92 : 1.0));
+        // sisi kanan kecil: pendek, disisir sedikit ke kanan (+x); dimulai dari dahi depan supaya tidak ada cangkang polos
+        for (int k = 0; k < 24; k++) {
+            double u = (k + r.nextDouble() * 0.7) / 24;
+            double sx = qx0 + (qx1 - qx0) * u, sz = qz0 + (qz1 - qz0) * u;
+            double wE = 0.10 + 1.45 * u + jit(r, 0.0, 0.14);
+            double yE = edgeY(wE) + jit(r, 0.4, 1.8) + (u > 0.6 ? 1.2 : 0.0);
+            if (Math.abs(wE) < 0.9) yE = Math.max(yE, 72.6 + 0.9 * (1 - Math.abs(wE) / 0.9));
+            double wB = wE * (0.45 + 0.55 * Math.min(1.0, u * 2.5)) + jit(r, 0.02, 0.10);
+            double yB = Math.max(yE + 1.0, jit(r, 76.3, 77.4));
+            flowLock(sx, sz, wB, yB, wE, yE, jit(r, 0.70, 0.95), (k % 2 == 0 ? 1 : -1) * jit(r, 0.1, 0.5), toneOf(k, r),
+                    jit(r, 0.30, 0.55), 0.35, 3.0, jit(r, -0.03, 0.03));
         }
-        for (int k = 0; k < 5; k++) {
-            double w0 = 0.35 + 1.0 * (k + r.nextDouble() * 0.6) / 5;
-            crownLock(w0, 77.5 + r.nextDouble() * 2.0, 1.2, 0.3, 1.0);
+        // belakang kanan: helai dari pusaran turun ke tepi (sisi kiri belakang sudah ditutup jambul)
+        for (int k = 0; k < 34; k++) {
+            double wE = 1.55 + (PI + 0.1 - 1.55) * (k + r.nextDouble() * 0.8) / 34;
+            if (wE > PI - 0.02) wE = PI - 0.02;
+            double yE = edgeY(wE) + jit(r, 0.2, 1.6);
+            double wB = wE + jit(r, 0.02, 0.10);
+            double yB = Math.max(yE + 0.8, jit(r, 75.6, 77.0));
+            double[] Bp = onHair(wB, yB);
+            double sx = xw + (Bp[0] - xw) * jit(r, 0.12, 0.35), sz = zw + (Bp[2] - zw) * jit(r, 0.12, 0.35);
+            flowLock(sx, sz, wB, yB, wE, yE, jit(r, 0.58, 0.80), ((k / 3) % 2 == 0 ? 1 : -1) * jit(r, 0.2, 0.7), toneOf(k, r),
+                    jit(r, 0.22, 0.45), 0.25, 3.2, ((k / 3) % 2 == 0 ? 1 : -1) * jit(r, 0.01, 0.04));
         }
         // garis belah: alur gelap tipis dari dahi ke belakang
-        curShade = constShade(0.38);
+        curShade = constShade(0.34);
         int np = 9;
-        double[][] path = new double[np][], rad = new double[np][];
+        double[][] path = new double[np][];
+        double[] hw = new double[np], lift = new double[np];
         for (int k = 0; k < np; k++) {
             double u = (double) k / (np - 1);
-            double y = 75.3 + 6.3 * Math.pow(Math.min(1.0, u * 1.25), 0.8);
-            double w = partW * (1 - 0.4 * u) + (u > 0.55 ? (u - 0.55) * 1.6 : 0);
-            double[] b = onHair(w, Math.min(y, 81.2)), o = outward(b);
-            path[k] = new double[]{b[0] + o[0] * 0.55, b[1] + o[1] * 0.55, b[2] + o[2] * 0.55};
-            rad[k] = new double[]{0.42, 0.42};
+            double[] c = capPt(qx0 + (qx1 - qx0) * u, qz0 + (qz1 - qz0) * u), o = outward(c);
+            path[k] = new double[]{c[0] + o[0] * 0.75, c[1] + o[1] * 0.75, c[2] + o[2] * 0.75};
+            hw[k] = 0.20 * (1.0 - 0.5 * u); lift[k] = 0.06;
         }
         tone = 1.0;
-        tube(path, rad, HAIR, 6);
-        double[][] tp = {{1.1, 82.25, HC[2] + 4.6}, {1.0, 82.5, HC[2] + 1.5}, {0.9, 82.5, HC[2] - 1.5}, {1.0, 82.25, HC[2] - 4.6}};
-        double[][] tr = {{0.4, 0.4}, {0.4, 0.4}, {0.4, 0.4}, {0.4, 0.4}};
-        tube(tp, tr, HAIR, 6);
+        ribbon(path, hw, lift, 3, HAIR);
         curShade = null;
         cur = P_OTHER;
     }
 
-    // ---- gaya Ikal (acuan no. 3): gumpalan ikal kecil menutupi kepala ----
-    private void curl(double w, double y, double rho, double toneV, int pts) {
-        double[] b = onHair(w, y), o = outward(b);
-        double[] e1 = norm3(o[2], 0, -o[0]);                 // tangen mendatar
-        double[] e2 = new double[]{o[1] * e1[2] - o[2] * e1[1], o[2] * e1[0] - o[0] * e1[2], o[0] * e1[1] - o[1] * e1[0]};
-        double ph = 6.283 * hash01(w * 7.3 + y * 1.9);
-        double[][] path = new double[pts][], rad = new double[pts][];
+    // ---- gaya 3: Ikal Ringan (acuan no. 3): ikal pegas longgar yang menggantung dan saling menumpuk ----
+    /** Satu ikal: pita berbentuk pegas dengan sumbu 'a' (menyusur permukaan), mulai dari titik b di cangkang. */
+    private void coil(double[] b, double[] a, double len, double rad, double turns, double hw, double toneV, int pts) {
+        double[] o = outward(b);
+        double[] u2 = unit(cross(a, o));
+        double ph = 2 * PI * hash01(b[0] * 7.3 + b[1] * 1.9 + b[2] * 3.1);
+        int cols = 3;
+        double[][][] P = new double[cols][pts][3];
         for (int k = 0; k < pts; k++) {
             double t = (double) k / (pts - 1);
-            double th = ph + t * 2 * PI * 1.35;
-            double rr = rho * (1.0 - 0.45 * t);
-            double lift = 0.15 + 0.85 * Math.sin(PI * Math.min(1.0, t * 1.1)) + 0.6 * t;
-            double c = Math.cos(th) * rr, sn = Math.sin(th) * rr;
-            path[k] = new double[]{b[0] + o[0] * lift + e1[0] * c + e2[0] * sn,
-                    b[1] + o[1] * lift + e1[1] * c + e2[1] * sn,
-                    b[2] + o[2] * lift + e1[2] * c + e2[2] * sn};
-            double rd = 0.95 * (1.0 - 0.45 * t * t);
-            rad[k] = new double[]{rd, rd};
+            double th = ph + 2 * PI * turns * t;
+            double rr = rad * (1.0 - 0.38 * t);
+            double[] rv = {u2[0] * Math.cos(th) + o[0] * Math.sin(th), u2[1] * Math.cos(th) + o[1] * Math.sin(th), u2[2] * Math.cos(th) + o[2] * Math.sin(th)};
+            double lift = 0.20 + rad * 0.80 - 0.45 * t;                 // sumbu pegas sedikit di atas cangkang
+            double env = (0.55 + 0.45 * smooth(0.0, 0.14, t)) * (1.0 - 0.55 * t * t * t);
+            double h = hw * env;
+            for (int c = 0; c < cols; c++) {
+                double u = 2.0 * c / (cols - 1) - 1.0, arch = 0.22 * h * (1 - u * u);
+                for (int m = 0; m < 3; m++)
+                    P[c][k][m] = b[m] + o[m] * lift + a[m] * (len * t + u * h) + rv[m] * (rr + arch);
+            }
         }
         tone = toneV;
-        tube(path, rad, HAIR, 5);
+        grid(P, HAIR, false, false, null);
+    }
+    private void coilAt(double[] b, java.util.Random r, double scale) {
+        double[] o = outward(b);
+        double[] dt = {o[0] * o[1], o[1] * o[1] - 1.0, o[2] * o[1]};   // gravitasi (0,-1,0) diproyeksikan ke bidang singgung
+        double l = Math.sqrt(dt[0] * dt[0] + dt[1] * dt[1] + dt[2] * dt[2]);
+        if (l < 0.35) {                                                // di puncak: jatuh keluar dari pusat
+            double[] rd = norm3(b[0] - HC[0], 0, b[2] - HC[2]);
+            double d = rd[0] * o[0] + rd[1] * o[1] + rd[2] * o[2];
+            dt = new double[]{rd[0] - o[0] * d, rd[1] - o[1] * d, rd[2] - o[2] * d};
+        }
+        double[] d0 = unit(dt), e1 = unit(cross(d0, o));
+        double sw = jit(r, -0.45, 0.45);
+        double[] a = unit(new double[]{d0[0] + e1[0] * sw, d0[1] + e1[1] * sw, d0[2] + e1[2] * sw});
+        coil(b, a, scale * jit(r, 3.2, 4.4), scale * jit(r, 0.95, 1.35), jit(r, 1.7, 2.4), scale * jit(r, 0.80, 1.05), 0.88 + 0.26 * r.nextDouble(), 15);
     }
     private void curlyStyle() {
         java.util.Random r = new java.util.Random(77);
-        ShadeFn sf = (p, n, i, j, nu, nv) -> {
+        curShade = (p, n, i, j, nu, nv) -> {
             double t = nv > 1 ? (double) j / (nv - 1) : 0;
-            double base = 0.66 + 0.40 * Math.pow(t, 0.9);       // pangkal gelap, ujung ikal terang
+            double base = 0.60 + 0.42 * Math.pow(t, 0.8);          // pangkal gelap, ujung ikal terang
             double side = n[0] * -0.45 + n[1] * 0.65 + n[2] * 0.62;
-            return tone * base * (1.0 + 0.14 * Math.max(0, side));
+            return tone * base * (1.0 + 0.16 * Math.max(0, side)) + 0.7 * ringTerm(p);
         };
-        final int COLS = 28;
-        for (int row = 0; row < 10; row++) {
-            double y = 63.5 + row * 2.3;
-            if (y > 81.0) y = 81.0;
-            for (int c = 0; c < COLS; c++) {
-                double w = -PI + 2 * PI * (c + 0.5 * (row % 2)) / COLS + (r.nextDouble() - 0.5) * 0.08;
-                double aw = Math.abs(w);
-                double edge = aw < HAIR_W ? hairlineY(w) : lowerY(aw);
-                if (y < edge + (aw < HAIR_W ? 0.2 : 0.9)) continue;   // depan: ikal sampai garis rambut agar tidak ada jeda dengan peci
+        final int COLS = 32;
+        for (int c = 0; c < COLS; c++) {
+            double w = -PI + 2 * PI * (c + 0.5) / COLS + (r.nextDouble() - 0.5) * 0.10;
+            double edge = edgeY(w);
+            double len0 = 3.8;
+            double yMin = Math.max(edge, Math.max(edgeY(w - 0.11), edgeY(w + 0.11))) + 0.8 * len0 + 0.3 - (Math.abs(w) < HAIR_W ? 0.0 : 0.4);
+            double y = yMin;
+            int row = 0;
+            while (y < 81.3) {
                 double yy = y + (r.nextDouble() - 0.5) * 0.8;
-                if (yy > 81.4) continue;
-                cur = yy <= 75.6 ? P_CURL_LOW : P_HAIR_CURL;   // sampai bibir peci: terlihat juga saat peci dipakai
-                curShade = sf;
-                curl(w, yy, 1.0 + 0.3 * r.nextDouble(), 0.86 + 0.28 * r.nextDouble(), 10);
+                double ww = w + (row % 2 == 0 ? 0.0 : PI / COLS) + (r.nextDouble() - 0.5) * 0.06;
+                cur = yy <= 75.6 ? P_CURL_LOW : P_HAIR_CURL;           // sampai bibir peci: terlihat juga saat peci dipakai
+                coilAt(onHair(ww, Math.min(yy, 81.2)), r, 1.0);
+                y += 2.15; row++;
             }
         }
-        // puncak kepala: beberapa ikal di bidang atas
+        // puncak kepala: ikal di bidang atas, jatuh ke luar dari pusat
         cur = P_HAIR_CURL;
-        curShade = sf;
-        for (int ring = 0; ring < 2; ring++) {
-            int nr = ring == 0 ? 6 : 12;
-            double rr = ring == 0 ? 2.6 : 5.6;
+        for (int ring = 0; ring < 3; ring++) {
+            int nr = ring == 0 ? 5 : (ring == 1 ? 11 : 17);
+            double rr = ring == 0 ? 2.2 : (ring == 1 ? 5.2 : 8.0);
             for (int k = 0; k < nr; k++) {
-                double a = 2 * PI * (k + 0.5 * ring) / nr;
-                double[] top = {HC[0] + rr * Math.sin(a), 82.0 - 0.3 * ring, HC[2] + rr * Math.cos(a)};
-                curlFlat(top, 1.1 + 0.25 * r.nextDouble(), 0.9 + 0.2 * r.nextDouble());
+                double a = 2 * PI * (k + 0.5 * ring + r.nextDouble() * 0.3) / nr;
+                coilAt(capPt(HC[0] + rr * Math.sin(a) * 0.95, HC[2] + rr * Math.cos(a) * 0.95), r, 0.95);
             }
         }
-        curlFlat(new double[]{HC[0], 82.2, HC[2]}, 1.3, 1.0);
         curShade = null;
         cur = P_OTHER;
-    }
-    /** ikal di bidang atas yang datar: lingkaran kecil mendatar yang naik sedikit. */
-    private void curlFlat(double[] c0, double rho, double toneV) {
-        int pts = 12;
-        double[][] path = new double[pts][], rad = new double[pts][];
-        double ph = 6.283 * hash01(c0[0] * 5.1 + c0[2] * 3.3);
-        for (int k = 0; k < pts; k++) {
-            double t = (double) k / (pts - 1);
-            double th = ph + t * 2 * PI * 1.35;
-            double rr = rho * (1.0 - 0.45 * t);
-            path[k] = new double[]{c0[0] + Math.cos(th) * rr, c0[1] + 0.2 + 0.9 * Math.sin(PI * Math.min(1.0, t * 1.1)) + 0.5 * t, c0[2] + Math.sin(th) * rr};
-            double rd = 0.95 * (1.0 - 0.45 * t * t);
-            rad[k] = new double[]{rd, rd};
-        }
-        tone = toneV;
-        tube(path, rad, HAIR, 5);
     }
 
     private void hairStyles() {
@@ -970,7 +1077,7 @@ final class PutraMesh {
                 case P_BUTTON: k = btn; break;
                 case P_SLEEVE: k = arm; break;
                 case P_PANTS: k = pants; break;
-                case P_HAIR: case P_HAIR_CREW: case P_HAIR_SPIKY: case P_HAIR_MESSY: case P_HAIR_DET: case P_HAIR_LOW: case P_HAIR_SIDE: case P_HAIR_CURL: case P_HAIR_CROWN: case P_CURL_LOW: {
+                case P_HAIR: case P_HAIR_CREW: case P_HAIR_SPIKY: case P_HAIR_MESSY: case P_HAIR_DET: case P_HAIR_LOW: case P_HAIR_SIDE: case P_HAIR_CURL: case P_HAIR_CROWN: case P_CURL_LOW: case P_HAIR_BANG: {
                     // gradasi: warna dasar (pilihan pemain, atau bawaan) dikali pengali terang/gelap per titik
                     double[] bc0 = hair != null ? hair : new double[]{c[i * 3], c[i * 3 + 1], c[i * 3 + 2]};
                     double m = shade[i], sheen = Math.max(0, m - 1) * 0.30;
@@ -998,8 +1105,10 @@ final class PutraMesh {
         hide[P_HAIR_MESSY] = !(st && style == STYLE_MESSY);
         boolean curly = style == STYLE_CURLY, side = style == STYLE_SIDE;
         // untaian volume: tidak dipakai crew cut (pendek rapi) dan ikal (diganti ikal sendiri)
-        hide[P_HAIR_DET] = !(st && style != STYLE_CREW && !curly);
-        hide[P_HAIR_CROWN] = !(st && (style == STYLE_DEFAULT || style == STYLE_MESSY));   // pusaran puncak: bukan untuk belah samping
+        boolean dflt = st && (style == STYLE_DEFAULT || style == STYLE_MESSY);
+        hide[P_HAIR_DET] = !dflt;                            // helai mengalir gaya Pendek Rapi (belah samping dan ikal punya helai sendiri)
+        hide[P_HAIR_CROWN] = !dflt;                          // pusaran puncak
+        hide[P_HAIR_BANG] = !(st && style == STYLE_DEFAULT); // poni di dahi
         hide[P_HAIR_LOW] = !showPeci || curly;               // untaian di bawah peci (peci dipakai); ikal punya sendiri
         hide[P_HAIR_SIDE] = !(side && st);
         hide[P_HAIR_CURL] = !(curly && st);
@@ -1007,7 +1116,7 @@ final class PutraMesh {
         if (st && style == STYLE_CREW) hide[P_HAIR] = true;
         if (style == STYLE_HOOD) {                           // tudung hewan: tanpa peci dan tanpa rambut
             hide[P_PECI] = true;
-            for (int q = P_HAIR; q <= P_CURL_LOW; q++) if (q != P_PECI) hide[q] = true;
+            for (int q = P_HAIR; q <= P_HAIR_BANG; q++) if (q != P_PECI) hide[q] = true;
         }
         int n = 0;
         for (int t = 0; t < idx.length; t += 3) if (!hide[part[idx[t]]]) n += 3;
