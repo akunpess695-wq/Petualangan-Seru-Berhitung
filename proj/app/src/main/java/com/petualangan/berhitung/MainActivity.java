@@ -6352,8 +6352,12 @@ public class MainActivity extends Activity {
         }
 
         LinearLayout c = column();
-        c.addView(text("\uD83D\uDECD\uFE0F Toko Avatar", 28, ORANGE_DARK, true), lp(WRAP, 0));
-        c.addView(pill("\uD83D\uDCB0 " + coins() + " koin", ORANGE), lpw(8));
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(text("\uD83D\uDECD\uFE0F Toko Avatar", 22, ORANGE_DARK, true), new LinearLayout.LayoutParams(0, WRAP, 1f));
+        head.addView(pill("\uD83D\uDCB0 " + coins(), ORANGE), new LinearLayout.LayoutParams(WRAP, WRAP));
+        c.addView(head, lp(WRAP, 0));
 
         if (np > 1) {
             LinearLayout pr = new LinearLayout(this);
@@ -6377,10 +6381,10 @@ public class MainActivity extends Activity {
         if (USE_PUTRI_GL) {
             putriGL = new PutriGLView(this, genderOf[shopPl]);
             applyLook3D(putriGL, shopPl);
-            pv.addView(putriGL, new LinearLayout.LayoutParams(dp(250), dp(250)));
+            pv.addView(putriGL, new LinearLayout.LayoutParams(dp(200), dp(200)));
         } else {
             putriGL = null;
-            pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(250), dp(250)));
+            pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(200), dp(200)));
         }
         LinearLayout gr = new LinearLayout(this);
         gr.setOrientation(LinearLayout.HORIZONTAL);
@@ -6397,10 +6401,9 @@ public class MainActivity extends Activity {
             });
             gr.addView(gt, weight(g == 0 ? 0 : 4, 0));
         }
-        pv.addView(gr, lp(dp(44), 8));
-        if (USE_PUTRI_GL && genderOf[shopPl] == 0) {
+        if (USE_PUTRI_GL && genderOf[shopPl] == 0) {   // peci: satu baris dengan Putra/Putri
             final boolean peciLepas = peciOff(shopPl);
-            TextView pc = text(peciLepas ? "\uD83E\uDDE2 Peci: Lepas" : "\uD83E\uDDE2 Peci: Pakai", 14,
+            TextView pc = text(peciLepas ? "\uD83E\uDDE2 Lepas" : "\uD83E\uDDE2 Peci", 14,
                     peciLepas ? DARK : Color.WHITE, true);
             pc.setGravity(Gravity.CENTER);
             pc.setBackground(box(peciLepas ? GRAY : GREEN, 16));
@@ -6409,11 +6412,9 @@ public class MainActivity extends Activity {
                 sfx(SFX_OK);
                 showToko();
             });
-            pv.addView(pc, lp(dp(44), 8));
+            gr.addView(pc, weight(4, 0));
         }
-        pv.addView(text(names[shopPl], 16, DARK, true), lp(WRAP, 8));
-        pv.addView(text("Ketuk barang untuk membeli, ketuk lagi untuk memakai atau melepas", 12, DARK, false),
-                lp(WRAP, 2));
+        pv.addView(gr, lp(dp(44), 8));
         c.addView(pv, lp(WRAP, 12));
 
         // Kategori ringkas: semua kategori terlihat tanpa geser horizontal.
@@ -6426,9 +6427,9 @@ public class MainActivity extends Activity {
                 final int tab = start + q;
                 if (tab >= SHOP_TAB_NAME.length) break;
                 boolean sel = tab == shopTab;
-                TextView chip = text(SHOP_TAB_ICON[tab] + "\n" + ((tab == 7 && genderOf[shopPl] == 1) ? "Jilbab" : SHOP_TAB_NAME[tab]), 12, sel ? Color.WHITE : DARK, true);
+                TextView chip = text(SHOP_TAB_ICON[tab] + " " + ((tab == 7 && genderOf[shopPl] == 1) ? "Jilbab" : SHOP_TAB_NAME[tab]), 12, sel ? Color.WHITE : DARK, true);
                 chip.setGravity(Gravity.CENTER);
-                chip.setMinHeight(dp(48));
+                chip.setMinHeight(dp(40));
                 chip.setPadding(dp(3), dp(5), dp(3), dp(5));
                 chip.setBackground(box(sel ? ORANGE : GRAY, 14));
                 chip.setOnClickListener(v -> {
