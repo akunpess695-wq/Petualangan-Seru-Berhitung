@@ -679,7 +679,7 @@ final class PutraMesh {
     // ---- rambut tebal: cangkang volume (menggembung 2-3 satuan) + gumpalan besar yang cembung dan meruncing ----
     private double bulgeAmp = 2.2;
     /** gaya rambut baru (VOL/VOLH, Messy, Bergelombang, Quiff, Ikat Kecil): tepi belakang diturunkan ke tengkuk dan pangkal helai dibuat lebih terang (0 = perilaku lama). */
-    private double hemDrop = 0.0, hemLift = 0.0;
+    private double hemDrop = 0.0, hemLift = 0.0, offShift = 0.0;   // offShift < 0: helai terbenam ke cangkang supaya tidak ada celah tembus
     private double backDrop(double aw) { return hemDrop * smooth(Math.toRadians(95), Math.toRadians(140), aw); }
     private double edgeYd(double w) { return edgeY(w) - backDrop(Math.abs(w)); }
     /** tebal tambahan cangkang volume di sudut w, tinggi y: tipis di tepi bawah, menebal ke atas, paling tebal di puncak. */
@@ -811,7 +811,7 @@ final class PutraMesh {
             lift[k] = 0.50 * hww[k];
             double w = Math.atan2(q[0] - HC[0], q[2] - HC[2]);
             double[] o = outward(q);
-            double of = bulge(w, q[1]) + off + 0.2 * hww[k] + tipLift * tt * tt * tt;
+            double of = bulge(w, q[1]) + off + offShift + 0.2 * hww[k] + tipLift * tt * tt * tt;
             path[k] = new double[]{q[0] + o[0] * of, q[1] + o[1] * of, q[2] + o[2] * of};
         }
         tone = toneV;
@@ -1025,7 +1025,7 @@ final class PutraMesh {
 
     // ---- bentuk rambut baru: dua cangkang volume bersama (VOL: garis rambut biasa; VOLH: dahi terbuka) lalu gumpalan tiap gaya ----
     private void volShells() {
-        hemDrop = 2.2; hemLift = 0.30;
+        hemDrop = 2.2; hemLift = 0.30; offShift = -1.0;
         frontUp = 0.0;
         bulgeShellN(P_HAIR_VOL, 2.4, 0.0, 54, 34, 30);
         frontUp = 1.7;
@@ -1098,13 +1098,13 @@ final class PutraMesh {
             double wB = wE + (r.nextBoolean() ? 1 : -1) * jit(r, 0.05, 0.40);
             double yB = Math.max(yE + 1.5, jit(r, 75.0, 79.0));
             double[] st = startNear(wB, yB, xw, zw, jit(r, 0.15, 0.40));
-            clump(st[0], st[1], wB, yB, wE, yE, jit(r, 2.3, 3.2), (r.nextBoolean() ? 1 : -1) * jit(r, 0.6, 1.8), toneOf(k, r), 0.6, jit(r, 1.8, 4.2), 2.2);
+            clump(st[0], st[1], wB, yB, wE, yE, jit(r, 2.3, 3.2), (r.nextBoolean() ? 1 : -1) * jit(r, 0.6, 1.8), toneOf(k, r), 0.6, jit(r, 0.2, 0.9), 2.2);
         }
         for (int k = 0; k < 8; k++) {   // jambul mencuat di puncak
             double a = 2 * PI * (k + r.nextDouble() * 0.5) / 8;
             double wB = Math.atan2(Math.sin(a) * 4.0, Math.cos(a) * 4.0 + 2.0);
             double[] st = startNear(wB, 79.6, xw, zw, 0.3);
-            clump(st[0], st[1], wB, 79.8, wB + (r.nextBoolean() ? 1 : -1) * jit(r, 0.15, 0.45), jit(r, 76.6, 78.2), jit(r, 1.7, 2.2), jit(r, -1.0, 1.0), 1.05 + jit(r, 0.0, 0.15), 1.0, jit(r, 3.5, 5.0), 2.2);
+            clump(st[0], st[1], wB, 79.8, wB + (r.nextBoolean() ? 1 : -1) * jit(r, 0.15, 0.45), jit(r, 76.6, 78.2), jit(r, 1.7, 2.2), jit(r, -1.0, 1.0), 1.05 + jit(r, 0.0, 0.15), 0.1, jit(r, 0.2, 0.7), 2.2);
         }
         curShade = null; cur = P_OTHER;
     }
@@ -1170,7 +1170,7 @@ final class PutraMesh {
         cur = P_TIE;
         ellipsoid(new double[]{cen[0] - co[0] * 2.9, cen[1] - co[1] * 2.9, cen[2] - co[2] * 2.9}, new double[]{2.3, 0.8, 2.3}, new double[]{0.80, 0.12, 0.12}, 12, 6);
         cur = P_OTHER;
-        hemDrop = 0.0; hemLift = 0.0;
+        hemDrop = 0.0; hemLift = 0.0; offShift = 0.0;
     }
 
     private void hairStyles() {
