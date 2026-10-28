@@ -1881,6 +1881,7 @@ public class MainActivity extends Activity {
                         rf.right + g * 0.6f, rf.bottom + g + dp(2));
                 cv.drawRoundRect(sr, rad + g * 0.6f, rad + g * 0.6f, p);
             }
+            p.setColor(Color.BLACK); // alpha paint harus 255, kalau tidak gradien kartu ikut transparan
             p.setShader(new LinearGradient(rf.left, rf.top, rf.right, rf.bottom,
                     new int[]{mixColor(base, Color.WHITE, 0.26f), base, mixColor(base, Color.BLACK, 0.24f)},
                     new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP));
