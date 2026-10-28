@@ -9510,7 +9510,7 @@ public class MainActivity extends Activity {
         final int done = advDone(k);
 
         LinearLayout c = column();
-        c.addView(text("\uD83D\uDDFA\uFE0F Peta Petualangan", 24, ORANGE_DARK, true), lp(WRAP, 0));
+        c.addView(text("\uD83D\uDDFA\uFE0F Peta Petualangan", 24, Color.parseColor("#1A3C6E"), true), lp(WRAP, 0));
         c.addView(text("Pilih kelas", 13, DARK, false), lp(WRAP, 8));
         c.addView(chips(KELAS_LABEL, k, KELAS_COLOR, i -> {
             prefs.edit().putInt("kelas", i).apply();
@@ -9523,11 +9523,7 @@ public class MainActivity extends Activity {
         hero.setOrientation(LinearLayout.VERTICAL);
         hero.setGravity(Gravity.CENTER_HORIZONTAL);
         hero.setPadding(dp(16), dp(16), dp(16), dp(16));
-        GradientDrawable hg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.parseColor(WORLD_PAL[k]), Color.parseColor(WORLD_PAL2[k])});
-        hg.setCornerRadius(dp(28));
-        hero.setBackground(hg);
-        hero.setElevation(dp(5));
+        premium(hero, Color.parseColor(WORLD_PAL[k]), 28, 600L);
         hero.addView(text(WORLD_ICON[k] + " " + WORLD_NAME[k], 22, Color.WHITE, true), lp(WRAP, 0));
         hero.addView(text(KELAS_NAMES[k] + " \u2022 " + done + " dari " + n + " level \u2022 \u2B50 "
                 + advStarSum(k) + "/" + (3 * n), 13, Color.WHITE, false), lp(WRAP, 4));
@@ -9536,7 +9532,10 @@ public class MainActivity extends Activity {
         bar.setBackground(box(Color.argb(90, 255, 255, 255), 6));
         if (done > 0) {
             View fill = new View(this);
-            fill.setBackground(box(Color.WHITE, 6));
+            GradientDrawable fg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{Color.parseColor("#FFE082"), Color.parseColor("#FFB300")});
+            fg.setCornerRadius(dp(6));
+            fill.setBackground(fg);
             bar.addView(fill, new LinearLayout.LayoutParams(0, MATCH, done));
         }
         if (n - done > 0) {
@@ -9579,7 +9578,7 @@ public class MainActivity extends Activity {
         if (next >= 0) {
             final int nl = next;
             Button go = button("\u25B6 Lanjut: Level " + (nl + 1) + " \u2022 " + lv(k, nl)[1], GREEN, 15);
-            go.setElevation(dp(4));
+            premium(go, GREEN, 28, 2400L);
             c.addView(go, lp(dp(56), 14));
             go.setOnClickListener(v -> startLevel(nl));
         }
@@ -9611,7 +9610,9 @@ public class MainActivity extends Activity {
         c.addView(back, lp(dp(46), 18));
         back.setOnClickListener(v -> showMenu());
 
+        menuBgOn = true;
         wrap(c);
+        menuBgOn = false;
     }
 
     private void dialogLevel(final int l) {
