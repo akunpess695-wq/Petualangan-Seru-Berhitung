@@ -1712,26 +1712,16 @@ public class MainActivity extends Activity {
                 }
             }
             LinearLayout t = subjectTile(SUBJ_ICON[s], SUBJ_NAMES[s], sub, SUBJ_COLOR[s]);
-            Drawable cube = s == 0 ? artDrawable("menu_cube") : null;
-            if (cube != null) {
-                t.removeViewAt(0);
-                ImageView civ = new ImageView(this);
-                civ.setImageDrawable(cube);
-                civ.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(dp(92), dp(80));
-                clp.rightMargin = dp(8);
-                clp.leftMargin = dp(-8);
-                t.addView(civ, 0, clp);
-                floatAnim(civ, 4, 1900L);
-            }
+            swapTileIcon(t, new String[]{"menu_cube", "menu_abc", "menu_globe"}[s]);
             premium(t, SUBJ_COLOR[s], 28, 1800L + s * 1300L);
             t.setOnClickListener(v -> openSubject(sj));
-            rt.addView(t, lp(dp(s == 0 ? 104 : 96), 14));
+            rt.addView(t, lp(dp(96), 14));
         }
 
         // Toko Avatar (kartu merah muda dengan koin)
         LinearLayout tk = subjectTile("\uD83D\uDECD\uFE0F", "Toko Avatar",
                 "\uD83D\uDCB0 " + coins() + " koin \u2022 ganti penampilan", PINK);
+        swapTileIcon(tk, "menu_shop");
         premium(tk, PINK, 28, 5700L);
         tk.setOnClickListener(v -> showToko());
         c.addView(tk, lp(dp(84), 18));
@@ -1999,7 +1989,6 @@ public class MainActivity extends Activity {
             p.setShader(null);
             cloud(cv, w * 0.20f, h * 0.10f, w * 0.10f);
             cloud(cv, w * 0.72f, h * 0.17f, w * 0.07f);
-            cloud(cv, w * 0.40f, h * 0.45f, w * 0.06f);
             hill(cv, w, h, 0.90f, 0.12f, Color.argb(120, 129, 199, 132), 0f);
             hill(cv, w, h, 0.945f, 0.08f, Color.argb(150, 76, 175, 80), 1.7f);
             cluster(cv, -w * 0.02f, -h * 0.01f, w * 0.30f, 14f);
@@ -2032,6 +2021,23 @@ public class MainActivity extends Activity {
     private Drawable artDrawable(String name) {
         int id = getResources().getIdentifier(name, "drawable", getPackageName());
         return id != 0 ? getResources().getDrawable(id, null) : null;
+    }
+
+    /** Ganti ikon emoji di kiri kartu dengan gambar (bila berkasnya ada); gambar melayang pelan. */
+    private void swapTileIcon(LinearLayout t, String artName) {
+        Drawable d = artDrawable(artName);
+        if (d == null) {
+            return;
+        }
+        t.removeViewAt(0);
+        ImageView iv = new ImageView(this);
+        iv.setImageDrawable(d);
+        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams lpi = new LinearLayout.LayoutParams(dp(96), dp(76));
+        lpi.rightMargin = dp(8);
+        lpi.leftMargin = dp(-8);
+        t.addView(iv, 0, lpi);
+        floatAnim(iv, 3, 1900L);
     }
 
     /** Judul bagian dengan daun di kiri dan kanan serta garis tipis di ujung. */
