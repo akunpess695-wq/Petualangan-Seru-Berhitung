@@ -3976,13 +3976,18 @@ public class MainActivity extends Activity {
   {6, "#90CAF9", "Jilbab Biru Muda", 40},
   {6, "#A5D6A7", "Jilbab Hijau Muda", 50},
   {6, "#CE93D8", "Jilbab Ungu", 50},
-  {6, "#BCAAA4", "Jilbab Cokelat", 60}
+  {6, "#BCAAA4", "Jilbab Cokelat", 60},
+  // 56-59: rambut putra gaya baru (lembar acuan no. 5-8); nomor barang tetap, tambahan HARUS di akhir daftar
+  {6, "#6D4C41", "Rambut Bergelombang", 90},
+  {6, "#8D5A3C", "Rambut Messy", 100},
+  {6, "#3E2723", "Rambut Quiff", 110},
+  {6, "#5D4037", "Rambut Ikat Kecil", 120}
     };
     private static final int ITEM_GALAKSI = 31;
     // Gender tiap barang, urut sama dengan ITEMS: u = semua, b = putra, g = putri.
     // Untuk memindah barang ke gender lain, cukup ubah hurufnya di sini.
     private static final String ITEM_GENDER =
-  "bggubbub" + "ugbu" + "bugubbu" + "uuuuuuuu" + "uuuuuuu" + "bbbbb" + "bbbbb" + "ggggg" + "bb" + "ggggg";
+  "bggubbub" + "ugbu" + "bugubbu" + "uuuuuuuu" + "uuuuuuu" + "bbbbb" + "bbbbb" + "ggggg" + "bb" + "ggggg" + "bbbb";
 
     private static int itGender(int i) {
         if (i < 0 || i >= ITEM_GENDER.length()) {
@@ -4053,7 +4058,7 @@ public class MainActivity extends Activity {
 
     /**
      * Gaya rambut 3D putra menurut nomor barang (nomor barang tetap, lihat catatan ITEMS):
-     * 39 Cepak Hitam dan 40 Cepak Kemerahan = cepak, 41 Belah Samping, 42 Ikal Ringan. 43 Pendek Rapi = bentuk bawaan.
+     * 39 Cepak Hitam dan 40 Cepak Kemerahan = cepak, 41 Belah Samping, 42 Ikal Ringan, 56 Bergelombang, 57 Messy, 58 Quiff, 59 Ikat Kecil. 43 Pendek Rapi = bentuk bawaan.
      */
     private static int hairStyleOf(int item) {
         switch (item) {
@@ -4061,6 +4066,10 @@ public class MainActivity extends Activity {
             case 40: return PutraMesh.STYLE_CREW;
             case 41: return PutraMesh.STYLE_SIDE;
             case 42: return PutraMesh.STYLE_CURLY;
+            case 56: return PutraMesh.STYLE_WAVY;
+            case 57: return PutraMesh.STYLE_MESSY;
+            case 58: return PutraMesh.STYLE_QUIFF;
+            case 59: return PutraMesh.STYLE_BUN;
             default: return PutraMesh.STYLE_DEFAULT;
         }
     }
