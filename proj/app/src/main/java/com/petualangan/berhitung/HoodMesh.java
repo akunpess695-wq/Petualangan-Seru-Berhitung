@@ -401,11 +401,19 @@ final class HoodMesh {
                 }
                 break;
             }
-            case 15: { // belalai pendek di dahi
-                double[] b = pa(0, 0.92, 0.5 * k), p1 = pa(0, 0.72, 1.6 * k), p2 = pa(0, sTop + 0.14, 2.4 * k);
-                double[][] p = {b, p1, p2, add(p2, 0, -1.8 * k, 1.0 * k)};
-                tube(p, new double[]{2.5 * k, 2.3 * k, 2.0 * k, 1.7 * k}, sh(main, 0.95), 8);
-                ball(p[3], 1.8 * k, sh(main, 0.95));
+            case 15: { // gajah: tiga garis kerut horizontal di dahi (rata mengikuti tudung, tanpa bagian yang menonjol)
+                double[] ss = {0.86, 0.74, 0.62}, ww = {30, 38, 30};
+                for (int q = 0; q < 3; q++) {
+                    int n = 9;
+                    double[][] arc = new double[n][];
+                    double[] rd = new double[n];
+                    for (int i = 0; i < n; i++) {
+                        double w = -ww[q] + 2 * ww[q] * i / (n - 1.0);
+                        arc[i] = pa(w, ss[q], -0.15 * k);
+                        rd[i] = (0.55 + 0.45 * Math.sin(Math.PI * i / (n - 1.0))) * 0.78 * k;
+                    }
+                    tube(arc, rd, sh(main, 0.74), 6);
+                }
                 break;
             }
             case 16: { // zebra: surai hitam dari puncak ke belakang

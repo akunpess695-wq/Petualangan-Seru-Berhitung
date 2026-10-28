@@ -4924,10 +4924,10 @@ public class MainActivity extends Activity {
                 case 15: // gajah
                     symBox(hx0 - 12f, hx0 - 1f, hy0 + 1f, hy0 + 22f, -6f, 8f, main);
                     symBox(hx0 - 12.8f, hx0 - 11.4f, hy0 + 4f, hy0 + 18f, -3f, 6f, acc);
-                    addBox(46.5f, 6f, 53.5f, 24f, 19.8f, 23.5f, shade(main, 0.95f), shade(main, 0.95f), shade(main, 0.95f), 0);
-                    addBox(46.2f, 11f, 53.8f, 11.8f, 23.3f, 23.7f, dk, dk, dk, 0);
-                    addBox(46.2f, 15f, 53.8f, 15.8f, 23.3f, 23.7f, dk, dk, dk, 0);
-                    addBox(46.2f, 19f, 53.8f, 19.8f, 23.3f, 23.7f, dk, dk, dk, 0);
+                    // tiga garis kerut horizontal di dahi (bukan belalai tegak)
+                    addBox(41.5f, 6f, 58.5f, 7.1f, 19.8f, 20.6f, shade(main, 0.74f), shade(main, 0.74f), shade(main, 0.74f), 0);
+                    addBox(40.5f, 9.6f, 59.5f, 10.7f, 19.8f, 20.6f, shade(main, 0.74f), shade(main, 0.74f), shade(main, 0.74f), 0);
+                    addBox(41.5f, 13.2f, 58.5f, 14.3f, 19.8f, 20.6f, shade(main, 0.74f), shade(main, 0.74f), shade(main, 0.74f), 0);
                     break;
                 case 16: // zebra: telinga tegak, garis hitam putih
                     symBox(hx0 - 1f, hx0 + 7f, hy0 - 13f, hy0 - 1f, -3f, 3f, main);
@@ -5977,13 +5977,10 @@ public class MainActivity extends Activity {
                     tri(c, tx, 23f, tx + 2.8f, 27.5f, tx + 5.6f, 23f, wht);
                 }
             } else if (a == 15) {
-                // gajah: belalai berkerut di dahi + gading
-                flat(c, 45.2f, 9f, 54.8f, 23f, 4.4f, shade(main, 0.93f));
-                line(c, 46.4f, 13f, 53.6f, 13f, 0.55f, dk);
-                line(c, 46.4f, 16.4f, 53.6f, 16.4f, 0.55f, dk);
-                line(c, 46.4f, 19.8f, 53.6f, 19.8f, 0.55f, dk);
-                dot(c, 48.5f, 22.6f, 0.9f, blk);
-                dot(c, 51.5f, 22.6f, 0.9f, blk);
+                // gajah: tiga garis kerut horizontal di dahi (bukan belalai tegak)
+                line(c, 40.5f, 8.2f, 59.5f, 8.2f, 0.6f, shade(main, 0.74f));
+                line(c, 39.5f, 12.2f, 60.5f, 12.2f, 0.6f, shade(main, 0.74f));
+                line(c, 40.5f, 16.2f, 59.5f, 16.2f, 0.6f, shade(main, 0.74f));
             } else if (a == 16) {
                 // zebra: garis hitam di dahi dan sisi
                 flat(c, 46f, 8.6f, 48f, 12f, 0.8f, acc);
