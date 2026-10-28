@@ -1025,8 +1025,10 @@ public class MainActivity extends Activity {
         return g;
     }
 
+    private boolean menuBgOn = false;
+
     private Drawable background() {
-        return new BgDrawable();
+        return menuBgOn ? new MenuBgDrawable() : new BgDrawable();
     }
 
     // Latar belakang: gradasi hangat, lingkaran lembut, dan simbol belajar yang samar
@@ -1189,8 +1191,8 @@ public class MainActivity extends Activity {
             float rad = dp(32);
             p.setStyle(Paint.Style.FILL);
             p.setShader(new LinearGradient(rf.left, rf.top, rf.right, rf.bottom,
-                    new int[]{Color.parseColor("#0B7A4B"), Color.parseColor("#16A0A8"), Color.parseColor("#3BB7F2")},
-                    new float[]{0f, 0.55f, 1f}, Shader.TileMode.CLAMP));
+                    new int[]{Color.parseColor("#06683F"), Color.parseColor("#0E9A8E"), Color.parseColor("#2AA9E8"), Color.parseColor("#6FD0F7")},
+                    new float[]{0f, 0.4f, 0.75f, 1f}, Shader.TileMode.CLAMP));
             cv.drawRoundRect(rf, rad, rad, p);
             p.setShader(null);
             Path clip = new Path();
@@ -1209,6 +1211,22 @@ public class MainActivity extends Activity {
             cv.drawCircle(rf.left + dp(48), rf.top + dp(40), dp(9), p);
             cv.drawCircle(rf.right - dp(54), rf.bottom - dp(46), dp(6), p);
             cv.drawCircle(rf.right - dp(86), rf.top + dp(26), dp(4), p);
+            // ombak halus di dasar spanduk
+            Path wv = new Path();
+            float wy = rf.bottom - dp(24);
+            wv.moveTo(rf.left, rf.bottom);
+            wv.lineTo(rf.left, wy);
+            for (float x = rf.left; x <= rf.right; x += dp(4)) {
+                wv.lineTo(x, wy + (float) Math.sin((x - rf.left) / dp(40) * 6.28318f) * dp(5));
+            }
+            wv.lineTo(rf.right, rf.bottom);
+            wv.close();
+            p.setColor(Color.argb(30, 255, 255, 255));
+            cv.drawPath(wv, p);
+            p.setColor(Color.argb(210, 255, 248, 200));
+            drawSparkle(cv, rf.right - dp(34), rf.top + dp(26), dp(9), p);
+            drawSparkle(cv, rf.right - dp(72), rf.bottom - dp(36), dp(5), p);
+            drawSparkle(cv, rf.left + dp(118), rf.top + dp(16), dp(4), p);
             cv.restore();
             RectF in = new RectF(rf);
             in.inset(1f, 1f);
@@ -1565,9 +1583,10 @@ public class MainActivity extends Activity {
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
         logo.setPadding(dp(7), dp(7), dp(7), dp(7));
         GradientDrawable lg = box(Color.WHITE, 26);
-        lg.setStroke(dp(3), Color.argb(120, 255, 255, 255));
+        lg.setStroke(dp(3), Color.parseColor("#FFD54F"));
         logo.setBackground(lg);
-        logo.setElevation(dp(6));
+        logo.setElevation(dp(8));
+        glow(logo, Color.parseColor("#FFB300"));
         LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(88), dp(88));
         logoLp.rightMargin = dp(14);
         hero.addView(logo, logoLp);
@@ -1608,11 +1627,18 @@ public class MainActivity extends Activity {
             seg.setOrientation(LinearLayout.HORIZONTAL);
             seg.setGravity(Gravity.CENTER);
             seg.setPadding(dp(6), 0, dp(6), 0);
-            GradientDrawable sgBg = box(sg == 0 ? KELAS_COLOR[kelas] : Color.WHITE, 26);
+            GradientDrawable sgBg = sg == 0
+                    ? new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{mixColor(KELAS_COLOR[kelas], Color.WHITE, 0.22f), KELAS_COLOR[kelas]})
+                    : box(Color.WHITE, 26);
+            sgBg.setCornerRadius(dp(26));
             sgBg.setStroke(dp(sg == 0 ? 3 : 1),
                     sg == 0 ? Color.argb(130, 255, 255, 255) : Color.argb(50, 96, 125, 139));
             seg.setBackground(sgBg);
-            seg.setElevation(dp(4));
+            seg.setElevation(dp(sg == 0 ? 9 : 4));
+            if (sg == 0) {
+                glow(seg, KELAS_COLOR[kelas]);
+            }
             TextView lbl = text(segTxt[sg], 13, sg == 0 ? Color.WHITE : DARK, true);
             lbl.setSingleLine(true);
             seg.addView(lbl, new LinearLayout.LayoutParams(WRAP, WRAP));
@@ -1687,7 +1713,9 @@ public class MainActivity extends Activity {
                 clp.rightMargin = dp(8);
                 clp.leftMargin = dp(-8);
                 t.addView(civ, 0, clp);
+                floatAnim(civ, 4, 1900L);
             }
+            premium(t, SUBJ_COLOR[s], 28, 1800L + s * 1300L);
             t.setOnClickListener(v -> openSubject(sj));
             rt.addView(t, lp(dp(s == 0 ? 104 : 96), 14));
         }
@@ -1695,6 +1723,7 @@ public class MainActivity extends Activity {
         // Toko Avatar (kartu merah muda dengan koin)
         LinearLayout tk = subjectTile("\uD83D\uDECD\uFE0F", "Toko Avatar",
                 "\uD83D\uDCB0 " + coins() + " koin \u2022 ganti penampilan", PINK);
+        premium(tk, PINK, 28, 5700L);
         tk.setOnClickListener(v -> showToko());
         c.addView(tk, lp(dp(84), 18));
 
@@ -1711,13 +1740,283 @@ public class MainActivity extends Activity {
 
         c.setFocusableInTouchMode(true);
         c.requestFocus();
+        menuBgOn = true;
         if (wide) {
             wrapTwo(c, cr);
             animateIn(cr);
         } else {
             wrap(c);
         }
+        menuBgOn = false;
         animateIn(c);
+    }
+
+    // ---------- Gaya premium: kaca berkilau, kilau bergerak, bayangan berwarna ----------
+
+    private void drawSparkle(Canvas cv, float x, float y, float r, Paint pt) {
+        Path sp = new Path();
+        sp.moveTo(x, y - r);
+        sp.quadTo(x, y, x + r, y);
+        sp.quadTo(x, y, x, y + r);
+        sp.quadTo(x, y, x - r, y);
+        sp.quadTo(x, y, x, y - r);
+        sp.close();
+        cv.drawPath(sp, pt);
+    }
+
+    /** Bayangan berwarna (Android 9 ke atas); di HP lama bayangan biasa. */
+    private void glow(View v, int color) {
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            v.setOutlineSpotShadowColor(color);
+            v.setOutlineAmbientShadowColor(color);
+        }
+    }
+
+    private void loopWhileAttached(final View v, final android.animation.Animator an) {
+        v.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View x) {
+                if (!an.isStarted()) {
+                    an.start();
+                }
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View x) {
+                an.cancel();
+            }
+        });
+    }
+
+    private void premium(View t, int color, int radDp, long delay) {
+        final PremiumTile d = new PremiumTile(color, radDp);
+        t.setBackground(d);
+        t.setElevation(dp(10));
+        glow(t, color);
+        final ValueAnimator va = ValueAnimator.ofFloat(0f, 3.2f);
+        va.setDuration(5200);
+        va.setStartDelay(delay);
+        va.setRepeatCount(ValueAnimator.INFINITE);
+        va.setInterpolator(new LinearInterpolator());
+        va.addUpdateListener(a -> {
+            d.shine = (Float) a.getAnimatedValue();
+            d.invalidateSelf();
+        });
+        loopWhileAttached(t, va);
+    }
+
+    private void floatAnim(View v, int ampDp, long dur) {
+        ObjectAnimator a = ObjectAnimator.ofFloat(v, View.TRANSLATION_Y, 0f, -dp(ampDp));
+        a.setDuration(dur);
+        a.setRepeatMode(ValueAnimator.REVERSE);
+        a.setRepeatCount(ValueAnimator.INFINITE);
+        a.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        loopWhileAttached(v, a);
+    }
+
+    private void pulse(View v) {
+        ObjectAnimator a = ObjectAnimator.ofPropertyValuesHolder(v,
+                android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.14f),
+                android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.14f));
+        a.setDuration(850);
+        a.setRepeatMode(ValueAnimator.REVERSE);
+        a.setRepeatCount(ValueAnimator.INFINITE);
+        a.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        loopWhileAttached(v, a);
+    }
+
+    /** Gambar bergerak pelan (zoom masuk-keluar) seperti kamera sinematik. */
+    private void kenBurns(View v) {
+        ObjectAnimator a = ObjectAnimator.ofPropertyValuesHolder(v,
+                android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.1f),
+                android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.1f));
+        a.setDuration(6000);
+        a.setRepeatMode(ValueAnimator.REVERSE);
+        a.setRepeatCount(ValueAnimator.INFINITE);
+        a.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        loopWhileAttached(v, a);
+    }
+
+    /** Kartu kaca: gradasi tiga tahap, pantulan cahaya di atas, kilau yang menyapu, garis tepi terang. */
+    private class PremiumTile extends Drawable {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int base;
+        private final int radDp;
+        float shine = -1f;
+
+        PremiumTile(int color, int radiusDp) {
+            base = color;
+            radDp = radiusDp;
+        }
+
+        @Override
+        public void draw(Canvas cv) {
+            RectF rf = new RectF(getBounds());
+            float rad = dp(radDp);
+            float w = rf.width();
+            float h = rf.height();
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new LinearGradient(rf.left, rf.top, rf.right, rf.bottom,
+                    new int[]{mixColor(base, Color.WHITE, 0.26f), base, mixColor(base, Color.BLACK, 0.24f)},
+                    new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP));
+            cv.drawRoundRect(rf, rad, rad, p);
+            p.setShader(null);
+            Path clip = new Path();
+            clip.addRoundRect(rf, rad, rad, Path.Direction.CW);
+            cv.save();
+            cv.clipPath(clip);
+            p.setShader(new LinearGradient(0f, rf.top, 0f, rf.top + h * 0.5f,
+                    Color.argb(92, 255, 255, 255), Color.argb(6, 255, 255, 255), Shader.TileMode.CLAMP));
+            cv.drawOval(new RectF(rf.left - w * 0.15f, rf.top - h * 0.85f, rf.right + w * 0.15f,
+                    rf.top + h * 0.5f), p);
+            p.setShader(null);
+            p.setColor(Color.argb(34, 255, 255, 255));
+            cv.drawCircle(rf.right - dp(16), rf.bottom - dp(6), dp(58), p);
+            p.setColor(Color.argb(24, 255, 255, 255));
+            cv.drawCircle(rf.left + dp(30), rf.bottom + dp(10), dp(40), p);
+            p.setColor(Color.argb(200, 255, 255, 255));
+            drawSparkle(cv, rf.right - dp(74), rf.top + dp(18), dp(5), p);
+            drawSparkle(cv, rf.right - dp(44), rf.bottom - dp(20), dp(3), p);
+            if (shine >= 0f && shine <= 1f) {
+                float cx = rf.left - h + (w + 2 * h) * shine;
+                float bw = w * 0.16f;
+                cv.save();
+                cv.rotate(18f, rf.centerX(), rf.centerY());
+                p.setShader(new LinearGradient(cx, 0f, cx + bw, 0f,
+                        new int[]{Color.argb(0, 255, 255, 255), Color.argb(110, 255, 255, 255),
+                                Color.argb(0, 255, 255, 255)}, null, Shader.TileMode.CLAMP));
+                cv.drawRect(cx, rf.top - h, cx + bw, rf.bottom + h, p);
+                p.setShader(null);
+                cv.restore();
+            }
+            cv.restore();
+            RectF in = new RectF(rf);
+            in.inset(1.5f, 1.5f);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(2f, dp(2) * 0.8f));
+            p.setShader(new LinearGradient(0f, rf.top, 0f, rf.bottom,
+                    Color.argb(210, 255, 255, 255), Color.argb(40, 255, 255, 255), Shader.TileMode.CLAMP));
+            cv.drawRoundRect(in, rad, rad, p);
+            p.setShader(null);
+            p.setStyle(Paint.Style.FILL);
+        }
+
+        @Override
+        public void getOutline(Outline outline) {
+            outline.setRoundRect(getBounds(), dp(radDp));
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+        }
+
+        @Override
+        public void setColorFilter(ColorFilter cf) {
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+    }
+
+    /** Latar menu: langit pagi, matahari berpendar, awan, bukit, dan daun di sudut layar. */
+    private class MenuBgDrawable extends Drawable {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        private void cloud(Canvas cv, float x, float y, float r) {
+            p.setColor(Color.argb(170, 255, 255, 255));
+            cv.drawCircle(x, y, r, p);
+            cv.drawCircle(x + r * 0.9f, y + r * 0.15f, r * 0.8f, p);
+            cv.drawCircle(x - r * 0.9f, y + r * 0.2f, r * 0.7f, p);
+            cv.drawRoundRect(new RectF(x - r * 1.6f, y + r * 0.2f, x + r * 1.7f, y + r * 0.95f),
+                    r * 0.4f, r * 0.4f, p);
+        }
+
+        private void hill(Canvas cv, int w, int h, float base, float amp, int color, float phase) {
+            Path hp = new Path();
+            hp.moveTo(0f, h);
+            for (float x = 0f; x <= w; x += dp(6)) {
+                hp.lineTo(x, h * base + (float) Math.sin(x / w * 6.28318f + phase) * h * amp * 0.3f);
+            }
+            hp.lineTo(w, h);
+            hp.close();
+            p.setColor(color);
+            cv.drawPath(hp, p);
+        }
+
+        private void leaf(Canvas cv, float x, float y, float len, float angle, int color) {
+            cv.save();
+            cv.translate(x, y);
+            cv.rotate(angle);
+            Path lf = new Path();
+            lf.moveTo(0f, 0f);
+            lf.quadTo(len * 0.5f, -len * 0.34f, len, 0f);
+            lf.quadTo(len * 0.5f, len * 0.34f, 0f, 0f);
+            lf.close();
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(color);
+            cv.drawPath(lf, p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1f, dp(1)));
+            p.setColor(Color.argb(90, 255, 255, 255));
+            cv.drawLine(0f, 0f, len * 0.92f, 0f, p);
+            p.setStyle(Paint.Style.FILL);
+            cv.restore();
+        }
+
+        private void cluster(Canvas cv, float x, float y, float len, float a0) {
+            leaf(cv, x, y, len, a0, Color.argb(200, 46, 125, 50));
+            leaf(cv, x, y, len * 0.85f, a0 + 28f, Color.argb(190, 67, 160, 71));
+            leaf(cv, x, y, len * 0.7f, a0 + 54f, Color.argb(180, 102, 187, 106));
+        }
+
+        @Override
+        public void draw(Canvas cv) {
+            Rect r = getBounds();
+            int w = r.width();
+            int h = r.height();
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new LinearGradient(0f, 0f, 0f, h,
+                    new int[]{Color.parseColor("#A8DCF8"), Color.parseColor("#D6EFFB"),
+                            Color.parseColor("#EAF7EF"), Color.parseColor("#FFF8E6")},
+                    new float[]{0f, 0.3f, 0.62f, 1f}, Shader.TileMode.CLAMP));
+            cv.drawRect(r, p);
+            p.setShader(new android.graphics.RadialGradient(w * 0.86f, h * 0.05f, w * 0.6f,
+                    new int[]{Color.argb(190, 255, 240, 170), Color.argb(0, 255, 240, 170)}, null,
+                    Shader.TileMode.CLAMP));
+            cv.drawCircle(w * 0.86f, h * 0.05f, w * 0.6f, p);
+            p.setShader(null);
+            cloud(cv, w * 0.20f, h * 0.10f, w * 0.10f);
+            cloud(cv, w * 0.72f, h * 0.17f, w * 0.07f);
+            cloud(cv, w * 0.40f, h * 0.45f, w * 0.06f);
+            hill(cv, w, h, 0.90f, 0.12f, Color.argb(120, 129, 199, 132), 0f);
+            hill(cv, w, h, 0.945f, 0.08f, Color.argb(150, 76, 175, 80), 1.7f);
+            cluster(cv, -w * 0.02f, -h * 0.01f, w * 0.30f, 14f);
+            cluster(cv, w * 1.02f, -h * 0.01f, w * 0.26f, 100f);
+            cluster(cv, -w * 0.02f, h * 1.01f, w * 0.30f, -80f);
+            cluster(cv, w * 1.02f, h * 1.01f, w * 0.30f, -170f);
+            p.setColor(Color.argb(210, 255, 255, 255));
+            drawSparkle(cv, w * 0.30f, h * 0.05f, dp(6), p);
+            drawSparkle(cv, w * 0.93f, h * 0.30f, dp(5), p);
+            drawSparkle(cv, w * 0.07f, h * 0.60f, dp(4), p);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+        }
+
+        @Override
+        public void setColorFilter(ColorFilter cf) {
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.OPAQUE;
+        }
     }
 
     // ---------- Pembantu tampilan menu baru ----------
@@ -1755,27 +2054,25 @@ public class MainActivity extends Activity {
         t.setOrientation(LinearLayout.HORIZONTAL);
         t.setGravity(Gravity.CENTER_VERTICAL);
         t.setPadding(dp(8), dp(8), dp(12), dp(8));
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Color.parseColor("#4FC3F7"), Color.parseColor("#1E9BE8"), Color.parseColor("#21B8E0")});
-        g.setCornerRadius(dp(30));
-        g.setStroke(dp(2), Color.argb(150, 255, 255, 255));
-        t.setBackground(g);
-        t.setElevation(dp(6));
+        premium(t, Color.parseColor("#1E9BE8"), 30, 700L);
 
         Drawable art = artDrawable("menu_island");
         if (art != null) {
-            ImageView iv = new ImageView(this);
-            iv.setImageDrawable(art);
-            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            FrameLayout frame = new FrameLayout(this);
             final float rad = dp(24);
-            iv.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            frame.setOutlineProvider(new android.view.ViewOutlineProvider() {
                 @Override
                 public void getOutline(View v, Outline o) {
                     o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), rad);
                 }
             });
-            iv.setClipToOutline(true);
-            t.addView(iv, new LinearLayout.LayoutParams(dp(124), MATCH));
+            frame.setClipToOutline(true);
+            ImageView iv = new ImageView(this);
+            iv.setImageDrawable(art);
+            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            frame.addView(iv, new FrameLayout.LayoutParams(MATCH, MATCH));
+            kenBurns(iv);
+            t.addView(frame, new LinearLayout.LayoutParams(dp(124), MATCH));
         } else {
             TextView em = text("\uD83C\uDFDD\uFE0F", 52, Color.WHITE, false);
             em.setBackground(box(Color.argb(60, 255, 255, 255), 24));
@@ -1827,6 +2124,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams golp = new LinearLayout.LayoutParams(dp(30), dp(30));
         golp.leftMargin = dp(6);
         row.addView(go, golp);
+        pulse(go);
         col.addView(row, lpw(8));
 
         LinearLayout.LayoutParams colLp = new LinearLayout.LayoutParams(0, WRAP, 1f);
