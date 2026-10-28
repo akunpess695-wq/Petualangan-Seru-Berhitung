@@ -73,7 +73,7 @@ import java.util.Random;
 
 public class MainActivity extends Activity {
 
-    private static final String APP_NAME = "Belajar Bersama";
+    private static final String APP_NAME = "Salamuda Quest";
     private static final String BANK_FILE = "bank.json";
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
@@ -1616,7 +1616,7 @@ public class MainActivity extends Activity {
         TextView inst = text("Muhammadiyah Kandangan", 13, Color.WHITE, true);
         inst.setGravity(Gravity.START);
         htx.addView(inst, lpw(8));
-        TextView tag = text("\uD83C\uDF31 Ayo belajar bersama alam! \uD83C\uDF3F", 12,
+        TextView tag = text("\uD83C\uDF31 Belajar, Bermain, Berpetualang \uD83C\uDF3F", 12,
                 Color.parseColor("#E8F5E9"), false);
         tag.setGravity(Gravity.START);
         htx.addView(tag, lpw(4));
@@ -4102,7 +4102,7 @@ public class MainActivity extends Activity {
                     .show();
         } catch (Exception e) {
             pendingRestore = "";
-            importMsg = "Berkas ini bukan cadangan Belajar Bersama.";
+            importMsg = "Berkas ini bukan cadangan " + APP_NAME + ".";
             showGuru();
         }
     }
