@@ -1549,11 +1549,11 @@ public class MainActivity extends Activity {
         bar.addView(avb, new LinearLayout.LayoutParams(dp(52), dp(52)));
         c.addView(bar, lp(WRAP, 0));
 
-        // Spanduk judul (premium: gradasi tiga warna, lingkaran kaca, kilau emas, cincin cahaya di logo)
+        // Spanduk judul: logo di kiri, teks di kanan
         LinearLayout hero = new LinearLayout(this);
-        hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setGravity(Gravity.CENTER_HORIZONTAL);
-        hero.setPadding(dp(16), dp(22), dp(16), dp(22));
+        hero.setOrientation(LinearLayout.HORIZONTAL);
+        hero.setGravity(Gravity.CENTER_VERTICAL);
+        hero.setPadding(dp(16), dp(20), dp(14), dp(20));
         hero.setBackground(new HeroDrawable());
         hero.setElevation(dp(8));
         hero.setOnLongClickListener(v -> {
@@ -1563,52 +1563,66 @@ public class MainActivity extends Activity {
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.logo);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        logo.setPadding(dp(8), dp(8), dp(8), dp(8));
-        GradientDrawable lg = box(Color.WHITE, 28);
+        logo.setPadding(dp(7), dp(7), dp(7), dp(7));
+        GradientDrawable lg = box(Color.WHITE, 26);
         lg.setStroke(dp(3), Color.argb(120, 255, 255, 255));
         logo.setBackground(lg);
         logo.setElevation(dp(6));
-        hero.addView(logo, new LinearLayout.LayoutParams(dp(104), dp(104)));
-        TextView ttl = text(APP_NAME, 28, Color.WHITE, true);
-        ttl.setLetterSpacing(0.02f);
+        LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(88), dp(88));
+        logoLp.rightMargin = dp(14);
+        hero.addView(logo, logoLp);
+        LinearLayout htx = new LinearLayout(this);
+        htx.setOrientation(LinearLayout.VERTICAL);
+        TextView ttl = text(APP_NAME, 22, Color.WHITE, true);
+        ttl.setGravity(Gravity.START);
+        ttl.setSingleLine(true);
         ttl.setShadowLayer(dp(3), 0f, dp(2), Color.argb(90, 0, 0, 0));
-        hero.addView(ttl, lp(WRAP, 12));
-        TextView alam = text("\uD83C\uDF33 SD ALAM \uD83C\uDF3F", 18, Color.WHITE, true);
-        GradientDrawable ag = box(Color.argb(60, 255, 255, 255), 20);
-        ag.setStroke(dp(1), Color.argb(120, 255, 255, 255));
+        htx.addView(ttl, new LinearLayout.LayoutParams(WRAP, WRAP));
+        TextView alam = text("\uD83C\uDF33 SD ALAM \uD83C\uDF3F", 15, Color.WHITE, true);
+        GradientDrawable ag = box(Color.argb(95, 76, 175, 80), 20);
+        ag.setStroke(dp(1), Color.argb(140, 255, 255, 255));
         alam.setBackground(ag);
-        alam.setLetterSpacing(0.08f);
-        alam.setPadding(dp(18), dp(5), dp(18), dp(5));
-        hero.addView(alam, lpw(10));
-        View sep = new View(this);
-        sep.setBackground(box(Color.argb(110, 255, 255, 255), 2));
-        LinearLayout.LayoutParams sepLp = new LinearLayout.LayoutParams(dp(44), dp(3));
-        sepLp.topMargin = dp(12);
-        hero.addView(sep, sepLp);
-        hero.addView(text("Muhammadiyah Kandangan", 14, Color.WHITE, true), lp(WRAP, 10));
-        hero.addView(text("Ayo belajar bersama alam!", 13,
-                Color.parseColor("#E8F5E9"), false), lp(WRAP, 2));
-        hero.addView(text("\uD83C\uDF31 \uD83C\uDF3B \uD83E\uDD8B \uD83C\uDF33 \uD83C\uDF43", 18,
-                Color.WHITE, false), lp(WRAP, 8));
+        alam.setLetterSpacing(0.06f);
+        alam.setPadding(dp(14), dp(4), dp(14), dp(4));
+        htx.addView(alam, lpw(6));
+        TextView inst = text("Muhammadiyah Kandangan", 13, Color.WHITE, true);
+        inst.setGravity(Gravity.START);
+        htx.addView(inst, lpw(8));
+        TextView tag = text("\uD83C\uDF31 Ayo belajar bersama alam! \uD83C\uDF3F", 12,
+                Color.parseColor("#E8F5E9"), false);
+        tag.setGravity(Gravity.START);
+        htx.addView(tag, lpw(4));
+        hero.addView(htx, new LinearLayout.LayoutParams(0, WRAP, 1f));
         c.addView(hero, lp(WRAP, 12));
 
-        // Kelas, pemain, waktu: satu bilah segmen putih (kelas disorot dengan warna kelasnya)
+        // Kelas, pemain, waktu: tiga pil terpisah (kelas disorot dengan warna kelasnya)
         LinearLayout opt = new LinearLayout(this);
         opt.setOrientation(LinearLayout.HORIZONTAL);
         opt.setGravity(Gravity.CENTER_VERTICAL);
-        opt.setPadding(dp(5), dp(5), dp(5), dp(5));
-        opt.setBackground(box(Color.WHITE, 28));
-        opt.setElevation(dp(4));
         String[] segTxt = {"\uD83C\uDF93 " + KELAS_NAMES[kelas],
                 "\uD83D\uDC65 " + (np == 1 ? "Sendiri" : np + " pemain"),
                 "\u23F1\uFE0F " + (timed ? secsNow() + " detik" : "Bebas")};
         for (int sgi = 0; sgi < 3; sgi++) {
             final int sg = sgi;
-            TextView seg = text(segTxt[sg], 13, sg == 0 ? Color.WHITE : DARK, true);
+            LinearLayout seg = new LinearLayout(this);
+            seg.setOrientation(LinearLayout.HORIZONTAL);
             seg.setGravity(Gravity.CENTER);
-            if (sg == 0) {
-                seg.setBackground(box(KELAS_COLOR[kelas], 22));
-            }
+            seg.setPadding(dp(6), 0, dp(6), 0);
+            GradientDrawable sgBg = box(sg == 0 ? KELAS_COLOR[kelas] : Color.WHITE, 26);
+            sgBg.setStroke(dp(sg == 0 ? 3 : 1),
+                    sg == 0 ? Color.argb(130, 255, 255, 255) : Color.argb(50, 96, 125, 139));
+            seg.setBackground(sgBg);
+            seg.setElevation(dp(4));
+            TextView lbl = text(segTxt[sg], 13, sg == 0 ? Color.WHITE : DARK, true);
+            lbl.setSingleLine(true);
+            seg.addView(lbl, new LinearLayout.LayoutParams(WRAP, WRAP));
+            TextView chev = text("\u203A", 20, sg == 0 ? Color.WHITE : Color.parseColor("#90A4AE"), true);
+            LinearLayout.LayoutParams chevLp = new LinearLayout.LayoutParams(WRAP, WRAP);
+            chevLp.leftMargin = dp(4);
+            seg.addView(chev, chevLp);
+            seg.setClickable(true);
+            seg.setFocusable(true);
+            pressable(seg);
             seg.setOnClickListener(v -> {
                 sfx(SFX_TAP);
                 if (sg == 0) {
@@ -1619,27 +1633,30 @@ public class MainActivity extends Activity {
                     dialogWaktu();
                 }
             });
-            opt.addView(seg, new LinearLayout.LayoutParams(0, MATCH, 1f));
+            LinearLayout.LayoutParams segLp = new LinearLayout.LayoutParams(0, MATCH, sg == 0 ? 1.2f : 1f);
+            if (sg > 0) {
+                segLp.leftMargin = dp(8);
+            }
+            opt.addView(seg, segLp);
         }
-        c.addView(opt, lp(dp(54), 16));
+        c.addView(opt, lp(dp(52), 16));
 
-        // Pilihan nyawa: ada nyawa atau belajar santai (kapsul kecil di tengah)
+        // Pilihan nyawa: kapsul putih selebar layar
         TextView bn = text(relaxed ? "\uD83D\uDC9A Belajar santai \u2022 tanpa nyawa"
-                : "\u2764\uFE0F Ada nyawa", 13, DARK, true);
-        bn.setBackground(box(Color.WHITE, 20));
-        bn.setPadding(dp(18), dp(9), dp(18), dp(9));
+                : "\u2764\uFE0F Ada nyawa", 14, DARK, true);
+        bn.setBackground(box(Color.WHITE, 24));
         bn.setElevation(dp(3));
         bn.setOnClickListener(v -> dialogNyawa());
         pressable(bn);
-        c.addView(bn, lpw(12));
+        c.addView(bn, lp(dp(46), 12));
 
         // Peta Petualangan
-        LinearLayout mp = subjectTile("\uD83D\uDDFA\uFE0F", "Peta Petualangan", advSummary(), GREEN);
+        LinearLayout mp = petaCard();
         mp.setOnClickListener(v -> showPeta());
-        rt.addView(mp, lp(dp(96), wide ? 0 : 18));
+        rt.addView(mp, lp(dp(140), wide ? 0 : 16));
 
         // Pilih pelajaran
-        rt.addView(sectionTitle("Pilih pelajaran"), lp(WRAP, wide ? 16 : 20));
+        rt.addView(sectionTitleLeaf("Pilih pelajaran"), lp(WRAP, wide ? 16 : 20));
         for (int s = 0; s < 3; s++) {
             final int sj = s;
             int n = countBank(s, kelas);
@@ -1660,8 +1677,19 @@ public class MainActivity extends Activity {
                 }
             }
             LinearLayout t = subjectTile(SUBJ_ICON[s], SUBJ_NAMES[s], sub, SUBJ_COLOR[s]);
+            Drawable cube = s == 0 ? artDrawable("menu_cube") : null;
+            if (cube != null) {
+                t.removeViewAt(0);
+                ImageView civ = new ImageView(this);
+                civ.setImageDrawable(cube);
+                civ.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(dp(92), dp(80));
+                clp.rightMargin = dp(8);
+                clp.leftMargin = dp(-8);
+                t.addView(civ, 0, clp);
+            }
             t.setOnClickListener(v -> openSubject(sj));
-            rt.addView(t, lp(dp(96), 14));
+            rt.addView(t, lp(dp(s == 0 ? 104 : 96), 14));
         }
 
         // Toko Avatar (kartu merah muda dengan koin)
@@ -1690,6 +1718,124 @@ public class MainActivity extends Activity {
             wrap(c);
         }
         animateIn(c);
+    }
+
+    // ---------- Pembantu tampilan menu baru ----------
+
+    /** Gambar dari res/drawable (mis. menu_island, menu_cube); null bila berkasnya belum ada. */
+    private Drawable artDrawable(String name) {
+        int id = getResources().getIdentifier(name, "drawable", getPackageName());
+        return id != 0 ? getResources().getDrawable(id, null) : null;
+    }
+
+    /** Judul bagian dengan daun di kiri dan kanan serta garis tipis di ujung. */
+    private LinearLayout sectionTitleLeaf(String s) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        int lineC = Color.argb(70, 38, 120, 140);
+        View l1 = new View(this);
+        l1.setBackground(box(lineC, 2));
+        View l2 = new View(this);
+        l2.setBackground(box(lineC, 2));
+        LinearLayout.LayoutParams a = new LinearLayout.LayoutParams(0, dp(2), 1f);
+        a.rightMargin = dp(8);
+        LinearLayout.LayoutParams b = new LinearLayout.LayoutParams(0, dp(2), 1f);
+        b.leftMargin = dp(8);
+        row.addView(l1, a);
+        row.addView(text("\uD83C\uDF3F " + s + " \uD83C\uDF3F", 18, Color.parseColor("#1A3C6E"), true),
+                new LinearLayout.LayoutParams(WRAP, WRAP));
+        row.addView(l2, b);
+        return row;
+    }
+
+    /** Kartu Peta Petualangan: pulau di kiri, nama dunia, titik kemajuan level, dan panah. */
+    private LinearLayout petaCard() {
+        LinearLayout t = new LinearLayout(this);
+        t.setOrientation(LinearLayout.HORIZONTAL);
+        t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setPadding(dp(8), dp(8), dp(12), dp(8));
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.parseColor("#4FC3F7"), Color.parseColor("#1E9BE8"), Color.parseColor("#21B8E0")});
+        g.setCornerRadius(dp(30));
+        g.setStroke(dp(2), Color.argb(150, 255, 255, 255));
+        t.setBackground(g);
+        t.setElevation(dp(6));
+
+        Drawable art = artDrawable("menu_island");
+        if (art != null) {
+            ImageView iv = new ImageView(this);
+            iv.setImageDrawable(art);
+            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            final float rad = dp(24);
+            iv.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(View v, Outline o) {
+                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), rad);
+                }
+            });
+            iv.setClipToOutline(true);
+            t.addView(iv, new LinearLayout.LayoutParams(dp(124), MATCH));
+        } else {
+            TextView em = text("\uD83C\uDFDD\uFE0F", 52, Color.WHITE, false);
+            em.setBackground(box(Color.argb(60, 255, 255, 255), 24));
+            t.addView(em, new LinearLayout.LayoutParams(dp(124), MATCH));
+        }
+
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER_VERTICAL);
+        TextView n = text("Peta Petualangan", 19, Color.WHITE, true);
+        n.setGravity(Gravity.START);
+        n.setMaxLines(2);
+        n.setShadowLayer(dp(2), 0f, dp(1), Color.argb(80, 0, 0, 0));
+        col.addView(n, new LinearLayout.LayoutParams(WRAP, WRAP));
+        TextView sub = text(advSummary(), 12, Color.parseColor("#E1F5FE"), false);
+        sub.setGravity(Gravity.START);
+        sub.setMaxLines(2);
+        col.addView(sub, lpw(2));
+
+        // Titik kemajuan: emas = level selesai, biru muda = belum, bintang di level terakhir
+        LinearLayout dots = new LinearLayout(this);
+        dots.setOrientation(LinearLayout.HORIZONTAL);
+        dots.setGravity(Gravity.CENTER_VERTICAL);
+        dots.setPadding(dp(8), dp(5), dp(8), dp(5));
+        dots.setBackground(box(Color.argb(70, 0, 70, 140), 14));
+        int total = LEVELS[kelas].length;
+        for (int l = 0; l < total; l++) {
+            if (l == total - 1 && total > 1) {
+                TextView star = text("\u2605", 11, Color.parseColor("#FFC107"), true);
+                dots.addView(star, new LinearLayout.LayoutParams(WRAP, WRAP));
+            } else {
+                GradientDrawable dg = new GradientDrawable();
+                dg.setShape(GradientDrawable.OVAL);
+                dg.setColor(advStarsOf(kelas, l) >= 1 ? Color.parseColor("#FFC107")
+                        : Color.parseColor("#9FD8F7"));
+                LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(7), dp(7));
+                dlp.rightMargin = dp(3);
+                View dv = new View(this);
+                dv.setBackground(dg);
+                dots.addView(dv, dlp);
+            }
+        }
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(dots, new LinearLayout.LayoutParams(WRAP, WRAP));
+        TextView go = text("\u203A", 22, Color.WHITE, true);
+        go.setBackground(box(Color.argb(90, 255, 255, 255), 15));
+        LinearLayout.LayoutParams golp = new LinearLayout.LayoutParams(dp(30), dp(30));
+        golp.leftMargin = dp(6);
+        row.addView(go, golp);
+        col.addView(row, lpw(8));
+
+        LinearLayout.LayoutParams colLp = new LinearLayout.LayoutParams(0, WRAP, 1f);
+        colLp.leftMargin = dp(10);
+        t.addView(col, colLp);
+        t.setClickable(true);
+        t.setFocusable(true);
+        pressable(t);
+        return t;
     }
 
     // ---------- Rekor skor tertinggi (disimpan di HP ini) ----------
