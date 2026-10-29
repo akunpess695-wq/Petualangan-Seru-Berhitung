@@ -1271,6 +1271,28 @@ final class PutraMesh {
         return P;
     }
 
+    /** Pita yang melingkar badan antara sudut t0..t1 (0 = depan, searah +x), tinggi y0..y1, tepi luar/dalam = badan + offOut/offIn. Penuh (closed) atau potongan dengan tutup ujung. */
+    private void ringBand(double t0, double t1, int nu, double y0, double y1, double offOut, double offIn, double[] colr, boolean closed) {
+        double[][][] outer = new double[nu][2][], top = new double[nu][2][], bot = new double[nu][2][];
+        for (int i = 0; i < nu; i++) {
+            double t = closed ? t0 + (t1 - t0) * i / nu : t0 + (t1 - t0) * i / (nu - 1.0);
+            outer[i][0] = ringPt(t, y0, offOut); outer[i][1] = ringPt(t, y1, offOut);
+            top[i][0] = ringPt(t, y1, offOut); top[i][1] = ringPt(t, y1, offIn);
+            bot[i][0] = ringPt(t, y0, offIn); bot[i][1] = ringPt(t, y0, offOut);
+        }
+        grid(outer, colr, closed, false, null);
+        grid(top, colr, closed, false, null);
+        grid(bot, colr, closed, false, null);
+        if (!closed) {
+            grid(new double[][][]{{ringPt(t0, y0, offIn), ringPt(t0, y1, offIn)}, {ringPt(t0, y0, offOut), ringPt(t0, y1, offOut)}}, colr, false, true, null);
+            grid(new double[][][]{{ringPt(t1, y0, offIn), ringPt(t1, y1, offIn)}, {ringPt(t1, y0, offOut), ringPt(t1, y1, offOut)}}, colr, false, false, null);
+        }
+    }
+    private static double[] ringPt(double t, double y, double off) {
+        double[] q = interp(TORSO, y);
+        return new double[]{q[2] + (q[0] + off) * Math.sin(t), y, q[3] + (q[1] + off) * Math.cos(t)};
+    }
+
     /** Seragam SD Alam Muhammadiyah Kandangan: kain leher marun bersimpul emas dan lambang di dada kiri pemakai (sisi +x). */
     private void uniform() {
         final double[] MARUN = {0.557, 0.106, 0.180}, GOLD = {0.83, 0.66, 0.16}, GOLD_D = {0.70, 0.52, 0.10};
@@ -1317,14 +1339,26 @@ final class PutraMesh {
             }
             grid(P, MARUN, false, false, null);
         }
-        // ikat pinggang hitam dan gesper
-        double[] bq = interp(TORSO, 30.0);
-        int bnn = 24;
-        double[][] belt = new double[bnn + 1][];
-        for (int i = 0; i < bnn; i++) { double t = 2 * PI * i / bnn; belt[i] = new double[]{bq[2] + (bq[0] + 0.5) * Math.sin(t), 30.0, bq[3] + (bq[1] + 0.5) * Math.cos(t)}; }
-        belt[bnn] = belt[0];
-        tube(belt, rr(bnn + 1, 0.9, 0.9), new double[]{0.07, 0.07, 0.08}, 6);
-        superbox(new double[]{0, 30.0, bq[3] + bq[1] + 0.9}, new double[]{1.6, 1.3, 0.35}, new double[]{0.78, 0.78, 0.80}, 3.0, 8, 6);
+        // ikat pinggang (lembar referensi): tali nilon hitam lebar, gesper plastik hitam doff persegi dengan lambang timbul,
+        // dan pengait ikat pinggang celana marun di kiri-kanan gesper dan di belakang
+        {
+            final double BY = 30.0, SH = 1.2, OUT = 1.4, INN = 0.7;
+            final double[] STRAP = {0.07, 0.07, 0.08}, BUCK = {0.22, 0.22, 0.25}, EMB = {0.36, 0.36, 0.40};
+            ringBand(0, 2 * PI, 40, BY - SH, BY + SH, OUT, INN, STRAP, true);
+            for (double dg : new double[]{-140, -40, 40, 140, 180}) {
+                double tc = Math.toRadians(dg), hw = 0.085;
+                ringBand(tc - hw, tc + hw, 3, BY - 1.75, BY + 1.75, OUT + 0.5, INN, PANTS, false);
+            }
+            double[] bq = interp(TORSO, BY);
+            double fz = bq[3] + bq[1] + OUT;                       // permukaan depan tali
+            superbox(new double[]{0, BY, fz + 0.15}, new double[]{2.15, 1.5, 0.6}, BUCK, 0.3, 16, 8);
+            // lambang timbul di gesper: bintang 8 sudut dengan cincin dan bulatan tengah
+            for (int k = 0; k < 8; k++) {
+                double ang = PI / 8 + k * PI / 4;
+                tdecal(1.0 * Math.cos(ang), BY + 1.0 * Math.sin(ang), 0.36, 0.36, 0.2, OUT + 0.62, EMB, 6, 4);
+            }
+            tdecal(0, BY, 0.62, 0.62, 0.2, OUT + 0.66, EMB, 10, 5);
+        }
         // saku dada kiri pemakai: panel putih bertepi jahitan, lipatan di atas, dasar runcing (lembar referensi baju)
         final double pcx = 5.6, pTop = 48.0, pBot = 40.2, phw = 2.9, pEdge = pTop - (pTop - pBot) * 5.0 / 7.0;
         {
