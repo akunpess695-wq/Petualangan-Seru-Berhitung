@@ -1223,7 +1223,7 @@ final class PutraMesh {
         double[] cq = interp(TORSO, 55.0);
         int n = 20;
         double[][] ring = new double[n + 1][];
-        for (int i = 0; i < n; i++) { double t = 2 * PI * i / n; ring[i] = new double[]{cq[2] + (cq[0] + 1.3) * Math.sin(t), 55.0, cq[3] + (cq[1] + 1.3) * Math.cos(t)}; }
+        for (int i = 0; i < n; i++) { double t = 2 * PI * i / n; ring[i] = new double[]{cq[2] + (cq[0] + 1.3) * Math.sin(t), 54.4, cq[3] + (cq[1] + 1.3) * Math.cos(t)}; }
         ring[n] = ring[0];
         tube(ring, rr(n + 1, 1.2, 1.2), MARUN, 6);
         // ujung kain menjuntai di dada, makin ke bawah makin sempit
@@ -1238,13 +1238,30 @@ final class PutraMesh {
         // simpul emas
         ellipsoid(new double[]{0, 53.4, tz(0, 53.4) + 1.3}, new double[]{2.1, 1.7, 1.2}, GOLD, 14, 8);
         ellipsoid(new double[]{0, 53.4, tz(0, 53.4) + 1.5}, new double[]{1.0, 0.8, 1.2}, GOLD_D, 10, 6);
+        // kerah kemeja putih: lingkar tebal di atas kain leher dan dua sayap runcing di dada
+        final double[] WH = {0.97, 0.97, 0.99};
+        double[][] col = new double[n + 1][];
+        for (int i = 0; i < n; i++) { double t = 2 * PI * i / n; col[i] = new double[]{cq[2] + (cq[0] + 1.7) * Math.sin(t), 55.9, cq[3] + (cq[1] + 1.7) * Math.cos(t)}; }
+        col[n] = col[0];
+        tube(col, rr(n + 1, 1.15, 1.0), WH, 8);
+        for (int sg = -1; sg <= 1; sg += 2) {
+            int fn = 4;
+            double[][] fp = new double[fn][], fr = new double[fn][];
+            for (int i = 0; i < fn; i++) {
+                double f = i / (fn - 1.0);
+                double x = sg * (4.4 - 3.0 * f), y = 56.0 - 3.6 * f;
+                fp[i] = new double[]{x, y, tz(x, y) + 1.5};
+                fr[i] = new double[]{1.5 * (1 - 0.85 * f) + 0.2, 0.55};
+            }
+            tube(fp, fr, WH, 6);
+        }
         // pita kain leher membentuk V dari bahu ke simpul
         for (int sg = -1; sg <= 1; sg += 2) {
             int vn = 5;
             double[][] vp = new double[vn][], vr = new double[vn][];
             for (int i = 0; i < vn; i++) {
                 double f = i / (vn - 1.0);
-                double x = sg * 6.2 * (1 - f), y = 55.0 - 1.8 * f - 0.0;
+                double x = sg * 6.2 * (1 - f), y = 54.4 - 1.4 * f;
                 vp[i] = new double[]{x, y, tz(x, y) + 1.0};
                 vr[i] = new double[]{1.2, 0.7};
             }
