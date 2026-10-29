@@ -4839,9 +4839,9 @@ public class MainActivity extends Activity {
         return prefs.getBoolean("peciOff" + pl, false);
     }
 
-    /** Ransel putra: bawaan dipakai; pemain boleh melepasnya lewat tombol Tas di Toko Avatar (tersimpan per pemain). Putri belum (mesh 3D putri tidak punya bagian ransel terpisah). */
+    /** Ransel putra: bawaan dipakai; pemain boleh melepasnya lewat tombol Tas di Toko Avatar (tersimpan per pemain). Putri juga (ransel putri adalah bagian terpisah di PutriMesh). */
     private boolean tasOff(int pl) {
-        return genderOf[pl] == 0 && prefs.getBoolean("tasOff" + pl, false);
+        return prefs.getBoolean("tasOff" + pl, false);
     }
 
     /**
@@ -7215,21 +7215,23 @@ public class MainActivity extends Activity {
             gr.addView(gt, weight(g == 0 ? 0 : 4, 0));
         }
         pv.addView(gr, lp(dp(44), 8));
-        if (USE_PUTRI_GL && genderOf[shopPl] == 0) {   // baris kedua: peci dan tas, masing-masing bisa dipasang / dilepas
+        if (USE_PUTRI_GL) {   // baris kedua: peci (putra) dan tas (putra dan putri), masing-masing bisa dipasang / dilepas
             LinearLayout gr2 = new LinearLayout(this);
             gr2.setOrientation(LinearLayout.HORIZONTAL);
-            final boolean peciLepas = peciOff(shopPl);
-            TextView pc = text(peciLepas ? "\uD83E\uDDE2 Lepas" : "\uD83E\uDDE2 Peci", 14,
-                    peciLepas ? DARK : Color.WHITE, true);
-            pc.setGravity(Gravity.CENTER);
-            pc.setBackground(box(peciLepas ? GRAY : GREEN, 16));
-            pc.setContentDescription(peciLepas ? "Peci dilepas. Ketuk untuk memakai peci" : "Peci dipakai. Ketuk untuk melepas peci");
-            pc.setOnClickListener(v -> {
-                prefs.edit().putBoolean("peciOff" + shopPl, !peciLepas).apply();
-                sfx(SFX_OK);
-                showToko();
-            });
-            gr2.addView(pc, weight(0, 0));
+            if (genderOf[shopPl] == 0) {
+                final boolean peciLepas = peciOff(shopPl);
+                TextView pc = text(peciLepas ? "\uD83E\uDDE2 Lepas" : "\uD83E\uDDE2 Peci", 14,
+                        peciLepas ? DARK : Color.WHITE, true);
+                pc.setGravity(Gravity.CENTER);
+                pc.setBackground(box(peciLepas ? GRAY : GREEN, 16));
+                pc.setContentDescription(peciLepas ? "Peci dilepas. Ketuk untuk memakai peci" : "Peci dipakai. Ketuk untuk melepas peci");
+                pc.setOnClickListener(v -> {
+                    prefs.edit().putBoolean("peciOff" + shopPl, !peciLepas).apply();
+                    sfx(SFX_OK);
+                    showToko();
+                });
+                gr2.addView(pc, weight(0, 0));
+            }
             final boolean tasLepas = tasOff(shopPl);
             TextView tb = text(tasLepas ? "\uD83C\uDF92 Lepas" : "\uD83C\uDF92 Tas", 14,
                     tasLepas ? DARK : Color.WHITE, true);
@@ -7241,7 +7243,7 @@ public class MainActivity extends Activity {
                 sfx(SFX_OK);
                 showToko();
             });
-            gr2.addView(tb, weight(4, 0));
+            gr2.addView(tb, weight(genderOf[shopPl] == 0 ? 4 : 0, 0));
             pv.addView(gr2, lp(dp(44), 8));
         }
         c.addView(pv, lp(WRAP, 12));

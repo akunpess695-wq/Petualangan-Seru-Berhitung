@@ -227,7 +227,7 @@ final class PutriGLView extends GLSurfaceView {
             } else {
                 if (sMesh == null) sMesh = PutriMesh.build();
                 PutriMesh m = sMesh;
-                mpos = m.pos; mnor = m.nor; midx = m.idx; mvc = m.vertCount;
+                mpos = m.pos; mnor = m.nor; midx = m.indexFor(true, showTas); mvc = m.vertCount; // ransel putri juga bisa dilepas
                 mcol = m.outfitColors(lookPakaian, lookRambut);
             }
             // tudung hewan: titik dan indeksnya ditambahkan di belakang mesh badan (indeks tetap di bawah 65.536)
