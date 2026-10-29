@@ -79,6 +79,14 @@ jobs:
               id 'com.android.application'
           }
 
+          // versionName dibaca dari APP_VERSION di MainActivity.java (cukup ubah versi di satu tempat itu)
+          def mainSrc = file('src/main/java/com/petualangan/berhitung/MainActivity.java')
+          def verMatch = mainSrc.exists() ? (mainSrc.text =~ /APP_VERSION\s*=\s*"([^"]+)"/) : null
+          if (verMatch == null || !verMatch.find()) {
+              throw new GradleException('APP_VERSION tidak ditemukan di MainActivity.java')
+          }
+          def appVersion = verMatch.group(1)
+
           android {
               namespace 'com.petualangan.berhitung'
               compileSdk 34
@@ -88,7 +96,7 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-                  versionName "6.6.6"
+                  versionName appVersion
               }
 
               signingConfigs {
