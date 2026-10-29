@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.16.0";
+    private static final String APP_VERSION = "6.17.0";
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
@@ -340,6 +340,10 @@ public class MainActivity extends Activity {
     private static final String[] SUBJ_NAMES = {"Matematika", "Bahasa Indonesia", "Bahasa Inggris"};
     private static final String[] SUBJ_ICON = {"\uD83D\uDD22", "\uD83D\uDCD6", "\uD83C\uDF0D"};
     private static final int[] SUBJ_COLOR = {ORANGE, TEAL, BLUE};
+    // Warna kartu pelajaran di menu utama (v6.17.0): gelap secukupnya agar teks putih terbaca (kontras >= 4,5:1).
+    // Matematika = tanah liat, Indonesia = daun, Inggris = air.
+    private static final int[] MENU_SUBJ_COLOR = {Color.parseColor("#BF360C"),
+            Color.parseColor("#33691E"), Color.parseColor("#00695C")};
 
     // Batas waktu per soal yang bisa diatur (detik)
     private static final int SECS_MIN = 3;
@@ -1535,6 +1539,7 @@ public class MainActivity extends Activity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         TextView snd = text(sfxOn ? "\uD83D\uDD0A" : "\uD83D\uDD07", 22, DARK, false);
         snd.setBackground(box(Color.WHITE, 26));
+        snd.setContentDescription(sfxOn ? "Suara menyala" : "Suara mati");
         snd.setElevation(dp(3));
         snd.setOnClickListener(v -> {
             prefs.edit().putBoolean("sfx", !sfxOn).apply();
@@ -1544,13 +1549,15 @@ public class MainActivity extends Activity {
         bar.addView(snd, new LinearLayout.LayoutParams(dp(52), dp(52)));
         TextView dsp = text("\uD83D\uDCFA", 22, DARK, false);
         dsp.setBackground(box(Color.WHITE, 26));
+        dsp.setContentDescription("Pengaturan tampilan");
         dsp.setElevation(dp(3));
         dsp.setOnClickListener(v -> dialogTampilan());
         LinearLayout.LayoutParams dspLp = new LinearLayout.LayoutParams(dp(52), dp(52));
         dspLp.leftMargin = dp(10);
         bar.addView(dsp, dspLp);
         bar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
-        TextView coin = text("\uD83D\uDCB0 " + coins(), 15, Color.WHITE, true);
+        TextView coin = text("\uD83D\uDCB0 " + coins(), 16, Color.parseColor("#3E2723"), true);
+        coin.setContentDescription("Toko Avatar, " + coins() + " koin");
         GradientDrawable cg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{Color.parseColor("#FFB300"), Color.parseColor("#FB8C00")});
         cg.setCornerRadius(dp(22));
@@ -1565,6 +1572,7 @@ public class MainActivity extends Activity {
         bar.addView(coin, coinLp);
         AvatarView avb = avatarView(0, 1);
         avb.setElevation(dp(3));
+        avb.setContentDescription("Toko Avatar");
         avb.setOnClickListener(v -> showToko());
         bar.addView(avb, new LinearLayout.LayoutParams(dp(52), dp(52)));
         c.addView(bar, lp(WRAP, 0));
@@ -1648,7 +1656,7 @@ public class MainActivity extends Activity {
             if (sg == 0) {
                 glow(seg, KELAS_COLOR[kelas]);
             }
-            TextView lbl = text(segTxt[sg], 13, sg == 0 ? Color.WHITE : DARK, true);
+            TextView lbl = text(segTxt[sg], wide ? 16 : 13, sg == 0 ? Color.WHITE : DARK, true);
             lbl.setSingleLine(true);
             seg.addView(lbl, new LinearLayout.LayoutParams(WRAP, WRAP));
             TextView chev = text("\u203A", 20, sg == 0 ? Color.WHITE : Color.parseColor("#90A4AE"), true);
@@ -1688,7 +1696,7 @@ public class MainActivity extends Activity {
         // Peta Petualangan
         LinearLayout mp = petaCard();
         mp.setOnClickListener(v -> showPeta());
-        rt.addView(mp, lp(dp(140), wide ? 0 : 16));
+        rt.addView(mp, lp(dp(152), wide ? 0 : 16));
 
         // Pilih pelajaran
         rt.addView(sectionTitleLeaf("Pilih pelajaran"), lp(WRAP, wide ? 16 : 20));
@@ -1713,16 +1721,16 @@ public class MainActivity extends Activity {
             }
             LinearLayout t = subjectTile(SUBJ_ICON[s], SUBJ_NAMES[s], sub, SUBJ_COLOR[s]);
             swapTileIcon(t, new String[]{"menu_cube", "menu_abc", "menu_globe"}[s]);
-            premium(t, SUBJ_COLOR[s], 28, 1800L + s * 1300L);
+            natureTile(t, MENU_SUBJ_COLOR[s], s);
             t.setOnClickListener(v -> openSubject(sj));
-            rt.addView(t, lp(dp(96), 14));
+            rt.addView(t, lp(dp(100), 14));
         }
 
         // Toko Avatar (kartu merah muda dengan koin)
         LinearLayout tk = subjectTile("\uD83D\uDECD\uFE0F", "Toko Avatar",
                 "\uD83D\uDCB0 " + coins() + " koin \u2022 ganti penampilan", PINK);
         swapTileIcon(tk, "menu_shop");
-        premium(tk, PINK, 28, 5700L);
+        natureTile(tk, PINK, 3);
         tk.setOnClickListener(v -> showToko());
         c.addView(tk, lp(dp(84), 18));
 
@@ -1947,6 +1955,120 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * Kartu menu bertema alam (v6.17.0): warna tenang, tepi bawah tebal seperti tanah, dan satu motif alam
+     * per kartu (kerikil, daun, ombak, koin). Tanpa kilau bergerak supaya Peta Petualangan jadi satu-satunya sorotan.
+     */
+    private void natureTile(LinearLayout t, int color, int kind) {
+        t.setBackground(new NatureTile(color, kind));
+        t.setElevation(0f);
+        if (t.getChildCount() > 1 && t.getChildAt(1) instanceof LinearLayout) {
+            LinearLayout col = (LinearLayout) t.getChildAt(1);
+            if (col.getChildCount() > 1 && col.getChildAt(1) instanceof TextView) {
+                TextView sub = (TextView) col.getChildAt(1);
+                sub.setTextSize(14f);
+                sub.setMaxLines(2);
+                sub.setTextColor(Color.WHITE);
+            }
+        }
+    }
+
+    private class NatureTile extends Drawable {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int base;
+        private final int kind;
+
+        NatureTile(int color, int k) {
+            base = color;
+            kind = k;
+        }
+
+        @Override
+        public void draw(Canvas cv) {
+            RectF all = new RectF(getBounds());
+            float rad = dp(24);
+            float ledge = dp(4);
+            p.setShader(null);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(mixColor(base, Color.BLACK, 0.32f));
+            cv.drawRoundRect(all, rad, rad, p);
+            RectF rf = new RectF(all.left, all.top, all.right, all.bottom - ledge);
+            p.setShader(new LinearGradient(0f, rf.top, 0f, rf.bottom,
+                    mixColor(base, Color.WHITE, 0.12f), base, Shader.TileMode.CLAMP));
+            cv.drawRoundRect(rf, rad, rad, p);
+            p.setShader(null);
+            Path clip = new Path();
+            clip.addRoundRect(rf, rad, rad, Path.Direction.CW);
+            cv.save();
+            cv.clipPath(clip);
+            float cx = rf.right - dp(78);
+            float cy = rf.centerY();
+            p.setColor(Color.argb(40, 255, 255, 255));
+            if (kind == 0) {
+                // kerikil: tiga bulatan berbeda ukuran
+                cv.drawCircle(cx, cy + dp(6), dp(24), p);
+                cv.drawCircle(cx + dp(34), cy - dp(10), dp(15), p);
+                cv.drawCircle(cx - dp(30), cy - dp(14), dp(10), p);
+            } else if (kind == 1) {
+                // daun dengan tulang tengah
+                float r = dp(26);
+                Path leaf = new Path();
+                leaf.moveTo(cx - r, cy + r);
+                leaf.quadTo(cx - r, cy - r * 1.3f, cx + r, cy - r);
+                leaf.quadTo(cx + r, cy + r * 1.3f, cx - r, cy + r);
+                leaf.close();
+                cv.drawPath(leaf, p);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(dp(2));
+                p.setColor(Color.argb(70, 255, 255, 255));
+                cv.drawLine(cx - r, cy + r, cx + r * 0.6f, cy - r * 0.6f, p);
+                p.setStyle(Paint.Style.FILL);
+            } else if (kind == 2) {
+                // ombak: tiga garis bergelombang
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(dp(3));
+                p.setStrokeCap(Paint.Cap.ROUND);
+                for (int i = 0; i < 3; i++) {
+                    Path w = new Path();
+                    w.moveTo(cx - dp(60), cy - dp(18) + i * dp(18));
+                    for (int sg = 0; sg < 4; sg++) {
+                        w.rQuadTo(dp(15), (sg % 2 == 0) ? -dp(8) : dp(8), dp(30), 0f);
+                    }
+                    cv.drawPath(w, p);
+                }
+                p.setStyle(Paint.Style.FILL);
+            } else {
+                // koin: dua lingkaran bertumpuk
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(dp(3));
+                cv.drawCircle(cx, cy, dp(24), p);
+                cv.drawCircle(cx + dp(30), cy + dp(8), dp(16), p);
+                p.setStyle(Paint.Style.FILL);
+            }
+            cv.restore();
+            p.setStyle(Paint.Style.FILL);
+        }
+
+        @Override
+        public void getOutline(Outline outline) {
+            outline.setRoundRect(getBounds(), dp(24));
+            outline.setAlpha(1f);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+        }
+
+        @Override
+        public void setColorFilter(ColorFilter cf) {
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+    }
+
     /** Latar menu: langit pagi, matahari berpendar, awan, bukit, dan daun di sudut layar. */
     private class MenuBgDrawable extends Drawable {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -2097,7 +2219,7 @@ public class MainActivity extends Activity {
         t.setOrientation(LinearLayout.HORIZONTAL);
         t.setGravity(Gravity.CENTER_VERTICAL);
         t.setPadding(dp(8), dp(8), dp(12), dp(8));
-        premium(t, Color.parseColor("#1E9BE8"), 30, 700L);
+        premium(t, Color.parseColor("#0B6FB8"), 30, 700L);
 
         Drawable art = artDrawable("menu_island");
         if (art != null) {
@@ -2125,12 +2247,12 @@ public class MainActivity extends Activity {
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.CENTER_VERTICAL);
-        TextView n = text("Peta Petualangan", 19, Color.WHITE, true);
+        TextView n = text("Peta Petualangan", 22, Color.WHITE, true);
         n.setGravity(Gravity.START);
         n.setMaxLines(2);
         n.setShadowLayer(dp(2), 0f, dp(1), Color.argb(80, 0, 0, 0));
         col.addView(n, new LinearLayout.LayoutParams(WRAP, WRAP));
-        TextView sub = text(advSummary(), 12, Color.parseColor("#E1F5FE"), false);
+        TextView sub = text(advSummary(), 14, Color.parseColor("#E1F5FE"), false);
         sub.setGravity(Gravity.START);
         sub.setMaxLines(2);
         col.addView(sub, lpw(2));
