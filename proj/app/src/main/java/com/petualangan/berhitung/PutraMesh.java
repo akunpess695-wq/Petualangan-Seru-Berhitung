@@ -1219,53 +1219,60 @@ final class PutraMesh {
     private void uniform() {
         final double[] MARUN = {0.557, 0.106, 0.180}, GOLD = {0.83, 0.66, 0.16}, GOLD_D = {0.70, 0.52, 0.10};
         cur = P_UNI;
-        // lingkar kain di pangkal leher, sedikit di luar kerah
+        // kain leher: lingkar di pangkal leher yang menonjol di luar kerah (terlihat di bahu)
         double[] cq = interp(TORSO, 55.0);
-        int n = 20;
+        int n = 24;
         double[][] ring = new double[n + 1][];
-        for (int i = 0; i < n; i++) { double t = 2 * PI * i / n; ring[i] = new double[]{cq[2] + (cq[0] + 1.3) * Math.sin(t), 54.4, cq[3] + (cq[1] + 1.3) * Math.cos(t)}; }
+        for (int i = 0; i < n; i++) { double t = 2 * PI * i / n; ring[i] = new double[]{cq[2] + (cq[0] + 2.5) * Math.sin(t), 54.1, cq[3] + (cq[1] + 2.5) * Math.cos(t)}; }
         ring[n] = ring[0];
-        tube(ring, rr(n + 1, 1.2, 1.2), MARUN, 6);
-        // ujung kain menjuntai di dada, makin ke bawah makin sempit
-        int m = 7;
-        double[][] tail = new double[m][], tr = new double[m][];
-        for (int i = 0; i < m; i++) {
-            double y = 54.0 - 12.5 * i / (m - 1.0);
-            tail[i] = new double[]{0, y, tz(0, y) + 0.55};
-            tr[i] = new double[]{4.0 * (1.0 - 0.86 * i / (m - 1.0)) + 0.4, 0.8};
-        }
-        tube(tail, tr, MARUN, 6);
-        // simpul emas
-        ellipsoid(new double[]{0, 53.4, tz(0, 53.4) + 1.3}, new double[]{2.1, 1.7, 1.2}, GOLD, 14, 8);
-        ellipsoid(new double[]{0, 53.4, tz(0, 53.4) + 1.5}, new double[]{1.0, 0.8, 1.2}, GOLD_D, 10, 6);
-        // kerah kemeja putih: lingkar tebal di atas kain leher dan dua sayap runcing di dada
-        final double[] WH = {0.97, 0.97, 0.99};
-        double[][] col = new double[n + 1][];
-        for (int i = 0; i < n; i++) { double t = 2 * PI * i / n; col[i] = new double[]{cq[2] + (cq[0] + 1.7) * Math.sin(t), 55.9, cq[3] + (cq[1] + 1.7) * Math.cos(t)}; }
-        col[n] = col[0];
-        tube(col, rr(n + 1, 1.15, 1.0), WH, 8);
+        tube(ring, rr(n + 1, 1.25, 1.15), MARUN, 8);
+        // pita V dari bahu menuju simpul (di bawah sayap kerah)
+        final double KY = 52.4;
         for (int sg = -1; sg <= 1; sg += 2) {
-            int fn = 4;
-            double[][] fp = new double[fn][], fr = new double[fn][];
-            for (int i = 0; i < fn; i++) {
-                double f = i / (fn - 1.0);
-                double x = sg * (4.4 - 3.0 * f), y = 56.0 - 3.6 * f;
-                fp[i] = new double[]{x, y, tz(x, y) + 1.5};
-                fr[i] = new double[]{1.5 * (1 - 0.85 * f) + 0.2, 0.55};
-            }
-            tube(fp, fr, WH, 6);
-        }
-        // pita kain leher membentuk V dari bahu ke simpul
-        for (int sg = -1; sg <= 1; sg += 2) {
-            int vn = 5;
+            int vn = 6;
             double[][] vp = new double[vn][], vr = new double[vn][];
             for (int i = 0; i < vn; i++) {
                 double f = i / (vn - 1.0);
-                double x = sg * 6.2 * (1 - f), y = 54.4 - 1.4 * f;
-                vp[i] = new double[]{x, y, tz(x, y) + 1.0};
-                vr[i] = new double[]{1.2, 0.7};
+                double x = sg * (6.4 * (1 - f) + 0.6), y = 54.1 + (KY - 54.1) * f;
+                vp[i] = new double[]{x, y, tz(x, y) + 0.9};
+                vr[i] = new double[]{1.3 - 0.3 * f, 0.7};
             }
             tube(vp, vr, MARUN, 6);
+        }
+        // ujung kain (dasi kacu) menjuntai di dada, makin ke bawah makin sempit
+        int m = 8;
+        double[][] tail = new double[m][], tr = new double[m][];
+        for (int i = 0; i < m; i++) {
+            double f = i / (m - 1.0), y = KY - 0.6 - 12.0 * f;
+            tail[i] = new double[]{0, y, tz(0, y) + 0.9};
+            tr[i] = new double[]{2.6 * (1.0 - 0.80 * f) + 0.5, 0.7};
+        }
+        tube(tail, tr, MARUN, 6);
+        // simpul emas: tiga gulungan
+        for (int k = -1; k <= 1; k++) {
+            double y = KY + k * 0.75;
+            ellipsoid(new double[]{0, y, tz(0, y) + 1.5}, new double[]{2.15 - 0.25 * Math.abs(k), 0.95, 1.3}, k == 0 ? GOLD : GOLD_D, 14, 8);
+        }
+        // kerah kemeja putih: berdiri di leher, terbuka di depan, ujungnya runcing jatuh ke dada
+        final double[] WH = {0.97, 0.97, 0.99};
+        final double[][] cone = {{0.9, 56.7}, {1.8, 55.9}, {2.3, 55.1}};
+        for (double[] cn : cone) {
+            int steps = 20;
+            double t0 = 0.45, t1 = 2 * PI - 0.45;
+            double[][] cp = new double[steps + 1][];
+            for (int i = 0; i <= steps; i++) { double t = t0 + (t1 - t0) * i / steps; cp[i] = new double[]{cq[2] + (cq[0] + cn[0]) * Math.sin(t), cn[1], cq[3] + (cq[1] + cn[0]) * Math.cos(t)}; }
+            tube(cp, rr(steps + 1, 0.8, 0.75), WH, 8);
+        }
+        for (int sg = -1; sg <= 1; sg += 2) {
+            int fn = 5;
+            double[][] fp = new double[fn][], fr = new double[fn][];
+            for (int i = 0; i < fn; i++) {
+                double f = i / (fn - 1.0);
+                double x = sg * (3.3 - 2.3 * f), y = 56.4 - 4.6 * f;
+                fp[i] = new double[]{x, y, tz(x, y) + 1.7};
+                fr[i] = new double[]{1.7 * (1 - 0.82 * f) + 0.15, 0.6};
+            }
+            tube(fp, fr, WH, 6);
         }
         // segitiga kain di punggung
         int bn2 = 6;
