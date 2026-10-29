@@ -1233,6 +1233,18 @@ final class PutraMesh {
         }
         grid(P, colr, false, false, null);
     }
+    /** Seperti sheetXY, tetapi pusat panel bergeser: cxf(s) = x tengah pada baris s. */
+    private void sheetXYc(int nu, int nv, SF yf, SF cxf, SF hwf, double off, double[] colr) {
+        double[][][] P = new double[nu][nv][3];
+        for (int j = 0; j < nv; j++) {
+            double s = j / (nv - 1.0), y = yf.f(s), hw = hwf.f(s), cx = cxf.f(s);
+            for (int i = 0; i < nu; i++) {
+                double x = cx + hw * (2.0 * i / (nu - 1) - 1);
+                P[i][j] = new double[]{x, y, tz(x, y) + off};
+            }
+        }
+        grid(P, colr, false, false, null);
+    }
     /**
      * Satu sayap kain di sekeliling leher (sg = sisi kiri/kanan, sudut t dari depan 0 ke belakang PI), menempel di badan.
      * Tinggi turun dari yTop sejauh drop(phi): dTip di tepi depan (ujung runcing), dBack di belakang leher.
@@ -1267,10 +1279,14 @@ final class PutraMesh {
         // lalu V di dada menuju simpul, ujung kacu menjuntai, dan segitiga di punggung
         final double KY = 50.9;
         for (int sg = -1; sg <= 1; sg += 2)
-            neckSheet(sg, MARUN, 0.5, 1.8, 7.0, 6.2, 1.0, 56.2, 0.10, 0.30, 0.20, 1.0, 12, 6);
+            neckSheet(sg, MARUN, 0.5, 1.8, 7.0, 3.2, 1.0, 56.2, 0.10, 0.30, 0.20, 1.0, 12, 6);
         sheetXY(5, 7, s -> 56.7 + (KY - 56.7) * s, s -> 2.5 - 1.6 * s, 1.05, MARUN);          // V depan
-        sheetXY(5, 8, s -> KY - 0.4 - 8.6 * s,                                                    // ujung kacu
-                s -> s < 0.45 ? 0.9 + 1.3 * (s / 0.45) : 0.25 + 1.95 * (1 - Math.pow((s - 0.45) / 0.55, 1.4)), 1.12, MARUN);
+        // ujung kacu: dua ekor pendek yang melebar lalu runcing, sedikit membuka ke luar (seperti lembar referensi), kiri-kanan beda kedalaman
+        for (int sg0 = -1; sg0 <= 1; sg0 += 2) {
+            final int sg = sg0;
+            sheetXYc(5, 8, s -> KY - 0.6 - 6.6 * s, s -> sg * (0.95 + 0.85 * s),
+                    s -> s < 0.4 ? 1.0 + 0.55 * (s / 0.4) : 1.55 * Math.pow(1 - (s - 0.4) / 0.6, 0.9) + 0.05, sg < 0 ? 1.12 : 1.20, MARUN);
+        }
         // simpul emas: tiga gulungan
         for (int k = -1; k <= 1; k++) {
             double y = KY + k * 0.75;
@@ -1293,7 +1309,7 @@ final class PutraMesh {
             for (int j = 0; j < bv; j++) {
                 double s = j / (bv - 1.0), y = 55.6 - 9.4 * s;
                 double[] q = interp(TORSO, y);
-                double hw = Math.min(q[0] - 0.8, 6.8 * (1 - s) + 0.3);
+                double hw = Math.min(q[0] - 0.5, 8.4 * (1 - s) + 0.3);
                 for (int i = 0; i < bu; i++) {
                     double x = hw * (2.0 * i / (bu - 1) - 1);
                     P[i][j] = new double[]{x, y, q[3] - q[1] * Math.sqrt(Math.max(0, 1 - sq(x / q[0]))) - 0.6};
