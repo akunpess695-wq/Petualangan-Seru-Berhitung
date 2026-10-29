@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.20.0";
+    private static final String APP_VERSION = "6.20.1";
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
@@ -5520,9 +5520,8 @@ public class MainActivity extends Activity {
             } else if (kind == 2) {
                 if (it[5] >= 0) {
                     drawClothes(c, it[5]);
-                } else {
-                    drawBadge(c);
                 }
+                // v6.20.1: lambang hanya ada di seragam sekolah (digambar lewat addBox di drawChar3D), tidak ada lencana lama di sini
             } else if (kind == 3) {
                 drawHeld(c, it[2]);
             }
@@ -5911,13 +5910,22 @@ public class MainActivity extends Activity {
                 // simpul emas di bawah leher
                 addBox(47.2f, 44.8f, 52.8f, 47.8f, 7.7f, 8.4f, gold, gold, gold, 0);
                 }
-                // lambang sekolah di dada kiri pemakai: bintang jingga, bulatan hijau, gelombang ungu
-                int org = col("#F28C1B");
-                int grn = col("#43A047");
-                int vio = col("#6A3DF0");
+                // saku dada kiri pemakai (tepi jahitan + garis lipatan atas) dan lambang di dalamnya:
+                // bintang kuning-jingga, cincin putih, bola bumi hijau dengan bagian biru
+                int seam = col("#C9CDE0");
+                addBox(52.2f, 55.0f, 58.4f, 55.4f, 7.05f, 7.35f, seam, seam, seam, 0);
+                addBox(52.2f, 55.0f, 52.6f, 64.2f, 7.05f, 7.35f, seam, seam, seam, 0);
+                addBox(58.0f, 55.0f, 58.4f, 64.2f, 7.05f, 7.35f, seam, seam, seam, 0);
+                addBox(52.2f, 63.8f, 58.4f, 64.2f, 7.05f, 7.35f, seam, seam, seam, 0);
+                addBox(52.6f, 56.6f, 58.0f, 56.9f, 7.05f, 7.3f, seam, seam, seam, 0);
+                int org = col("#F5A623");
+                int wht = col("#FFFFFF");
+                int grn = col("#2E9E4F");
+                int blu = col("#1E4FCC");
                 addBox(53.2f, 57.6f, 58f, 62.4f, 7.05f, 7.5f, org, org, org, 0);
-                addBox(53.9f, 58.3f, 57.3f, 61.7f, 7.5f, 7.8f, grn, grn, grn, 0);
-                addBox(55.6f, 58.3f, 57.3f, 60f, 7.8f, 8f, vio, vio, vio, 0);
+                addBox(53.7f, 58.1f, 57.5f, 61.9f, 7.5f, 7.8f, wht, wht, wht, 0);
+                addBox(54.3f, 58.7f, 56.9f, 61.3f, 7.8f, 8f, grn, grn, grn, 0);
+                addBox(55.6f, 58.7f, 56.9f, 60f, 8f, 8.2f, blu, blu, blu, 0);
             }
             detach();
             // kaki / rok + sepatu
@@ -6187,27 +6195,6 @@ public class MainActivity extends Activity {
                 float x0 = xl + i * cw;
                 addBox(x0, hy0 + 2f, x0 + cw, bot, hz - 2.5f, hz + 3.5f, cc, cc, cc, 0);
             }
-        }
-
-        // Lencana sekolah (perisai hijau) di dada seragam polos
-        private void drawBadge(Canvas c) {
-            path.reset();
-            path.moveTo(fx(41f), fy(47f));
-            path.lineTo(fx(49f), fy(47f));
-            path.lineTo(fx(49f), fy(52.5f));
-            path.lineTo(fx(45f), fy(56.5f));
-            path.lineTo(fx(41f), fy(52.5f));
-            path.close();
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(col("#2E7D32"));
-            c.drawPath(path, p);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(0.7f * u);
-            p.setStrokeJoin(Paint.Join.ROUND);
-            p.setColor(col("#FFC107"));
-            c.drawPath(path, p);
-            p.setStyle(Paint.Style.FILL);
-            dot(c, 45f, 50.6f, 1.3f, col("#FFC107"));
         }
 
         // Bukaan wajah jilbab: kulit berbentuk persegi membulat dengan garis tepi searah warna jilbab
