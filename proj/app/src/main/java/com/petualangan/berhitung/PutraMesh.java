@@ -30,7 +30,8 @@ final class PutraMesh {
             P_UNI = 24,   // perlengkapan seragam sekolah (kacu marun, simpul emas, ikat pinggang, lambang): hanya terlihat bila tidak memakai baju dari toko
             P_SLEEVE_LO = 25,   // lengan baju bagian bawah (lengan panjang baju toko): disembunyikan saat seragam (lengan pendek)
             P_ARM_SKIN = 26,    // lengan bawah berkulit: hanya terlihat saat seragam
-            P_RING = 27;        // cincin kerah bawaan baju toko: disembunyikan saat seragam (seragam punya kerah sendiri)
+            P_RING = 27,        // cincin kerah bawaan baju toko: disembunyikan saat seragam (seragam punya kerah sendiri)
+            P_BAG = 28;         // ransel (badan, saku, kancing, tali bahu): bisa dilepas lewat tombol Tas di Toko Avatar
     /** Gaya rambut (terlihat hanya bila peci dilepas). 0 = cangkang rambut bawaan (rapi). */
     static final int STYLE_DEFAULT = 0, STYLE_CREW = 1, STYLE_SPIKY = 2, STYLE_MESSY = 3, STYLE_SIDE = 4, STYLE_CURLY = 5,
             STYLE_HOOD = 6, STYLE_WAVY = 7, STYLE_QUIFF = 8, STYLE_BUN = 9;   // tudung hewan dipakai: peci dan semua rambut disembunyikan (tudung digambar HoodMesh)
@@ -409,7 +410,7 @@ final class PutraMesh {
             M.cur = P_OTHER;
             M.ellipsoid(new double[]{s * 15.0, 26.6, -0.4}, new double[]{2.7, 4.0, 2.5}, SKIN, 18, 12);
         }
-        M.cur = P_OTHER;
+        M.cur = P_BAG;
         // ransel: badan + saku depan + kancing + tali
         M.superbox(new double[]{0, 38.5, -12.7}, new double[]{10.9, 12.5, 4.1}, PBAG, 0.32, 36, 20);
         M.superbox(new double[]{0, 35.3, -17.3}, new double[]{7.6, 5.3, 1.0}, PBAG, 0.30, 36, 20);
@@ -420,6 +421,7 @@ final class PutraMesh {
                     {s * 9.8, 45, tz(9.8, 45) + 0.9}, {s * 9.8, 40, tz(9.8, 40) + 0.9}, {s * 9.8, 36.5, tz(9.8, 36.5) + 0.9}};
             M.tube(pth, rr(7, 1.35, 0.5), PBAG, 8);
         }
+        M.cur = P_OTHER;
         M.uniform();
         // kepala + wajah
         final int headStart = M.bp.size();
@@ -1460,8 +1462,10 @@ final class PutraMesh {
      * Indeks segitiga untuk satu tampilan. showPeci=false membuang peci; gaya rambut (STYLE_*) hanya digambar bila
      * peci dilepas, sebab rambut tertutup peci. Gaya crew cut menggantikan cangkang rambut bawaan.
      */
-    int[] indexFor(boolean showPeci, int style, boolean uniform) {
-        boolean[] hide = new boolean[28];
+    int[] indexFor(boolean showPeci, int style, boolean uniform) { return indexFor(showPeci, style, uniform, true); }
+    int[] indexFor(boolean showPeci, int style, boolean uniform, boolean showBag) {
+        boolean[] hide = new boolean[29];
+        hide[P_BAG] = !showBag;                              // ransel boleh dilepas
         hide[P_SLEEVE_LO] = uniform;                         // seragam berlengan pendek
         hide[P_ARM_SKIN] = !uniform;                         // lengan bawah berkulit hanya saat seragam
         hide[P_RING] = uniform;                              // kerah seragam menggantikan cincin kerah baju toko

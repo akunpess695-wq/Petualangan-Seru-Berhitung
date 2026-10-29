@@ -4675,6 +4675,7 @@ public class MainActivity extends Activity {
                             ed.remove("eq" + pl + "_" + sl);
                         }
                         ed.remove("peciOff" + pl);
+                        ed.remove("tasOff" + pl);
                     }
                     ed.apply();
                     dialogAdmin();
@@ -4842,6 +4843,11 @@ public class MainActivity extends Activity {
         return prefs.getBoolean("peciOff" + pl, false);
     }
 
+    /** Ransel putra: bawaan dipakai; pemain boleh melepasnya lewat tombol Tas di Toko Avatar (tersimpan per pemain). Putri belum (mesh 3D putri tidak punya bagian ransel terpisah). */
+    private boolean tasOff(int pl) {
+        return genderOf[pl] == 0 && prefs.getBoolean("tasOff" + pl, false);
+    }
+
     /**
      * Gaya rambut 3D putra menurut nomor barang (nomor barang tetap, lihat catatan ITEMS):
      * 39 Cepak Hitam dan 40 Cepak Kemerahan = cepak, 41 Belah Samping, 42 Ikal Ringan, 56 Bergelombang, 57 Messy, 58 Quiff, 59 Ikat Kecil. 43 Pendek Rapi = bentuk bawaan.
@@ -4864,6 +4870,7 @@ public class MainActivity extends Activity {
     private void applyLook3D(PutriGLView v, int pl) {
         int ba = eqValid(pl, 5), hr = eqValid(pl, 6), bg = eqValid(pl, 4);
         v.setHood(isHood(avatar[pl]) ? avatar[pl] : -1); // tudung hewan 3D (putra dan putri)
+        v.setTas(!tasOff(pl));
         v.setLook(ba >= 0 ? itIcon(ba) : null, hr >= 0 ? itIcon(hr) : null, bg >= 0 ? itIcon(bg) : null,
                 genderOf[pl] != 0 || !peciOff(pl), (genderOf[pl] == 0 && hr >= 0) ? hairStyleOf(hr) : PutraMesh.STYLE_DEFAULT);
     }
@@ -5055,6 +5062,7 @@ public class MainActivity extends Activity {
         private final android.graphics.Matrix decalM = new android.graphics.Matrix();
         private int fn = 0;
         int gender = 0;
+        boolean tasOff = false;   // ransel dilepas (putra)
         private boolean srcOn = false;
         private final float[] ovr = new float[4];
 
@@ -5889,11 +5897,13 @@ public class MainActivity extends Activity {
             // v6.14.0: untuk putri tas turun (y +5) dan mundur (z -3.5) agar berada di atas kain kerudung.
             final float bdy = girl ? 5f : 0f;
             final float bdz = girl ? -3.5f : 0f;
+            if (!tasOff) {
             addBox(39f, 45f + bdy, 61f, 61f + bdy, -13.5f + bdz, -7.2f + bdz, bagMain, bagTop, bagDark, 0);
             addBox(42f, 43.5f + bdy, 58f, 48f + bdy, -14.5f + bdz, -7.5f + bdz, bagTop, bagTop, bagMain, 0);
+            }
             // Tali bahu + tali dada menempel di depan badan (induk: badan, permukaan depan).
             attach(36f, 42f, 64f, TORSO_BOT, -7f, 7f, 0);
-            if (!(girl && !hood)) {
+            if (!(girl && !hood) && !tasOff) {
             addBox(38f, 42.5f, 41.5f, 59f, 7.05f, 7.9f, bagDark, bagDark, bagDark, 0);
             addBox(58.5f, 42.5f, 62f, 59f, 7.05f, 7.9f, bagDark, bagDark, bagDark, 0);
             addBox(41.5f, 55.3f, 58.5f, 57.3f, 7.05f, 7.6f, col("#A5D6A7"), col("#A5D6A7"), col("#2E7D32"), 0);
@@ -7069,6 +7079,7 @@ public class MainActivity extends Activity {
         int a = avatar[pl];
         AvatarView av3 = new AvatarView(this, isHood(a) ? a : -1, items, mode, true);
         av3.gender = genderOf[pl];
+        av3.tasOff = tasOff(pl);
         return av3;
     }
 
@@ -7207,20 +7218,36 @@ public class MainActivity extends Activity {
             });
             gr.addView(gt, weight(g == 0 ? 0 : 4, 0));
         }
-        if (USE_PUTRI_GL && genderOf[shopPl] == 0) {   // peci: satu baris dengan Putra/Putri
+        pv.addView(gr, lp(dp(44), 8));
+        if (USE_PUTRI_GL && genderOf[shopPl] == 0) {   // baris kedua: peci dan tas, masing-masing bisa dipasang / dilepas
+            LinearLayout gr2 = new LinearLayout(this);
+            gr2.setOrientation(LinearLayout.HORIZONTAL);
             final boolean peciLepas = peciOff(shopPl);
             TextView pc = text(peciLepas ? "\uD83E\uDDE2 Lepas" : "\uD83E\uDDE2 Peci", 14,
                     peciLepas ? DARK : Color.WHITE, true);
             pc.setGravity(Gravity.CENTER);
             pc.setBackground(box(peciLepas ? GRAY : GREEN, 16));
+            pc.setContentDescription(peciLepas ? "Peci dilepas. Ketuk untuk memakai peci" : "Peci dipakai. Ketuk untuk melepas peci");
             pc.setOnClickListener(v -> {
                 prefs.edit().putBoolean("peciOff" + shopPl, !peciLepas).apply();
                 sfx(SFX_OK);
                 showToko();
             });
-            gr.addView(pc, weight(4, 0));
+            gr2.addView(pc, weight(0, 0));
+            final boolean tasLepas = tasOff(shopPl);
+            TextView tb = text(tasLepas ? "\uD83C\uDF92 Lepas" : "\uD83C\uDF92 Tas", 14,
+                    tasLepas ? DARK : Color.WHITE, true);
+            tb.setGravity(Gravity.CENTER);
+            tb.setBackground(box(tasLepas ? GRAY : GREEN, 16));
+            tb.setContentDescription(tasLepas ? "Tas dilepas. Ketuk untuk memakai tas" : "Tas dipakai. Ketuk untuk melepas tas");
+            tb.setOnClickListener(v -> {
+                prefs.edit().putBoolean("tasOff" + shopPl, !tasLepas).apply();
+                sfx(SFX_OK);
+                showToko();
+            });
+            gr2.addView(tb, weight(4, 0));
+            pv.addView(gr2, lp(dp(44), 8));
         }
-        pv.addView(gr, lp(dp(44), 8));
         c.addView(pv, lp(WRAP, 12));
 
         // Kategori ringkas: semua kategori terlihat tanpa geser horizontal.

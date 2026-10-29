@@ -32,6 +32,7 @@ final class PutriGLView extends GLSurfaceView {
     private volatile float yaw = 0f, pitch = 0f; // derajat
     private volatile float bgR = 1f, bgG = 1f, bgB = 1f; // warna latar (default putih = warna kartu)
     private volatile String lookPakaian, lookRambut;          // "badan,lengan[,celana/rok]" dan "#hex" (null = bawaan)
+    private volatile boolean showTas = true;                  // ransel putra (boleh dilepas)
     private volatile boolean showPeci = true;                 // hanya berlaku untuk putra
     private volatile int hood = -1;                           // nomor tudung hewan (slot 0..24, lihat HoodMesh.used), -1 = tanpa tudung
     private volatile int hairStyle = 0;                       // PutraMesh.STYLE_*; terlihat hanya bila peci dilepas
@@ -63,6 +64,9 @@ final class PutriGLView extends GLSurfaceView {
      */
     /** Pasang tudung hewan (0..11) atau lepas (-1). Panggil sebelum setLook, yang memuat ulang mesh. */
     void setHood(int animal) { hood = HoodMesh.used(animal) ? animal : -1; }
+
+    /** Pasang / lepas ransel putra. Panggil sebelum setLook, yang memuat ulang mesh. */
+    void setTas(boolean on) { showTas = on; }
 
     void setLook(String pakaian, String rambut, String latar, boolean peci, int gayaRambut) {
         lookPakaian = pakaian; lookRambut = rambut; showPeci = peci; hairStyle = gayaRambut;
@@ -218,7 +222,7 @@ final class PutriGLView extends GLSurfaceView {
             if (gender == 0) {
                 if (sMeshPutra == null) sMeshPutra = PutraMesh.build();
                 PutraMesh m = sMeshPutra;
-                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci, hood >= 0 ? PutraMesh.STYLE_HOOD : hairStyle); mvc = m.vertCount;
+                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci, hood >= 0 ? PutraMesh.STYLE_HOOD : hairStyle, lookPakaian == null && hood < 0, showTas); mvc = m.vertCount;
                 mcol = m.outfitColors(lookPakaian, lookRambut);
             } else {
                 if (sMesh == null) sMesh = PutriMesh.build();
