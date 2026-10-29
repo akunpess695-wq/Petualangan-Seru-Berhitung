@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.18.0";
+    private static final String APP_VERSION = "6.20.0";
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
@@ -5867,7 +5867,7 @@ public class MainActivity extends Activity {
             int red = col("#A11F2B"); if (cl >= 0) { String[] cs3 = itIcon(cl).split(","); if (cs3.length > 2) { red = col(cs3[2]); } }
             // v6.18.0: Putra tanpa baju dari toko memakai seragam SD Alam Muhammadiyah Kandangan:
             // kemeja putih, celana merah marun, kain leher marun bersimpul emas, lambang sekolah di dada.
-            final boolean seragam = !girl && !hood && cl < 0;
+            final boolean seragam = !hood && cl < 0;   // putra dan putri
             if (seragam) {
                 shirt = col("#F8F8F8");
                 slv = shirt;
@@ -5903,12 +5903,14 @@ public class MainActivity extends Activity {
                 int mar = col("#8E1B2E");
                 int marD = col("#6D1422");
                 int gold = col("#D4A82A");
-                // ujung kain leher menjuntai di dada (makin ke bawah makin sempit)
+                if (!girl) {
+                // ujung kain leher menjuntai di dada (makin ke bawah makin sempit); putri berjilbab tanpa kain leher
                 addBox(44.5f, 44.5f, 55.5f, 48.5f, 7.05f, 7.7f, mar, mar, marD, 0);
                 addBox(46f, 48.5f, 54f, 52.5f, 7.05f, 7.7f, mar, mar, marD, 0);
                 addBox(47.6f, 52.5f, 52.4f, 55.3f, 7.05f, 7.7f, mar, mar, marD, 0);
                 // simpul emas di bawah leher
                 addBox(47.2f, 44.8f, 52.8f, 47.8f, 7.7f, 8.4f, gold, gold, gold, 0);
+                }
                 // lambang sekolah di dada kiri pemakai: bintang jingga, bulatan hijau, gelombang ungu
                 int org = col("#F28C1B");
                 int grn = col("#43A047");

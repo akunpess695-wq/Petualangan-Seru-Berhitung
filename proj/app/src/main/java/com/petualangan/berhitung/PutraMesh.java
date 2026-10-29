@@ -26,7 +26,10 @@ final class PutraMesh {
     // per tampilan tanpa mengubah mesh bersama (static di PutriGLView). ----
     static final int P_OTHER = 0, P_SHIRT = 1, P_TRIM = 2, P_BUTTON = 3, P_SLEEVE = 4, P_PANTS = 5, P_HAIR = 6, P_PECI = 7,
             P_HAIR_CREW = 8, P_HAIR_SPIKY = 9, P_HAIR_MESSY = 10, P_HAIR_DET = 11, P_HAIR_LOW = 12, P_HAIR_SIDE = 13, P_HAIR_CURL = 14, P_HAIR_CROWN = 15, P_CURL_LOW = 16, P_HAIR_BANG = 17,
-            P_HAIR_WAVY = 18, P_HAIR_QUIFF = 19, P_HAIR_BUN = 20, P_HAIR_VOL = 21, P_HAIR_VOLH = 22, P_TIE = 23;
+            P_HAIR_WAVY = 18, P_HAIR_QUIFF = 19, P_HAIR_BUN = 20, P_HAIR_VOL = 21, P_HAIR_VOLH = 22, P_TIE = 23,
+            P_UNI = 24,   // perlengkapan seragam sekolah (kacu marun, simpul emas, ikat pinggang, lambang): hanya terlihat bila tidak memakai baju dari toko
+            P_SLEEVE_LO = 25,   // lengan baju bagian bawah (lengan panjang baju toko): disembunyikan saat seragam (lengan pendek)
+            P_ARM_SKIN = 26;    // lengan bawah berkulit: hanya terlihat saat seragam
     /** Gaya rambut (terlihat hanya bila peci dilepas). 0 = cangkang rambut bawaan (rapi). */
     static final int STYLE_DEFAULT = 0, STYLE_CREW = 1, STYLE_SPIKY = 2, STYLE_MESSY = 3, STYLE_SIDE = 4, STYLE_CURLY = 5,
             STYLE_HOOD = 6, STYLE_WAVY = 7, STYLE_QUIFF = 8, STYLE_BUN = 9;   // tudung hewan dipakai: peci dan semua rambut disembunyikan (tudung digambar HoodMesh)
@@ -380,15 +383,27 @@ final class PutraMesh {
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg;
             M.cur = P_SLEEVE;
-            double[][] path = {{s * 10.8, 48.5, -0.6}, {s * 12.4, 42, -1.2}, {s * 13.8, 36, -1.8}, {s * 15.0, 30.0, -2.0}};
-            double[] rd = {3.9, 3.8, 3.7, 3.9};
+            // lengan atas (lengan pendek seragam): dari bahu sampai y=42
+            double[][] upper = {{s * 10.8, 48.5, -0.6}, {s * 11.6, 45.2, -0.9}, {s * 12.4, 42, -1.2}};
+            M.tube(upper, new double[][]{{3.9, 3.9}, {3.85, 3.85}, {3.8, 3.8}}, WHITE, 16);
+            M.ellipsoid(new double[]{s * 10.8, 48.5, -0.6}, new double[]{3.9, 3.9, 3.9}, WHITE, 16, 10);
+            double[][] hem = {{s * 12.3, 42.6, -1.15}, {s * 12.5, 41.4, -1.25}};
+            M.tube(hem, new double[][]{{4.05, 4.05}, {4.05, 4.05}}, WHITE, 16); // tepi lengan pendek
+            // lengan bawah baju (hanya baju toko berlengan panjang)
+            M.cur = P_SLEEVE_LO;
+            double[][] path = {{s * 12.4, 42, -1.2}, {s * 13.1, 39, -1.5}, {s * 13.8, 36, -1.8}, {s * 15.0, 30.0, -2.0}};
+            double[] rd = {3.8, 3.75, 3.7, 3.9};
             double[][] rad = new double[4][];
             for (int i = 0; i < 4; i++) rad[i] = new double[]{rd[i], rd[i]};
             M.tube(path, rad, WHITE, 16);
-            M.ellipsoid(new double[]{s * 10.8, 48.5, -0.6}, new double[]{3.9, 3.9, 3.9}, WHITE, 16, 10);
             double[][] cuff = new double[2][];
             cuff[0] = new double[]{s * 14.6, 30.6, -1.95}; cuff[1] = new double[]{s * 14.9, 29.2, -2.0};
             M.tube(cuff, new double[][]{{4.1, 4.1}, {4.2, 4.2}}, new double[]{0.86, 0.88, 0.95}, 16); // manset
+            // lengan bawah berkulit (hanya seragam): ujung atasnya terselip di dalam lengan pendek
+            M.cur = P_ARM_SKIN;
+            double[][] fore = {{s * 12.2, 43.5, -1.1}, {s * 13.1, 39, -1.5}, {s * 13.8, 36, -1.8}, {s * 15.0, 30.0, -2.0}};
+            M.tube(fore, new double[][]{{3.3, 3.3}, {3.35, 3.35}, {3.25, 3.25}, {2.9, 2.9}}, SKIN, 16);
+            M.ellipsoid(new double[]{s * 15.0, 30.0, -2.0}, new double[]{2.9, 1.3, 2.9}, SKIN, 16, 8); // penutup pergelangan
             M.cur = P_OTHER;
             M.ellipsoid(new double[]{s * 15.0, 26.6, -0.4}, new double[]{2.7, 4.0, 2.5}, SKIN, 18, 12);
         }
@@ -403,6 +418,7 @@ final class PutraMesh {
                     {s * 9.8, 45, tz(9.8, 45) + 0.9}, {s * 9.8, 40, tz(9.8, 40) + 0.9}, {s * 9.8, 36.5, tz(9.8, 36.5) + 0.9}};
             M.tube(pth, rr(7, 1.35, 0.5), PBAG, 8);
         }
+        M.uniform();
         // kepala + wajah
         final int headStart = M.bp.size();
         M.skull(HC, HR, SKIN, 56, 32, -PI / 2, null);
@@ -679,7 +695,7 @@ final class PutraMesh {
     // ---- rambut tebal: cangkang volume (menggembung 2-3 satuan) + gumpalan besar yang cembung dan meruncing ----
     private double bulgeAmp = 2.2;
     /** gaya rambut baru (VOL/VOLH, Messy, Bergelombang, Quiff, Ikat Kecil): tepi belakang diturunkan ke tengkuk dan pangkal helai dibuat lebih terang (0 = perilaku lama). */
-    private double hemDrop = 0.0, hemLift = 0.0, offShift = 0.0;   // offShift < 0: helai terbenam ke cangkang supaya tidak ada celah tembus
+    private double hemDrop = 0.0, hemLift = 0.0;
     private double backDrop(double aw) { return hemDrop * smooth(Math.toRadians(95), Math.toRadians(140), aw); }
     private double edgeYd(double w) { return edgeY(w) - backDrop(Math.abs(w)); }
     /** tebal tambahan cangkang volume di sudut w, tinggi y: tipis di tepi bawah, menebal ke atas, paling tebal di puncak. */
@@ -811,7 +827,7 @@ final class PutraMesh {
             lift[k] = 0.50 * hww[k];
             double w = Math.atan2(q[0] - HC[0], q[2] - HC[2]);
             double[] o = outward(q);
-            double of = bulge(w, q[1]) + off + offShift + 0.2 * hww[k] + tipLift * tt * tt * tt;
+            double of = bulge(w, q[1]) + off + 0.2 * hww[k] + tipLift * tt * tt * tt;
             path[k] = new double[]{q[0] + o[0] * of, q[1] + o[1] * of, q[2] + o[2] * of};
         }
         tone = toneV;
@@ -1025,7 +1041,7 @@ final class PutraMesh {
 
     // ---- bentuk rambut baru: dua cangkang volume bersama (VOL: garis rambut biasa; VOLH: dahi terbuka) lalu gumpalan tiap gaya ----
     private void volShells() {
-        hemDrop = 2.2; hemLift = 0.30; offShift = -1.0;
+        hemDrop = 2.2; hemLift = 0.30;
         frontUp = 0.0;
         bulgeShellN(P_HAIR_VOL, 2.4, 0.0, 54, 34, 30);
         frontUp = 1.7;
@@ -1098,13 +1114,13 @@ final class PutraMesh {
             double wB = wE + (r.nextBoolean() ? 1 : -1) * jit(r, 0.05, 0.40);
             double yB = Math.max(yE + 1.5, jit(r, 75.0, 79.0));
             double[] st = startNear(wB, yB, xw, zw, jit(r, 0.15, 0.40));
-            clump(st[0], st[1], wB, yB, wE, yE, jit(r, 2.3, 3.2), (r.nextBoolean() ? 1 : -1) * jit(r, 0.6, 1.8), toneOf(k, r), 0.6, jit(r, 0.2, 0.9), 2.2);
+            clump(st[0], st[1], wB, yB, wE, yE, jit(r, 2.3, 3.2), (r.nextBoolean() ? 1 : -1) * jit(r, 0.6, 1.8), toneOf(k, r), 0.6, jit(r, 1.8, 4.2), 2.2);
         }
         for (int k = 0; k < 8; k++) {   // jambul mencuat di puncak
             double a = 2 * PI * (k + r.nextDouble() * 0.5) / 8;
             double wB = Math.atan2(Math.sin(a) * 4.0, Math.cos(a) * 4.0 + 2.0);
             double[] st = startNear(wB, 79.6, xw, zw, 0.3);
-            clump(st[0], st[1], wB, 79.8, wB + (r.nextBoolean() ? 1 : -1) * jit(r, 0.15, 0.45), jit(r, 76.6, 78.2), jit(r, 1.7, 2.2), jit(r, -1.0, 1.0), 1.05 + jit(r, 0.0, 0.15), 0.1, jit(r, 0.2, 0.7), 2.2);
+            clump(st[0], st[1], wB, 79.8, wB + (r.nextBoolean() ? 1 : -1) * jit(r, 0.15, 0.45), jit(r, 76.6, 78.2), jit(r, 1.7, 2.2), jit(r, -1.0, 1.0), 1.05 + jit(r, 0.0, 0.15), 1.0, jit(r, 3.5, 5.0), 2.2);
         }
         curShade = null; cur = P_OTHER;
     }
@@ -1170,7 +1186,7 @@ final class PutraMesh {
         cur = P_TIE;
         ellipsoid(new double[]{cen[0] - co[0] * 2.9, cen[1] - co[1] * 2.9, cen[2] - co[2] * 2.9}, new double[]{2.3, 0.8, 2.3}, new double[]{0.80, 0.12, 0.12}, 12, 6);
         cur = P_OTHER;
-        hemDrop = 0.0; hemLift = 0.0; offShift = 0.0;
+        hemDrop = 0.0; hemLift = 0.0;
     }
 
     private void hairStyles() {
@@ -1190,6 +1206,76 @@ final class PutraMesh {
     }
     private static double clamp(double a) { return a < 0 ? 0 : (a > 1 ? 1 : a); }
     private static double tz(double x, double y) { double[] q = interp(TORSO, y); return q[1] * Math.sqrt(Math.max(0, 1 - sq(x / q[0]))); }
+
+    /** Stiker bundar menempel di dada: setengah elipsoid yang dasarnya mengikuti lengkung badan (z = tz + off). */
+    void tdecal(double cx, double cy, double rx, double ry, double thick, double off, double[] colr, int nu, int nv) {
+        ellipsoid(new double[]{cx, cy, 0}, new double[]{rx, ry, thick}, colr, nu, nv, -PI / 2, PI / 2, null, P -> {
+            for (double[][] row : P)
+                for (double[] v : row) v[2] = tz(v[0], v[1]) + off + Math.max(v[2], 0);
+        });
+    }
+
+    /** Seragam SD Alam Muhammadiyah Kandangan: kain leher marun bersimpul emas dan lambang di dada kiri pemakai (sisi +x). */
+    private void uniform() {
+        final double[] MARUN = {0.557, 0.106, 0.180}, GOLD = {0.83, 0.66, 0.16}, GOLD_D = {0.70, 0.52, 0.10};
+        cur = P_UNI;
+        // lingkar kain di pangkal leher, sedikit di luar kerah
+        double[] cq = interp(TORSO, 55.0);
+        int n = 20;
+        double[][] ring = new double[n + 1][];
+        for (int i = 0; i < n; i++) { double t = 2 * PI * i / n; ring[i] = new double[]{cq[2] + (cq[0] + 1.3) * Math.sin(t), 55.0, cq[3] + (cq[1] + 1.3) * Math.cos(t)}; }
+        ring[n] = ring[0];
+        tube(ring, rr(n + 1, 1.2, 1.2), MARUN, 6);
+        // ujung kain menjuntai di dada, makin ke bawah makin sempit
+        int m = 7;
+        double[][] tail = new double[m][], tr = new double[m][];
+        for (int i = 0; i < m; i++) {
+            double y = 54.0 - 12.5 * i / (m - 1.0);
+            tail[i] = new double[]{0, y, tz(0, y) + 0.55};
+            tr[i] = new double[]{4.0 * (1.0 - 0.86 * i / (m - 1.0)) + 0.4, 0.8};
+        }
+        tube(tail, tr, MARUN, 6);
+        // simpul emas
+        ellipsoid(new double[]{0, 53.4, tz(0, 53.4) + 1.3}, new double[]{2.1, 1.7, 1.2}, GOLD, 14, 8);
+        ellipsoid(new double[]{0, 53.4, tz(0, 53.4) + 1.5}, new double[]{1.0, 0.8, 1.2}, GOLD_D, 10, 6);
+        // pita kain leher membentuk V dari bahu ke simpul
+        for (int sg = -1; sg <= 1; sg += 2) {
+            int vn = 5;
+            double[][] vp = new double[vn][], vr = new double[vn][];
+            for (int i = 0; i < vn; i++) {
+                double f = i / (vn - 1.0);
+                double x = sg * 6.2 * (1 - f), y = 55.0 - 1.8 * f - 0.0;
+                vp[i] = new double[]{x, y, tz(x, y) + 1.0};
+                vr[i] = new double[]{1.2, 0.7};
+            }
+            tube(vp, vr, MARUN, 6);
+        }
+        // segitiga kain di punggung
+        int bn2 = 6;
+        double[][] bk = new double[bn2][], br = new double[bn2][];
+        for (int i = 0; i < bn2; i++) {
+            double y = 54.0 - 9.0 * i / (bn2 - 1.0);
+            double[] q = interp(TORSO, y);
+            bk[i] = new double[]{0, y, q[3] - q[1] - 0.6};
+            br[i] = new double[]{4.2 * (1.0 - 0.85 * i / (bn2 - 1.0)) + 0.3, 0.6};
+        }
+        tube(bk, br, MARUN, 6);
+        // ikat pinggang hitam dan gesper
+        double[] bq = interp(TORSO, 30.0);
+        int bnn = 24;
+        double[][] belt = new double[bnn + 1][];
+        for (int i = 0; i < bnn; i++) { double t = 2 * PI * i / bnn; belt[i] = new double[]{bq[2] + (bq[0] + 0.5) * Math.sin(t), 30.0, bq[3] + (bq[1] + 0.5) * Math.cos(t)}; }
+        belt[bnn] = belt[0];
+        tube(belt, rr(bnn + 1, 0.9, 0.9), new double[]{0.07, 0.07, 0.08}, 6);
+        superbox(new double[]{0, 30.0, bq[3] + bq[1] + 0.9}, new double[]{1.6, 1.3, 0.35}, new double[]{0.78, 0.78, 0.80}, 3.0, 8, 6);
+        // lambang sekolah cincin jingga, bulatan hijau, gelombang ungu
+        final double lx = 5.4, ly = 43.5;
+        tdecal(lx, ly, 3.3, 3.3, 0.35, 0.10, new double[]{0.95, 0.55, 0.10}, 16, 8);
+        tdecal(lx, ly, 2.7, 2.7, 0.35, 0.22, new double[]{0.99, 0.96, 0.80}, 16, 8);
+        tdecal(lx, ly, 2.4, 2.4, 0.35, 0.34, new double[]{0.26, 0.62, 0.28}, 16, 8);
+        tdecal(lx + 0.8, ly + 0.8, 1.35, 1.5, 0.30, 0.46, new double[]{0.42, 0.24, 0.94}, 12, 8);
+        cur = P_OTHER;
+    }
 
     /** Skala non-seragam untuk semua bagian yang dibuat sejak indeks 'from' (kepala), dengan pivot (px,py,pz). */
     private void scaleFrom(int from, double sx, double sy, double sz, double px, double py, double pz) {
@@ -1283,7 +1369,7 @@ final class PutraMesh {
                 case P_SHIRT: k = body; break;
                 case P_TRIM: k = trim; break;
                 case P_BUTTON: k = btn; break;
-                case P_SLEEVE: k = arm; break;
+                case P_SLEEVE: case P_SLEEVE_LO: k = arm; break;
                 case P_PANTS: k = pants; break;
                 case P_HAIR: case P_HAIR_CREW: case P_HAIR_SPIKY: case P_HAIR_MESSY: case P_HAIR_DET: case P_HAIR_LOW: case P_HAIR_SIDE: case P_HAIR_CURL: case P_HAIR_CROWN: case P_CURL_LOW: case P_HAIR_BANG: case P_HAIR_WAVY: case P_HAIR_QUIFF: case P_HAIR_BUN: case P_HAIR_VOL: case P_HAIR_VOLH: {
                     // gradasi: warna dasar (pilihan pemain, atau bawaan) dikali pengali terang/gelap per titik
@@ -1300,12 +1386,16 @@ final class PutraMesh {
     }
     /** Indeks segitiga untuk satu tampilan (tanpa gaya rambut tambahan). */
     int[] indexFor(boolean showPeci) { return indexFor(showPeci, STYLE_DEFAULT); }
+    int[] indexFor(boolean showPeci, int style) { return indexFor(showPeci, style, true); }
     /**
      * Indeks segitiga untuk satu tampilan. showPeci=false membuang peci; gaya rambut (STYLE_*) hanya digambar bila
      * peci dilepas, sebab rambut tertutup peci. Gaya crew cut menggantikan cangkang rambut bawaan.
      */
-    int[] indexFor(boolean showPeci, int style) {
-        boolean[] hide = new boolean[24];
+    int[] indexFor(boolean showPeci, int style, boolean uniform) {
+        boolean[] hide = new boolean[27];
+        hide[P_SLEEVE_LO] = uniform;                         // seragam berlengan pendek
+        hide[P_ARM_SKIN] = !uniform;                         // lengan bawah berkulit hanya saat seragam
+        hide[P_UNI] = !uniform;                              // seragam hanya bila tanpa baju dari toko
         boolean st = !showPeci;
         hide[P_PECI] = !showPeci;
         hide[P_HAIR_SPIKY] = true;                          // gaya jabrik sudah tidak dipakai (tidak cocok untuk sekolah)
