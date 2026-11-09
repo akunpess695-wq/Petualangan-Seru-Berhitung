@@ -1,0 +1,11 @@
+SATU ZIP UNTUK SOURCE + BUILD.YML
+
+1. Ekstrak ZIP ini.
+2. Buka folder PSB-v3.7-GitHub-Ready.
+3. Upload SEMUA isinya ke root repository GitHub, termasuk folder .github (folder tersembunyi).
+4. Pastikan .github/workflows/build.yml ada di repository.
+5. Buka tab Actions dan jalankan Build Android APK v3.7 atau push ke main/master.
+6. Unduh APK dari Artifacts jika build berhasil.
+
+Jangan upload ZIP ini sebagai satu file ke repository: workflow membutuhkan source yang sudah diekstrak.
+Build APK belum diverifikasi pada runner GitHub.
