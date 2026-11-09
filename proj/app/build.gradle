@@ -10,17 +10,11 @@ android {
         applicationId "com.petualangan.belajarbersama"
         minSdk 21
         targetSdk 34
-        versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-        versionName "6.22.0"
+        versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '13')
+        versionName "7.0.0"
     }
 
     signingConfigs {
-        debug {
-            storeFile file('pb.keystore')
-            storePassword 'berhitung123'
-            keyAlias 'berhitung'
-            keyPassword 'berhitung123'
-        }
         release {
             // Diisi dari GitHub Secrets (lihat langkah "Siapkan keystore release")
             def ks = System.getenv('RELEASE_KEYSTORE')
