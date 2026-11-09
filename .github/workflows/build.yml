@@ -1,66 +1,31 @@
-name: Build Petualangan Seru Berhitung v2.3
-
+name: Build Android APK v3.7
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-
+    branches: [main, master]
 permissions:
   contents: read
-
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Extract source ZIP automatically
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f Petualangan-Seru-Berhitung-v2.3-source.zip || { echo 'ERROR: Upload Petualangan-Seru-Berhitung-v2.3-source.zip to repository root'; exit 1; }
-          python3 - <<'PYZIP'
-          import zipfile, pathlib
-          p=pathlib.Path('Petualangan-Seru-Berhitung-v2.3-source.zip')
-          with zipfile.ZipFile(p) as z:
-              for m in z.infolist():
-                  q=pathlib.PurePosixPath(m.filename)
-                  if q.is_absolute() or '..' in q.parts or not str(q).startswith('Petualangan-Seru-Berhitung-v2.3-source/'):
-                      raise RuntimeError('Unsafe ZIP entry: '+m.filename)
-              bad=z.testzip()
-              if bad: raise RuntimeError('Corrupt ZIP entry: '+bad)
-              z.extractall('source')
-          PYZIP
-          test -f source/Petualangan-Seru-Berhitung-v2.3-source/proj/app/build.gradle
-
-      - name: Configure Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
+      - name: Verify character meshes
+        run: bash verification/verify_obj.sh
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
-      - name: Verify Android SDK
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          test -d "$ANDROID_HOME/platforms/android-34" || { echo 'Android 34 platform missing on runner'; exit 1; }
-          test -d "$ANDROID_HOME/build-tools/34.0.0" || { echo 'Android 34 build-tools missing on runner'; exit 1; }
-
-      - name: Compile debug APK
-        working-directory: source/Petualangan-Seru-Berhitung-v2.3-source/proj
+      - name: Build debug APK
+        working-directory: proj
         run: gradle --no-daemon --stacktrace :app:assembleDebug
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: Petualangan-Seru-Berhitung-v2.3-debug-APK
-          path: source/Petualangan-Seru-Berhitung-v2.3-source/proj/app/build/outputs/apk/debug/*.apk
+          name: Petualangan-Seru-Berhitung-v3.7-debug
+          path: proj/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
