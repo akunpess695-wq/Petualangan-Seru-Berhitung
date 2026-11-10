@@ -462,8 +462,13 @@ final class HoodMesh {
         double s0 = sTop + 0.15;
         double[] m = pa(0, s0, 0.3 * k);
         ellipsoidN(add(m, 0, 0, 0.5 * k), 6.0 * k * mw, 3.3 * k, 2.4 * k, muz, 12, 7);
-        ellipsoidN(add(m, 0, 1.0 * k, 2.4 * k), 1.9 * k, 1.3 * k, 1.2 * k, nose, 10, 6);
+        ellipsoidN(add(m, 0, 1.0 * k, 2.4 * k), 1.9 * k, 1.3 * k, 1.2 * k, nose, 14, 9);
+        // Hidung mengilap dan dua pipi lembut; detail timbul, bukan gambar datar.
+        ellipsoidN(add(m, -0.43 * k, 1.44 * k, 3.48 * k),
+                0.36 * k, 0.22 * k, 0.13 * k, new double[]{1.0, 0.92, 0.84}, 9, 6);
         for (int sg = -1; sg <= 1; sg += 2) {
+            ellipsoidN(add(m, sg * 4.35 * k, -0.85 * k, 2.18 * k),
+                    0.95 * k, 0.52 * k, 0.19 * k, new double[]{0.96, 0.65, 0.64}, 10, 6);
             double[] e = pa(sg * 19, s0 + 0.16, 0.5 * k);
             ellipsoidN(add(e, 0, 0, 0.5 * k), 1.15 * k, 1.45 * k, 0.9 * k, eye, 14, 9);
             // Pantulan cahaya kecil membuat mata hewan lebih hidup tanpa mengubah identitasnya.
