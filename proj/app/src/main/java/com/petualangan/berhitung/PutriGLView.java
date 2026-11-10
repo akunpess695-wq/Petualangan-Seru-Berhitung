@@ -8,8 +8,6 @@ import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.util.Log;
 import android.view.MotionEvent;
-import android.view.Choreographer;
-import android.os.SystemClock;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -29,7 +27,6 @@ final class PutriGLView extends GLSurfaceView {
     private static PutriMesh sMesh;     // putri, dibuat sekali, dipakai ulang
     private static PutraMesh sMeshPutra; // putra
     private static final HoodMesh[][] sHood = new HoodMesh[2][HoodMesh.COUNT]; // tudung per gender dan hewan, dibuat saat dipakai
-    private final Context assetContext;
     private final int gender;            // 0 = putra, 1 = putri
 
     private volatile float yaw = 0f, pitch = 0f; // derajat
@@ -42,62 +39,11 @@ final class PutriGLView extends GLSurfaceView {
     private volatile float[] bgGrad;                          // 6 warna rgb + jumlah ruas di [18]; null = latar rata
     private float lastX, lastY;
     private final Renderer renderer = new Renderer();
-    // Lightweight idle animation: no per-frame mesh uploads, max 30 fps.
-    private volatile boolean animated = true;
-    private volatile float idlePhase = 0f;
-    private boolean frameScheduled = false;
-    private long lastFrameNs = 0L;
-    private long idleStartMs = SystemClock.uptimeMillis();
-    private final Choreographer.FrameCallback idleFrame = new Choreographer.FrameCallback() {
-        @Override public void doFrame(long frameTimeNanos) {
-            frameScheduled = false;
-            if (!animated || !isAttachedToWindow() || getVisibility() != VISIBLE) return;
-            if (frameTimeNanos - lastFrameNs >= 33_000_000L) {
-                lastFrameNs = frameTimeNanos;
-                idlePhase = (SystemClock.uptimeMillis() - idleStartMs) * 0.001f;
-                requestRender();
-            }
-            scheduleIdleFrame();
-        }
-    };
-
-    private void scheduleIdleFrame() {
-        if (animated && isAttachedToWindow() && getVisibility() == VISIBLE && !frameScheduled) {
-            frameScheduled = true;
-            Choreographer.getInstance().postFrameCallback(idleFrame);
-        }
-    }
-    private void stopIdleFrame() {
-        if (frameScheduled) Choreographer.getInstance().removeFrameCallback(idleFrame);
-        frameScheduled = false;
-    }
-    @Override protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        scheduleIdleFrame();
-    }
-    @Override protected void onDetachedFromWindow() {
-        stopIdleFrame();
-        super.onDetachedFromWindow();
-    }
-    @Override public void onPause() {
-        stopIdleFrame();
-        super.onPause();
-    }
-    @Override public void onResume() {
-        super.onResume();
-        scheduleIdleFrame();
-    }
-    void setIdleAnimationEnabled(boolean enabled) {
-        animated = enabled;
-        if (enabled) scheduleIdleFrame();
-        else { stopIdleFrame(); requestRender(); }
-    }
 
     PutriGLView(Context ctx) { this(ctx, 1); }
 
     PutriGLView(Context ctx, int gender) {
         super(ctx);
-        assetContext = ctx.getApplicationContext();
         this.gender = gender == 0 ? 0 : 1;
         setEGLContextClientVersion(2);
         setEGLConfigChooser(8, 8, 8, 0, 16, 0); // RGB + depth 16
@@ -193,8 +139,7 @@ final class PutriGLView extends GLSurfaceView {
             "  vC = aCol;\n" +
             "}\n";
 
-    // Studio portrait lighting: warm key, cool fill, soft ambient and edge light.
-    // Material is based on existing vertex colors; no unsupported external texture files.
+    // Sama dengan render.py: key (-0.45,0.65,0.62), fill (0.6,0.1,0.5), spekular 0.10^24
     private static final String FS =
             "precision mediump float;\n" +
             "varying vec3 vN;\n" +
@@ -202,19 +147,15 @@ final class PutriGLView extends GLSurfaceView {
             "void main(){\n" +
             "  vec3 n = normalize(vN);\n" +
             "  if (n.z < 0.0) n = -n;\n" +
-            "  vec3 key = normalize(vec3(-0.48, 0.72, 0.62));\n" +
-            "  vec3 fill = normalize(vec3(0.75, 0.25, 0.48));\n" +
-            "  float dKey = max(dot(n, key), 0.0);\n" +
-            "  float dFill = max(dot(n, fill), 0.0);\n" +
+            "  vec3 L1 = normalize(vec3(-0.45, 0.65, 0.62));\n" +
+            "  vec3 L2 = normalize(vec3(0.6, 0.1, 0.5));\n" +
+            "  vec3 Hh = normalize(L1 + vec3(0.0, 0.0, 1.0));\n" +
+            "  float d1 = max(dot(n, L1), 0.0);\n" +
+            "  float d2 = max(dot(n, L2), 0.0);\n" +
             "  float hemi = 0.5 + 0.5 * n.y;\n" +
-            "  float diffuse = 0.44 + 0.17 * hemi + 0.38 * dKey + 0.13 * dFill;\n" +
-            "  vec3 halfVec = normalize(key + vec3(0.0, 0.0, 1.0));\n" +
-            "  float gloss = 0.065 * pow(max(dot(n, halfVec), 0.0), 24.0);\n" +
-            "  float rim = pow(1.0 - abs(n.z), 3.0) * 0.10;\n" +
-            "  vec3 warm = vec3(1.0, 0.967, 0.94);\n" +
-            "  vec3 cool = vec3(0.80, 0.87, 1.0);\n" +
-            "  vec3 c = vC * (diffuse * warm + 0.08 * dFill * cool);\n" +
-            "  c += vec3(gloss) + rim * cool * vC;\n" +
+            "  float sh = 0.50 + 0.18 * hemi + 0.50 * d1 + 0.12 * d2;\n" +
+            "  float spec = 0.10 * pow(max(dot(n, Hh), 0.0), 24.0);\n" +
+            "  vec3 c = vC * sh + vec3(spec) + (1.0 - sh) * vec3(-0.01, 0.0, 0.025);\n" +
             "  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);\n" +
             "}\n";
 
@@ -289,20 +230,10 @@ final class PutriGLView extends GLSurfaceView {
                 mpos = m.pos; mnor = m.nor; midx = m.indexFor(true, showTas); mvc = m.vertCount; // ransel putri juga bisa dilepas
                 mcol = m.outfitColors(lookPakaian, lookRambut);
             }
-            // External character assets are optional. On missing/invalid assets, retain the tested legacy mesh.
-            // Explicitly avoid applying legacy accessory indices to an external topology.
-            ExternalCharacterMesh replacement = ExternalCharacterMesh.tryLoad(assetContext, gender);
-            if (replacement != null) {
-                mpos = replacement.pos;
-                mnor = replacement.nor;
-                mcol = replacement.col;
-                midx = replacement.indices;
-                mvc = replacement.vertexCount;
-            }
             // tudung hewan: titik dan indeksnya ditambahkan di belakang mesh badan (indeks tetap di bawah 65.536)
             HoodMesh hm = null;
             final int hd = hood;
-            if (hd >= 0 && replacement == null) {
+            if (hd >= 0) {
                 if (sHood[gender][hd] == null) sHood[gender][hd] = HoodMesh.build(hd, gender);
                 hm = sHood[gender][hd];
                 if (mvc + hm.vertCount > 65535) hm = null;   // pengaman batas short
@@ -372,14 +303,6 @@ final class PutriGLView extends GLSurfaceView {
                 GLES20.glEnable(GLES20.GL_DEPTH_TEST);
             }
             Matrix.setIdentityM(model, 0);
-            // Gentle breathing, weight shift and head-to-toe sway of existing mesh.
-            // This is a whole-body idle motion; facial blinking needs a rigged mesh.
-            float phase = idlePhase;
-            if (animated) {
-                Matrix.translateM(model, 0, 0f, (float)Math.sin(phase * 2.1f) * 0.55f, 0f);
-                Matrix.rotateM(model, 0, (float)Math.sin(phase * 0.85f) * 1.35f, 0f, 0f, 1f);
-                Matrix.rotateM(model, 0, (float)Math.sin(phase * 1.2f) * 0.85f, 1f, 0f, 0f);
-            }
             Matrix.rotateM(model, 0, pitch, 1f, 0f, 0f);
             Matrix.rotateM(model, 0, yaw, 0f, 1f, 0f);
             Matrix.translateM(model, 0, 0f, -48f, 0f);

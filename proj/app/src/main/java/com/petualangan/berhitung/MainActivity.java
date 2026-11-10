@@ -7168,7 +7168,7 @@ public class MainActivity extends Activity {
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(text("✨ Avatar Studio", 24, Color.rgb(93, 62, 177), true), new LinearLayout.LayoutParams(0, WRAP, 1f));
+        head.addView(text("\uD83D\uDECD\uFE0F Toko Avatar", 22, ORANGE_DARK, true), new LinearLayout.LayoutParams(0, WRAP, 1f));
         head.addView(pill("\uD83D\uDCB0 " + coins(), ORANGE), new LinearLayout.LayoutParams(WRAP, WRAP));
         c.addView(head, lp(WRAP, 0));
 
@@ -7189,46 +7189,16 @@ public class MainActivity extends Activity {
             c.addView(pr, lp(dp(44), 12));
         }
 
-        // V2.2: real visual overhaul of the avatar preview, not only an idle animation.
         LinearLayout pv = card();
-        pv.setPadding(dp(12), dp(12), dp(12), dp(18));
-        pv.setBackground(box(Color.rgb(246, 244, 255), 28));
-        TextView stageTitle = text("✦ STUDIO AVATAR 3D", 15, Color.rgb(93, 62, 177), true);
-        stageTitle.setGravity(Gravity.CENTER);
-        pv.addView(stageTitle, lp(WRAP, 5));
-        TextView stageHint = text("Geser karakter untuk melihat dari segala sisi", 12, Color.rgb(109, 104, 139), false);
-        stageHint.setGravity(Gravity.CENTER);
-        pv.addView(stageHint, lp(WRAP, 4));
-        FrameLayout stage = new FrameLayout(this);
-        GradientDrawable stageBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(218, 205, 255), Color.rgb(235, 244, 255), Color.rgb(251, 229, 238)});
-        stageBg.setCornerRadius(dp(25));
-        stage.setBackground(stageBg);
-        stage.setClipToOutline(true);
+        pv.setGravity(Gravity.CENTER_HORIZONTAL);
         if (USE_PUTRI_GL) {
             putriGL = new PutriGLView(this, genderOf[shopPl]);
             applyLook3D(putriGL, shopPl);
-            // Match the 3D background to the new studio scene.
-            putriGL.setBackgroundRgb(Color.rgb(233, 226, 250));
-            FrameLayout.LayoutParams avLp = new FrameLayout.LayoutParams(-1, dp(310));
-            avLp.gravity = Gravity.CENTER;
-            stage.addView(putriGL, avLp);
+            pv.addView(putriGL, new LinearLayout.LayoutParams(dp(200), dp(200)));
         } else {
             putriGL = null;
-            FrameLayout.LayoutParams avLp = new FrameLayout.LayoutParams(dp(265), dp(290), Gravity.CENTER);
-            stage.addView(avatarView(shopPl), avLp);
+            pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(200), dp(200)));
         }
-        TextView studioTag = text("● LIVE 3D  ·  PUTAR 360°", 11, Color.WHITE, true);
-        studioTag.setGravity(Gravity.CENTER);
-        studioTag.setPadding(dp(12), dp(8), dp(12), dp(8));
-        studioTag.setBackground(box(Color.rgb(91, 64, 160), 18));
-        FrameLayout.LayoutParams tagLp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
-        tagLp.setMargins(0, dp(12), dp(12), 0);
-        stage.addView(studioTag, tagLp);
-        pv.addView(stage, new LinearLayout.LayoutParams(-1, dp(310)));
-        TextView stageCaption = text("✨ Kostum pilihanmu langsung tampil pada karakter", 12, Color.rgb(93, 62, 177), true);
-        stageCaption.setGravity(Gravity.CENTER);
-        pv.addView(stageCaption, lp(WRAP, 10));
         LinearLayout gr = new LinearLayout(this);
         gr.setOrientation(LinearLayout.HORIZONTAL);
         for (int g = 0; g < 2; g++) {
@@ -7278,9 +7248,7 @@ public class MainActivity extends Activity {
         }
         c.addView(pv, lp(WRAP, 12));
 
-        TextView customizeTitle = text("🎨 PILIH GAYA KARAKTER", 18, Color.rgb(81, 49, 149), true);
-        c.addView(customizeTitle, lp(WRAP, 16));
-                // Lima kategori dalam satu baris: semua terlihat tanpa geser dan tanpa baris kedua.
+        // Lima kategori dalam satu baris: semua terlihat tanpa geser dan tanpa baris kedua.
         LinearLayout tabRow = new LinearLayout(this);
         tabRow.setOrientation(LinearLayout.HORIZONTAL);
         for (int tab = 0; tab < SHOP_TAB_NAME.length; tab++) {
