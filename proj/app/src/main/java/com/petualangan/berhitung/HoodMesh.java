@@ -164,7 +164,7 @@ final class HoodMesh {
     }
 
     private void shell(double[] c) {
-        int nu = 96, nv = 40;
+        int nu = 112, nv = 48;
         double th0 = Math.asin(SB);
         double[][][] G = new double[nu][nv][3];
         double[] TH = new double[nv];
@@ -450,7 +450,10 @@ final class HoodMesh {
         double s0 = sTop + 0.15;
         for (int sg = -1; sg <= 1; sg += 2) {
             double[] e = pa(sg * 19, s0 + 0.16, 0.5 * k);
-            ellipsoidN(add(e, 0, 0, 0.5 * k), 1.0 * k, 1.3 * k, 0.9 * k, eye, 10, 6);
+            ellipsoidN(add(e, 0, 0, 0.5 * k), 1.15 * k, 1.45 * k, 0.9 * k, eye, 14, 9);
+            // Pantulan cahaya kecil membuat mata hewan lebih hidup tanpa mengubah identitasnya.
+            ellipsoidN(add(e, -0.35 * k, 0.48 * k, 1.35 * k), 0.32 * k, 0.39 * k, 0.20 * k,
+                    new double[]{1, 1, 1}, 9, 6);
         }
     }
 
@@ -462,7 +465,10 @@ final class HoodMesh {
         ellipsoidN(add(m, 0, 1.0 * k, 2.4 * k), 1.9 * k, 1.3 * k, 1.2 * k, nose, 10, 6);
         for (int sg = -1; sg <= 1; sg += 2) {
             double[] e = pa(sg * 19, s0 + 0.16, 0.5 * k);
-            ellipsoidN(add(e, 0, 0, 0.5 * k), 1.0 * k, 1.3 * k, 0.9 * k, eye, 10, 6);
+            ellipsoidN(add(e, 0, 0, 0.5 * k), 1.15 * k, 1.45 * k, 0.9 * k, eye, 14, 9);
+            // Pantulan cahaya kecil membuat mata hewan lebih hidup tanpa mengubah identitasnya.
+            ellipsoidN(add(e, -0.35 * k, 0.48 * k, 1.35 * k), 0.32 * k, 0.39 * k, 0.20 * k,
+                    new double[]{1, 1, 1}, 9, 6);
             if (whisk) {
                 for (int q = 0; q < 2; q++) {
                     double[] b = add(m, sg * 3.6 * k, -0.9 * k - q * 1.0 * k, 2.2 * k);
