@@ -55,7 +55,7 @@ final class PutriMesh {
     static double hemY(double ph) {
         final double d0 = Math.toRadians(76), d1 = Math.toRadians(110);
         double d = Math.abs(((ph + PI) % (2 * PI)) - PI);
-        if (d < d0) return 54.4 - 14.4 * (1 - d / d0);
+        if (d < d0) { double t = d / d0; return 40.0 + 14.4 * t * t * (3 - 2 * t); }
         if (d < d1) { double t = (d - d0) / (d1 - d0); t = t * t * (3 - 2 * t); return 54.4 - 7.4 * t; }
         return 41.0 + 6.0 * Math.sin(PI - d) / Math.sin(PI - d1);
     }
@@ -252,6 +252,31 @@ final class PutriMesh {
         grid(P, colr, true, false, keep);
     }
 
+    /** Dua permukaan bertemu tepat pada kurva bukaan wajah. */
+    private void hijabShell(double centerY, double halfHeight, double halfAngle) {
+        final int columns = 216, rows = 36;
+        for (int section = 0; section < 2; section++) {
+            double[][][] points = new double[columns][rows][3];
+            for (int i = 0; i < columns; i++) {
+                double angle = 2 * PI * i / columns;
+                double signedAngle = angle > PI ? angle - 2 * PI : angle;
+                double extent = halfHeight * Math.sqrt(Math.max(0, 1 - sq(signedAngle / halfAngle)));
+                double top = section == 0 ? HIJAB[0][0] : centerY - extent;
+                double bottom = section == 0 ? centerY + extent : hemY(angle);
+                for (int j = 0; j < rows; j++) {
+                    double y = top + (bottom - top) * j / (rows - 1);
+                    double[] profile = interp(HIJAB, y);
+                    points[i][j] = new double[]{
+                        profile[2] + profile[0] * Math.sin(angle),
+                        y,
+                        profile[3] + profile[1] * Math.cos(angle)
+                    };
+                }
+            }
+            grid(points, HIJ, true, false, null);
+        }
+    }
+
     // ---- rakitan putri ----
     static final double[] EYE = {0.29, 0.15, 0.10}, EYE2 = {0.56, 0.33, 0.20}, PUPIL = {0.10, 0.05, 0.04}, LASH = {0.13, 0.07, 0.05}, LIP = {0.88, 0.31, 0.31};
 
@@ -275,7 +300,7 @@ final class PutriMesh {
         }, null);
         // baju
         M.cur = P_SHIRT;
-        M.loft(TORSO, WHITE, 48, 16, null, null);
+        M.loft(TORSO, WHITE, 64, 24, null, null);
         // plaket (lipatan kancing depan) dan kancing; hanya bagian di bawah ujung jilbab yang terlihat
         M.tube(new double[][]{{0, 45, tz(0, 45) + 0.25}, {0, 38, tz(0, 38) + 0.25}, {0, 29.5, tz(0, 29.5) + 0.25}}, rr(3, 0.55, 0.25), CUFF, 8);
         M.cur = P_OTHER;
@@ -285,16 +310,21 @@ final class PutriMesh {
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg;
             M.cur = P_SLEEVE;
-            double[][] path = {{s * 10.8, 48.5, -0.6}, {s * 12.4, 42, -1.2}, {s * 13.8, 36, -1.8}, {s * 15.0, 30.0, -2.0}};
-            double[] rd = {3.9, 3.8, 3.7, 3.9};
-            double[][] rad = new double[4][];
-            for (int i = 0; i < 4; i++) rad[i] = new double[]{rd[i], rd[i]};
-            M.tube(path, rad, WHITE, 16);
-            M.ellipsoid(new double[]{s * 10.8, 48.5, -0.6}, new double[]{3.9, 3.9, 3.9}, WHITE, 16, 10);
-            // manset: cincin sedikit lebih lebar dari lengan, menyempit di ujung, dengan satu kancing di sisi luar
-            M.tube(new double[][]{{s * 14.7, 32.5, -1.95}, {s * 15.0, 29.5, -2.0}, {s * 15.0, 28.3, -2.0}}, new double[][]{{4.2, 4.2}, {4.25, 4.25}, {3.0, 3.0}}, CUFF, 16);
+            double[][] path = {
+                {s * 10.6, 49.0, -0.6}, {s * 11.5, 46.5, -0.8},
+                {s * 12.4, 42.0, -1.2}, {s * 13.4, 37.5, -1.6},
+                {s * 14.2, 33.0, -1.9}, {s * 14.7, 30.0, -2.0}
+            };
+            double[] rd = {3.7, 3.8, 3.65, 3.45, 3.25, 3.05};
+            double[][] rad = new double[path.length][];
+            for (int i = 0; i < path.length; i++) rad[i] = new double[]{rd[i], rd[i]};
+            M.tube(path, rad, WHITE, 24);
+            M.ellipsoid(new double[]{s * 10.6, 49.0, -0.6}, new double[]{3.7, 3.7, 3.7}, WHITE, 24, 14);
+            // Manset mengikuti ujung lengan dengan transisi bertahap.
+            M.tube(new double[][]{{s * 14.5, 31.3, -1.95}, {s * 14.8, 29.7, -2.0}, {s * 15.0, 28.5, -2.0}},
+                    new double[][]{{3.18, 3.18}, {3.15, 3.15}, {2.85, 2.85}}, CUFF, 24);
             M.cur = P_OTHER;
-            M.ellipsoid(new double[]{s * 19.3, 30.8, -2.0}, new double[]{0.35, 0.6, 0.6}, BTN, 10, 6);
+            M.ellipsoid(new double[]{s * 17.85, 29.7, -1.8}, new double[]{0.25, 0.42, 0.42}, BTN, 12, 8);
             M.ellipsoid(new double[]{s * 15.0, 26.6, -0.4}, new double[]{2.7, 4.0, 2.5}, SKIN, 18, 12);
         }
         M.cur = P_TAS;
@@ -326,9 +356,6 @@ final class PutriMesh {
         M.cur = P_OTHER;
         // kepala + wajah (mengikuti "Detail Wajah": mata besar berlapis, alis tebal, pipi lembut, senyum tipis)
         M.ellipsoid(HC, HR, SKIN, 48, 28);
-        double[][] hl = new double[7][];
-        for (int i = 0; i < 7; i++) { double x = -6.8 + 13.6 * i / 6, y = 80.2 - 0.05 * x * x; hl[i] = new double[]{x, y, onHead(x, y, 0.2)}; }
-        M.tube(hl, rr(7, 0.5, 0.5), BROWN, 6); // garis rambut tipis di dahi
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg, ex = s * 6.3, ey = 66.6;
             M.decal(ex, ey + 0.2, 2.8, 3.65, 0.40, 0.03, new double[]{0.99, 0.96, 0.93}, 24, 14);        // putih mata
@@ -391,30 +418,29 @@ final class PutriMesh {
         M.loft(NECK, HIJ, 48, 14, null, null); // penutup leher putih
         // jilbab: satu cangkang putih (kubah -> bahu -> ujung V depan dan segitiga belakang), bukaan wajah dipotong
         final double yc = 68.3, hh = 12.4, pw = Math.toRadians(47);
-        M.loft(HIJAB, HIJ, 216, 72, null, ph -> new double[]{85.5, hemY(ph)},
-                (ph, y) -> sq(ph / pw) + sq((y - yc) / hh) < 1.0);
+        M.hijabShell(yc, hh, pw);
         double[][] bigTab = new double[HIJAB.length][];
         for (int i = 0; i < HIJAB.length; i++)
             bigTab[i] = new double[]{HIJAB[i][0], HIJAB[i][1] * 1.012, HIJAB[i][2] * 1.012, HIJAB[i][3], HIJAB[i][4]};
         // list marun di sepanjang tepi bawah (V depan, bahu, segitiga belakang)
-        M.loft(bigTab, MARUN, 216, 8, null, ph -> new double[]{hemY(ph) + 3.2, hemY(ph)});
+        M.loft(bigTab, MARUN, 216, 8, null, ph -> new double[]{hemY(ph) + 2.0, hemY(ph)});
         // list marun di sekeliling wajah: pipa yang menebal di dahi dan pipi, menipis ke arah dagu (kain putih di bawah dagu)
         double[][] rim = new double[73][], rimO = new double[73][], rrad = new double[73][];
         for (int i = 0; i < 72; i++) {
             double t = 2 * PI * i / 72, ph = pw * Math.sin(t), y = yc + hh * Math.cos(t);
             double[] q = interp(HIJAB, y);
             rim[i] = new double[]{q[2] + q[0] * Math.sin(ph), y, q[3] + q[1] * Math.cos(ph)};
-            double ph2 = pw * 1.09 * Math.sin(t), y2 = yc + hh * 1.07 * Math.cos(t);
+            double ph2 = ph, y2 = y;
             double[] q2 = interp(HIJAB, y2);
             rimO[i] = new double[]{q2[2] + q2[0] * 1.004 * Math.sin(ph2), y2, q2[3] + q2[1] * 1.004 * Math.cos(ph2)};
-            double r = 0.75 + 0.6 * clamp((Math.cos(t) + 0.5) / 1.2);
+            double r = 0.48 + 0.22 * clamp((Math.cos(t) + 0.5) / 1.2);
             rrad[i] = new double[]{r, r};
         }
         rim[72] = rim[0]; rimO[72] = rimO[0]; rrad[72] = rrad[0];
         M.tube(java.util.Arrays.copyOfRange(rimO, 0, 26), java.util.Arrays.copyOfRange(rrad, 0, 26), MARUN, 10);
         M.tube(java.util.Arrays.copyOfRange(rimO, 47, 73), java.util.Arrays.copyOfRange(rrad, 47, 73), MARUN, 10);
         double[][] bot = java.util.Arrays.copyOfRange(rim, 25, 48);
-        M.tube(bot, rr(bot.length, 0.75, 0.75), HIJ, 10);
+        M.tube(bot, rr(bot.length, 0.48, 0.48), HIJ, 10);
         M.finish();
         return M;
     }
