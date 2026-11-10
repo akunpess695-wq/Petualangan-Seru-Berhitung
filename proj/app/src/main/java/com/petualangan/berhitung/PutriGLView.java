@@ -38,6 +38,8 @@ final class PutriGLView extends GLSurfaceView {
     private volatile int hairStyle = 0;                       // PutraMesh.STYLE_*; terlihat hanya bila peci dilepas
     private volatile float[] bgGrad;                          // 6 warna rgb + jumlah ruas di [18]; null = latar rata
     private float lastX, lastY;
+    private volatile float zoom = 1f;
+    private final android.view.ScaleGestureDetector scaleDetector;
     private final Renderer renderer = new Renderer();
 
     PutriGLView(Context ctx) { this(ctx, 1); }
@@ -45,6 +47,14 @@ final class PutriGLView extends GLSurfaceView {
     PutriGLView(Context ctx, int gender) {
         super(ctx);
         this.gender = gender == 0 ? 0 : 1;
+        scaleDetector = new android.view.ScaleGestureDetector(ctx,
+                new android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    @Override public boolean onScale(android.view.ScaleGestureDetector detector) {
+                        zoom = Math.max(1f, Math.min(1.8f, zoom * detector.getScaleFactor()));
+                        requestRender();
+                        return true;
+                    }
+                });
         setEGLContextClientVersion(2);
         setEGLConfigChooser(8, 8, 8, 0, 16, 0); // RGB + depth 16
         getHolder().setFormat(PixelFormat.OPAQUE); // latar opak (transparan menghasilkan kotak hitam)
@@ -75,6 +85,34 @@ final class PutriGLView extends GLSurfaceView {
         requestRender();
     }
 
+    private float glossFor(int part) {
+        if (gender == 1) return part == PutriMesh.P_OTHER ? 0.065f : 0.02f;
+        switch (part) {
+            case PutraMesh.P_OTHER:
+            case PutraMesh.P_ARM_SKIN:
+                return 0.065f;
+            case PutraMesh.P_HAIR:
+            case PutraMesh.P_HAIR_CREW:
+            case PutraMesh.P_HAIR_SPIKY:
+            case PutraMesh.P_HAIR_MESSY:
+            case PutraMesh.P_HAIR_DET:
+            case PutraMesh.P_HAIR_LOW:
+            case PutraMesh.P_HAIR_SIDE:
+            case PutraMesh.P_HAIR_CURL:
+            case PutraMesh.P_HAIR_CROWN:
+            case PutraMesh.P_CURL_LOW:
+            case PutraMesh.P_HAIR_BANG:
+            case PutraMesh.P_HAIR_WAVY:
+            case PutraMesh.P_HAIR_QUIFF:
+            case PutraMesh.P_HAIR_BUN:
+            case PutraMesh.P_HAIR_VOL:
+            case PutraMesh.P_HAIR_VOLH:
+                return 0.085f;
+            default:
+                return 0.02f;
+        }
+    }
+
     private static float[] parseGrad(String latar) {
         if (latar == null || latar.trim().isEmpty()) return null;
         String[] cs = latar.split(",");
@@ -99,6 +137,11 @@ final class PutriGLView extends GLSurfaceView {
         return g;
     }
 
+    void resetView() {
+        zoom = 1f;
+        setAngles(0f, 0f);
+    }
+
     void setAngles(float yawDeg, float pitchDeg) {
         yaw = yawDeg;
         pitch = Math.max(-12f, Math.min(28f, pitchDeg));
@@ -107,6 +150,11 @@ final class PutriGLView extends GLSurfaceView {
 
     @Override
     public boolean onTouchEvent(MotionEvent e) {
+        scaleDetector.onTouchEvent(e);
+        if (e.getPointerCount() > 1 || e.getActionMasked() == MotionEvent.ACTION_POINTER_UP) {
+            lastX = e.getX(); lastY = e.getY();
+            return true;
+        }
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 lastX = e.getX(); lastY = e.getY();
@@ -131,12 +179,15 @@ final class PutriGLView extends GLSurfaceView {
             "attribute vec3 aPos;\n" +
             "attribute vec3 aNor;\n" +
             "attribute vec3 aCol;\n" +
+            "attribute float aGloss;\n" +
+            "varying float vGloss;\n" +
             "varying vec3 vN;\n" +
             "varying vec3 vC;\n" +
             "void main(){\n" +
             "  gl_Position = uMVP * vec4(aPos, 1.0);\n" +
             "  vN = uNM * aNor;\n" +
             "  vC = aCol;\n" +
+            "  vGloss = aGloss;\n" +
             "}\n";
 
     // Sama dengan render.py: key (-0.45,0.65,0.62), fill (0.6,0.1,0.5), spekular 0.10^24
@@ -144,6 +195,7 @@ final class PutriGLView extends GLSurfaceView {
             "precision mediump float;\n" +
             "varying vec3 vN;\n" +
             "varying vec3 vC;\n" +
+            "varying float vGloss;\n" +
             "void main(){\n" +
             "  vec3 n = normalize(vN);\n" +
             "  if (n.z < 0.0) n = -n;\n" +
@@ -153,8 +205,8 @@ final class PutriGLView extends GLSurfaceView {
             "  float d1 = max(dot(n, L1), 0.0);\n" +
             "  float d2 = max(dot(n, L2), 0.0);\n" +
             "  float hemi = 0.5 + 0.5 * n.y;\n" +
-            "  float sh = 0.50 + 0.18 * hemi + 0.50 * d1 + 0.12 * d2;\n" +
-            "  float spec = 0.10 * pow(max(dot(n, Hh), 0.0), 24.0);\n" +
+            "  float sh = 0.48 + 0.16 * hemi + 0.36 * d1 + 0.10 * d2;\n" +
+            "  float spec = vGloss * pow(max(dot(n, Hh), 0.0), 24.0);\n" +
             "  vec3 c = vC * sh + vec3(spec) + (1.0 - sh) * vec3(-0.01, 0.0, 0.025);\n" +
             "  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);\n" +
             "}\n";
@@ -217,16 +269,19 @@ final class PutriGLView extends GLSurfaceView {
         /** Susun ulang buffer GPU dari mesh bersama + salinan warna/indeks untuk tampilan ini. Dipanggil di thread GL. */
         void uploadMesh() {
             float[] mpos, mnor, mcol;
+            byte[] parts;
             int[] midx;
             int mvc;
             if (gender == 0) {
                 if (sMeshPutra == null) sMeshPutra = PutraMesh.build();
                 PutraMesh m = sMeshPutra;
+                parts = m.part;
                 mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci, hood >= 0 ? PutraMesh.STYLE_HOOD : hairStyle, lookPakaian == null && hood < 0, showTas); mvc = m.vertCount;
                 mcol = m.outfitColors(lookPakaian, lookRambut);
             } else {
                 if (sMesh == null) sMesh = PutriMesh.build();
                 PutriMesh m = sMesh;
+                parts = m.part;
                 mpos = m.pos; mnor = m.nor; midx = m.indexFor(true, showTas); mvc = m.vertCount; // ransel putri juga bisa dilepas
                 mcol = m.outfitColors(lookPakaian, lookRambut);
             }
@@ -239,17 +294,19 @@ final class PutriGLView extends GLSurfaceView {
                 if (mvc + hm.vertCount > 65535) hm = null;   // pengaman batas short
             }
             int hvc = hm == null ? 0 : hm.vertCount;
-            float[] inter = new float[(mvc + hvc) * 9];
+            float[] inter = new float[(mvc + hvc) * 10];
             for (int i = 0; i < mvc; i++) {
-                System.arraycopy(mpos, i * 3, inter, i * 9, 3);
-                System.arraycopy(mnor, i * 3, inter, i * 9 + 3, 3);
-                System.arraycopy(mcol, i * 3, inter, i * 9 + 6, 3);
+                System.arraycopy(mpos, i * 3, inter, i * 10, 3);
+                System.arraycopy(mnor, i * 3, inter, i * 10 + 3, 3);
+                System.arraycopy(mcol, i * 3, inter, i * 10 + 6, 3);
+                inter[i * 10 + 9] = glossFor(parts[i]);
             }
             if (hm != null) {
                 for (int i = 0; i < hvc; i++) {
-                    System.arraycopy(hm.pos, i * 3, inter, (mvc + i) * 9, 3);
-                    System.arraycopy(hm.nor, i * 3, inter, (mvc + i) * 9 + 3, 3);
-                    System.arraycopy(hm.col, i * 3, inter, (mvc + i) * 9 + 6, 3);
+                    System.arraycopy(hm.pos, i * 3, inter, (mvc + i) * 10, 3);
+                    System.arraycopy(hm.nor, i * 3, inter, (mvc + i) * 10 + 3, 3);
+                    System.arraycopy(hm.col, i * 3, inter, (mvc + i) * 10 + 6, 3);
+                    inter[(mvc + i) * 10 + 9] = 0.025f;
                 }
                 int[] all = new int[midx.length + hm.idx.length];
                 System.arraycopy(midx, 0, all, 0, midx.length);
@@ -305,6 +362,7 @@ final class PutriGLView extends GLSurfaceView {
             Matrix.setIdentityM(model, 0);
             Matrix.rotateM(model, 0, pitch, 1f, 0f, 0f);
             Matrix.rotateM(model, 0, yaw, 0f, 1f, 0f);
+            Matrix.scaleM(model, 0, zoom, zoom, zoom);
             Matrix.translateM(model, 0, 0f, -48f, 0f);
             Matrix.multiplyMM(mv, 0, view, 0, model, 0);
             Matrix.multiplyMM(mvp, 0, proj, 0, mv, 0);
@@ -317,7 +375,10 @@ final class PutriGLView extends GLSurfaceView {
             GLES20.glUniformMatrix3fv(uNM, 1, false, nm, 0);
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo);
             GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, ibo);
-            int stride = 9 * 4;
+            int stride = 10 * 4;
+            int glossLocation = GLES20.glGetAttribLocation(prog, "aGloss");
+            GLES20.glEnableVertexAttribArray(glossLocation);
+            GLES20.glVertexAttribPointer(glossLocation, 1, GLES20.GL_FLOAT, false, stride, 36);
             GLES20.glEnableVertexAttribArray(aPos);
             GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, stride, 0);
             GLES20.glEnableVertexAttribArray(aNor);
@@ -328,6 +389,7 @@ final class PutriGLView extends GLSurfaceView {
             GLES20.glDisableVertexAttribArray(aPos);
             GLES20.glDisableVertexAttribArray(aNor);
             GLES20.glDisableVertexAttribArray(aCol);
+            GLES20.glDisableVertexAttribArray(glossLocation);
         }
 
         private int compile(int type, String src) {

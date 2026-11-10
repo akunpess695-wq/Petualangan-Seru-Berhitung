@@ -7224,7 +7224,12 @@ public class MainActivity extends Activity {
         if (USE_PUTRI_GL) {
             putriGL = new PutriGLView(this, genderOf[shopPl]);
             applyLook3D(putriGL, shopPl);
-            pv.addView(putriGL, new LinearLayout.LayoutParams(dp(238), dp(238)));
+            int avatarSize = Math.min(dp(320), getResources().getDisplayMetrics().widthPixels - dp(64));
+            pv.addView(putriGL, new LinearLayout.LayoutParams(avatarSize, avatarSize));
+            android.widget.TextView resetAvatar = text("↺ Tampak depan · cubit untuk zoom", 12, Color.rgb(91, 59, 174), true);
+            resetAvatar.setPadding(dp(8), dp(12), dp(8), dp(12));
+            resetAvatar.setOnClickListener(v -> { if (putriGL != null) putriGL.resetView(); });
+            pv.addView(resetAvatar);
         } else {
             putriGL = null;
             pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(238), dp(238)));
