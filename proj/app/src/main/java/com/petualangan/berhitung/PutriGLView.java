@@ -276,7 +276,7 @@ final class PutriGLView extends GLSurfaceView {
                 if (sMeshPutra == null) sMeshPutra = PutraMesh.build();
                 PutraMesh m = sMeshPutra;
                 parts = m.part;
-                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci, hood >= 0 ? PutraMesh.STYLE_HOOD : hairStyle, lookPakaian == null && hood < 0, showTas); mvc = m.vertCount;
+                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci, hood >= 0 ? PutraMesh.STYLE_HOOD : hairStyle, lookPakaian == null, showTas); mvc = m.vertCount;
                 mcol = m.outfitColors(lookPakaian, lookRambut);
             } else {
                 if (sMesh == null) sMesh = PutriMesh.build();
@@ -291,32 +291,55 @@ final class PutriGLView extends GLSurfaceView {
             if (hd >= 0) {
                 if (sHood[gender][hd] == null) sHood[gender][hd] = HoodMesh.build(hd, gender);
                 hm = sHood[gender][hd];
-                if (mvc + hm.vertCount > 65535) hm = null;   // pengaman batas short
             }
             int hvc = hm == null ? 0 : hm.vertCount;
-            float[] inter = new float[(mvc + hvc) * 10];
-            for (int i = 0; i < mvc; i++) {
-                System.arraycopy(mpos, i * 3, inter, i * 10, 3);
-                System.arraycopy(mnor, i * 3, inter, i * 10 + 3, 3);
-                System.arraycopy(mcol, i * 3, inter, i * 10 + 6, 3);
-                inter[i * 10 + 9] = glossFor(parts[i]);
-            }
+            // Only upload referenced vertices. Avoid allocating a full interleaved
+            // array for every hidden hairstyle and every unused hood vertex.
             if (hm != null) {
-                for (int i = 0; i < hvc; i++) {
-                    System.arraycopy(hm.pos, i * 3, inter, (mvc + i) * 10, 3);
-                    System.arraycopy(hm.nor, i * 3, inter, (mvc + i) * 10 + 3, 3);
-                    System.arraycopy(hm.col, i * 3, inter, (mvc + i) * 10 + 6, 3);
-                    inter[(mvc + i) * 10 + 9] = 0.025f;
-                }
                 int[] all = new int[midx.length + hm.idx.length];
                 System.arraycopy(midx, 0, all, 0, midx.length);
                 for (int i = 0; i < hm.idx.length; i++) all[midx.length + i] = hm.idx[i] + mvc;
                 midx = all;
             }
-            FloatBuffer fb = ByteBuffer.allocateDirect(inter.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
-            fb.put(inter).position(0);
+            int[] remap = new int[mvc + hvc];
+            java.util.Arrays.fill(remap, -1);
+            int active = 0;
+            for (int index : midx) {
+                if (index < 0 || index >= remap.length) throw new IllegalStateException("Invalid mesh index: " + index);
+                if (remap[index] == -1) remap[index] = active++;
+            }
+            if (active > 65536) {
+                // Never cast an out-of-range index to short: it would corrupt geometry.
+                if (hood >= 0) {
+                    Log.w("Salamuda3D", "Hood exceeds 16-bit mesh capacity; showing avatar without hood");
+                    hood = -1;
+                    uploadMesh();
+                    return;
+                }
+                throw new IllegalStateException("Mesh exceeds GLES2 16-bit index limit");
+            }
+            float[] packed = new float[active * 10];
+            for (int old = 0; old < remap.length; old++) {
+                int dst = remap[old];
+                if (dst < 0) continue;
+                int off = dst * 10;
+                if (old < mvc) {
+                    System.arraycopy(mpos, old * 3, packed, off, 3);
+                    System.arraycopy(mnor, old * 3, packed, off + 3, 3);
+                    System.arraycopy(mcol, old * 3, packed, off + 6, 3);
+                    packed[off + 9] = glossFor(parts[old]);
+                } else {
+                    int hi = old - mvc;
+                    System.arraycopy(hm.pos, hi * 3, packed, off, 3);
+                    System.arraycopy(hm.nor, hi * 3, packed, off + 3, 3);
+                    System.arraycopy(hm.col, hi * 3, packed, off + 6, 3);
+                    packed[off + 9] = 0.025f;
+                }
+            }
+            FloatBuffer fb = ByteBuffer.allocateDirect(packed.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+            fb.put(packed).position(0);
             short[] si = new short[midx.length];
-            for (int i = 0; i < si.length; i++) si[i] = (short) midx[i];
+            for (int i = 0; i < si.length; i++) si[i] = (short) remap[midx[i]];
             ShortBuffer ib = ByteBuffer.allocateDirect(si.length * 2).order(ByteOrder.nativeOrder()).asShortBuffer();
             ib.put(si).position(0);
             idxCount = si.length;
@@ -326,7 +349,7 @@ final class PutriGLView extends GLSurfaceView {
             GLES20.glGenBuffers(2, b, 0);
             vbo = b[0]; ibo = b[1];
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo);
-            GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, inter.length * 4, fb, GLES20.GL_STATIC_DRAW);
+            GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, packed.length * 4, fb, GLES20.GL_STATIC_DRAW);
             GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, ibo);
             GLES20.glBufferData(GLES20.GL_ELEMENT_ARRAY_BUFFER, si.length * 2, ib, GLES20.GL_STATIC_DRAW);
         }
