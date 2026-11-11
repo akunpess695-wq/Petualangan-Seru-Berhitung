@@ -362,6 +362,15 @@ final class PutraMesh {
             M.tube(lp, lr, PANTS, 24);
             M.ellipsoid(new double[]{s * 5.8, 4.6, 0}, new double[]{6.8, 2.0, 7.6}, PANTS, 24, 8, -PI / 2, 0, null, null); // tutup ujung kaki celana
         }
+        // Stage 2: jahitan depan celana dan lipatan halus, mengikuti kaki asli.
+        // P_PANTS memastikan warna detail mengikuti pilihan celana di toko.
+        M.cur = P_PANTS;
+        for (int sg = -1; sg <= 1; sg += 2) {
+            double x = sg * 5.8;
+            double[][] crease = {{x, 21.5, 7.25}, {x, 17.0, 7.48},
+                    {x, 12.0, 7.65}, {x, 7.2, 7.70}};
+            M.tube(crease, rr(4, 0.12, 0.10), new double[]{0.70, 0.10, 0.15}, 6);
+        }
         // pinggul celana + penutup selangkangan (supaya tidak ada rongga dari bawah)
         M.cur = P_PANTS;
         M.loft(PANTSTOP, PANTS, 56, 12, null, null);
@@ -382,6 +391,17 @@ final class PutraMesh {
         M.tube(plk, rr(10, 0.45, 0.3), new double[]{0.80, 0.83, 0.92}, 6); // lajur kancing kemeja
         M.cur = P_BUTTON;
         for (int bi2 = 0; bi2 < 5; bi2++) { double y = 51.0 - 5.2 * bi2; M.ellipsoid(new double[]{0, y, tz(0, y) + 0.45}, new double[]{0.55, 0.55, 0.3}, new double[]{0.97, 0.97, 0.98}, 8, 6); }
+        // Stage 2: saku dada kemeja, dengan tepi atas dan jahitan samping.
+        // Detail dipasang pada permukaan depan kemeja, tanpa mengubah torso/wajah.
+        M.cur = P_SHIRT;
+        double pocketZ = tz(5.5, 45.0) + 0.35;
+        M.ellipsoid(new double[]{5.5, 44.7, pocketZ},
+                new double[]{2.25, 2.55, 0.38}, WHITE, 14, 8);
+        M.cur = P_TRIM;
+        double[][] pocketTop = {{3.5, 46.7, pocketZ + 0.35},
+                {5.5, 46.7, pocketZ + 0.43}, {7.5, 46.7, pocketZ + 0.35}};
+        M.tube(pocketTop, rr(3, 0.16, 0.14),
+                new double[]{0.76, 0.79, 0.85}, 6);
         // lengan kemeja panjang
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg;

@@ -306,6 +306,23 @@ final class PutriMesh {
         M.cur = P_OTHER;
         for (double by : new double[]{29.8}) M.ellipsoid(new double[]{0, by, tz(0, by) + 0.45}, new double[]{0.6, 0.6, 0.3}, BTN, 14, 8);
         M.cur = P_SHIRT;
+        // Stage 2: saku kemeja dan jahitan tipis di bawah jilbab.
+        // Mengikuti permukaan torso sehingga tidak tampak melayang.
+        M.cur = P_SHIRT;
+        double px = 5.3, py = 34.0;
+        M.ellipsoid(new double[]{px, py, tz(px, py) + 0.20},
+                new double[]{1.85, 2.10, 0.22}, WHITE, 12, 8);
+        M.cur = P_OTHER;
+        M.tube(new double[][]{{px - 1.6, py + 1.45, tz(px - 1.6, py + 1.45) + 0.40},
+                {px, py + 1.45, tz(px, py + 1.45) + 0.44},
+                {px + 1.6, py + 1.45, tz(px + 1.6, py + 1.45) + 0.40}},
+                rr(3, 0.12, 0.10), CUFF, 6);
+        // Dua kancing tambahan pada plaket seragam.
+        for (double by : new double[]{32.5, 35.5}) {
+            M.ellipsoid(new double[]{0, by, tz(0, by) + 0.50},
+                    new double[]{0.42, 0.42, 0.24}, BTN, 10, 6);
+        }
+        M.cur = P_SHIRT;
         // lengan: lurus ke bawah, sedikit melebar di manset
         for (int sg = -1; sg <= 1; sg += 2) {
             double s = sg;
@@ -419,6 +436,22 @@ final class PutriMesh {
         // jilbab: satu cangkang putih (kubah -> bahu -> ujung V depan dan segitiga belakang), bukaan wajah dipotong
         final double yc = 68.3, hh = 12.4, pw = Math.toRadians(47);
         M.hijabShell(yc, hh, pw);
+        // Stage 2: two subtle stitched fabric folds on the outer shoulder drape.
+        // They follow the existing hijab surface; no head/face vertices are changed.
+        final double[] seamColor = {0.84, 0.84, 0.91};
+        for (int side = -1; side <= 1; side += 2) {
+            double[][] seam = new double[9][3];
+            for (int j = 0; j < seam.length; j++) {
+                double t = j / (seam.length - 1.0);
+                double y = 58.0 - 13.0 * t;
+                double ph = side * (1.08 + 0.12 * t);
+                double[] q = interp(HIJAB, y);
+                seam[j][0] = q[2] + q[0] * 1.018 * Math.sin(ph);
+                seam[j][1] = y;
+                seam[j][2] = q[3] + q[1] * 1.018 * Math.cos(ph);
+            }
+            M.tube(seam, rr(seam.length, 0.12, 0.12), seamColor, 6);
+        }
         double[][] bigTab = new double[HIJAB.length][];
         for (int i = 0; i < HIJAB.length; i++)
             bigTab[i] = new double[]{HIJAB[i][0], HIJAB[i][1] * 1.012, HIJAB[i][2] * 1.012, HIJAB[i][3], HIJAB[i][4]};

@@ -4763,13 +4763,16 @@ public class MainActivity extends Activity {
   {6, "#6D4C41", "Rambut Bergelombang", 90},
   {6, "#8D5A3C", "Rambut Messy", 100},
   {6, "#3E2723", "Rambut Quiff", 110},
-  {6, "#5D4037", "Rambut Ikat Kecil", 120}
+  {6, "#5D4037", "Rambut Ikat Kecil", 120},
+  // Stage 2: append-only IDs; keep old saved equipment mappings stable.
+  {5, "#FFFFFF,#FFFFFF,#C62828", "Seragam SD Putra", 0},
+  {5, "#FFFFFF,#FFFFFF,#C62828", "Seragam SD Putri", 0}
     };
     private static final int ITEM_GALAKSI = 31;
     // Gender tiap barang, urut sama dengan ITEMS: u = semua, b = putra, g = putri.
     // Untuk memindah barang ke gender lain, cukup ubah hurufnya di sini.
     private static final String ITEM_GENDER =
-  "bggubbub" + "ugbu" + "bugubbu" + "uuuuuuuu" + "uuuuuuu" + "bbbbb" + "bbbbb" + "ggggg" + "bb" + "ggggg" + "bbbb";
+  "bggubbub" + "ugbu" + "bugubbu" + "uuuuuuuu" + "uuuuuuu" + "bbbbb" + "bbbbb" + "ggggg" + "bb" + "ggggg" + "bbbb" + "bg";
 
     private static int itGender(int i) {
         if (i < 0 || i >= ITEM_GENDER.length()) {
@@ -4785,11 +4788,10 @@ public class MainActivity extends Activity {
     }
     private static final String[] RAR_NAME = {"Biasa", "Keren", "Epik", "Legendaris"};
     private static final int[] RAR_COLOR = {SILVER, BLUE, PURPLE, GOLD};
-    // v6.21.0: delapan tab dirampingkan menjadi lima. Tiap tab memuat satu atau dua slot barang
-    // (slot = indeks lama dikurangi satu; hewan/tudung berdiri sendiri). Data barang tidak berubah.
+    // Avatar Studio: Teman has its own category, separate from Suasana. Item IDs remain stable.
     private static final String[] SHOP_TAB_ICON = {
-            "\uD83C\uDFA9", "\uD83D\uDD76\uFE0F", "\uD83C\uDFA8", "\uD83D\uDC55", "\uD83D\uDC87"};
-    private static final String[] SHOP_TAB_NAME = {"Kepala", "Aksesori", "Suasana", "Pakaian", "Rambut"};
+            "\uD83C\uDFA9", "\uD83D\uDD76\uFE0F", "\uD83C\uDFA8", "\uD83D\uDC55", "\uD83D\uDC87", "\uD83D\uDC23"};
+    private static final String[] SHOP_TAB_NAME = {"Kepala", "Aksesori", "Suasana", "Pakaian", "Rambut", "Teman"};
 
     private int lastCoinGain = 0;
     private int shopPl = 0;
@@ -7091,12 +7093,15 @@ public class MainActivity extends Activity {
     private View shopCell(final int id) {
         final boolean own = owns(id);
         final boolean on = eq(shopPl, itSlot(id)) == id;
+        // This catalog displays only supported 3D equipment. Legacy 2D items
+        // are kept in ITEMS for compatibility but filtered from the visible shop.
+        final boolean pending3D = false;
         final int rar = itRar(id);
         final int rc = RAR_COLOR[rar];
         LinearLayout cell = new LinearLayout(this);
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER_HORIZONTAL);
-        cell.setPadding(dp(7), dp(9), dp(7), dp(9));
+        cell.setPadding(dp(5), dp(6), dp(5), dp(6));
 
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 on ? new int[]{Color.rgb(229, 250, 238), Color.WHITE}
@@ -7104,13 +7109,13 @@ public class MainActivity extends Activity {
         bg.setCornerRadius(dp(20));
         bg.setStroke(dp(on ? 3 : 1), on ? GREEN : (rar > 0 ? rc : Color.rgb(222, 226, 240)));
         cell.setBackground(bg);
-        cell.setElevation(dp(on ? 7 : 3));
+        cell.setElevation(dp(on ? 4 : 2));
 
         TextView rarity = text(RAR_NAME[rar].toUpperCase(Locale.ROOT), 9, rc, true);
         rarity.setGravity(Gravity.CENTER);
         rarity.setPadding(dp(7), dp(2), dp(7), dp(2));
         rarity.setBackground(box(Color.rgb(243, 245, 252), 10));
-        cell.addView(rarity, lp(WRAP, 0));
+        // Rarity stays in accessibility description; omit its extra visual row.
 
         FrameLayout display = new FrameLayout(this);
         GradientDrawable stage = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
@@ -7132,25 +7137,31 @@ public class MainActivity extends Activity {
             preview.gender = itGender(id) < 0 ? genderOf[shopPl] : itGender(id);
             display.addView(preview, new FrameLayout.LayoutParams(MATCH, MATCH));
         }
-        cell.addView(display, new LinearLayout.LayoutParams(MATCH, dp(78)));
+        cell.addView(display, new LinearLayout.LayoutParams(MATCH, dp(70)));
 
         TextView itemName = text(itName(id), 12, Color.rgb(48, 42, 72), true);
         itemName.setGravity(Gravity.CENTER);
         itemName.setMaxLines(2);
         itemName.setEllipsize(TextUtils.TruncateAt.END);
-        cell.addView(itemName, lp(dp(36), 5));
+        cell.addView(itemName, lp(dp(30), 3));
 
-        String label = on ? "✓ DIPAKAI" : own ? "PAKAI" : "🪙 " + itPrice(id);
-        int actionColor = on ? GREEN : own ? BLUE : coins() >= itPrice(id) ? ORANGE : SILVER;
+        String label = pending3D ? "3D SEGERA" : on ? "✓ DIPAKAI" : own ? "PAKAI" : "🪙 " + itPrice(id);
+        int actionColor = pending3D ? Color.rgb(135, 142, 160) : on ? GREEN : own ? BLUE : coins() >= itPrice(id) ? ORANGE : SILVER;
         TextView action = text(label, 11, Color.WHITE, true);
         action.setGravity(Gravity.CENTER);
         action.setMinHeight(dp(32));
         action.setBackground(box(actionColor, 12));
-        cell.addView(action, new LinearLayout.LayoutParams(MATCH, dp(34)));
+        cell.addView(action, new LinearLayout.LayoutParams(MATCH, dp(30)));
         cell.setContentDescription(itName(id) + ", " + RAR_NAME[rar] + ", " +
                 (on ? "sedang dipakai" : own ? "sudah dimiliki, ketuk untuk memakai" :
                         "harga " + itPrice(id) + " koin"));
-        cell.setOnClickListener(v -> tapItem(id));
+        cell.setOnClickListener(v -> {
+            if (pending3D) {
+                Toast.makeText(this, "Model 3D belum tersedia untuk " + itName(id), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            tapItem(id);
+        });
         return cell;
     }
 
@@ -7191,10 +7202,9 @@ public class MainActivity extends Activity {
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(text("✦ AVATAR STUDIO", 22, Color.rgb(91, 59, 174), true), new LinearLayout.LayoutParams(0, WRAP, 1f));
+        head.addView(text("Avatar Studio", 20, Color.rgb(91, 59, 174), true), new LinearLayout.LayoutParams(0, WRAP, 1f));
         head.addView(pill("\uD83D\uDCB0 " + coins(), ORANGE), new LinearLayout.LayoutParams(WRAP, WRAP));
         c.addView(head, lp(WRAP, 0));
-        c.addView(text("Pilih gaya favoritmu dan lengkapi koleksi!", 12, Color.rgb(109, 103, 135), false), lp(WRAP, 6));
 
         if (np > 1) {
             LinearLayout pr = new LinearLayout(this);
@@ -7220,14 +7230,14 @@ public class MainActivity extends Activity {
         studioBg.setCornerRadius(dp(22));
         studioBg.setStroke(dp(1), Color.rgb(219, 206, 255));
         pv.setBackground(studioBg);
-        pv.addView(text("✦ PREVIEW KARAKTER 3D", 12, Color.rgb(91, 59, 174), true), lp(WRAP, 5));
+        pv.addView(text("Geser untuk memutar avatar 3D", 11, Color.rgb(91, 59, 174), true), lp(WRAP, 2));
         if (USE_PUTRI_GL) {
             putriGL = new PutriGLView(this, genderOf[shopPl]);
             applyLook3D(putriGL, shopPl);
-            int avatarSize = Math.min(dp(320), getResources().getDisplayMetrics().widthPixels - dp(64));
+            int avatarSize = Math.min(dp(228), getResources().getDisplayMetrics().widthPixels - dp(64));
             pv.addView(putriGL, new LinearLayout.LayoutParams(avatarSize, avatarSize));
             android.widget.TextView resetAvatar = text("↺ Tampak depan · cubit untuk zoom", 12, Color.rgb(91, 59, 174), true);
-            resetAvatar.setPadding(dp(8), dp(12), dp(8), dp(12));
+            resetAvatar.setPadding(dp(6), dp(5), dp(6), dp(5));
             resetAvatar.setOnClickListener(v -> { if (putriGL != null) putriGL.resetView(); });
             pv.addView(resetAvatar);
         } else {
@@ -7249,7 +7259,7 @@ public class MainActivity extends Activity {
             });
             gr.addView(gt, weight(g == 0 ? 0 : 4, 0));
         }
-        pv.addView(gr, lp(dp(44), 8));
+        pv.addView(gr, lp(dp(12), 5));
         if (USE_PUTRI_GL) {   // baris kedua: peci (putra) dan tas (putra dan putri), masing-masing bisa dipasang / dilepas
             LinearLayout gr2 = new LinearLayout(this);
             gr2.setOrientation(LinearLayout.HORIZONTAL);
@@ -7279,20 +7289,21 @@ public class MainActivity extends Activity {
                 showToko();
             });
             gr2.addView(tb, weight(genderOf[shopPl] == 0 ? 4 : 0, 0));
-            pv.addView(gr2, lp(dp(44), 8));
+            pv.addView(gr2, lp(dp(8), 4));
         }
-        c.addView(pv, lp(WRAP, 12));
+        c.addView(pv, lp(WRAP, 7));
 
-        // Lima kategori dalam satu baris: semua terlihat tanpa geser dan tanpa baris kedua.
+        // Six categories in two compact rows to avoid cramped labels on small screens.
         LinearLayout tabRow = new LinearLayout(this);
         tabRow.setOrientation(LinearLayout.HORIZONTAL);
         for (int tab = 0; tab < SHOP_TAB_NAME.length; tab++) {
+            if (tab == 3) { c.addView(tabRow, lp(WRAP, 2)); tabRow = new LinearLayout(this); tabRow.setOrientation(LinearLayout.HORIZONTAL); }
             final int tb = tab;
             boolean sel = tab == shopTab;
             String nm = (tab == 4 && genderOf[shopPl] == 1) ? "Jilbab" : SHOP_TAB_NAME[tab];
             TextView chip = text(SHOP_TAB_ICON[tab] + "\n" + nm, 11, sel ? Color.WHITE : DARK, true);
             chip.setGravity(Gravity.CENTER);
-            chip.setMinHeight(dp(56));
+            chip.setMinHeight(dp(48));
             chip.setPadding(dp(2), dp(5), dp(2), dp(5));
             chip.setBackground(box(sel ? Color.rgb(108, 76, 205) : Color.rgb(238, 235, 249), 14));
             chip.setContentDescription("Kategori " + nm + (sel ? ", dipilih" : ""));
@@ -7304,28 +7315,48 @@ public class MainActivity extends Activity {
             cl.setMargins(dp(2), dp(3), dp(2), dp(3));
             tabRow.addView(chip, cl);
         }
-        c.addView(tabRow, lp(WRAP, 12));
-        c.addView(text("KOLEKSI AKSESORI", 15, Color.rgb(67, 52, 112), true), lp(WRAP, 7));
+        c.addView(tabRow, lp(WRAP, 5));
+        c.addView(text(shopTab == 5 ? "Teman 3D sedang dikembangkan: berjalan dan terbang mengitari avatar" :
+                (shopTab == 0 || shopTab == 1 ? "Koleksi 2D lama disembunyikan sampai model 3D tersedia" :
+                "Pilih item · periksa hasilnya pada avatar 3D di atas"),
+                12, Color.rgb(67, 52, 112), false), lp(WRAP, 4));
 
         if (shopTab == 0) {
-            c.addView(text("\uD83D\uDC3E Tudung hewan (gratis): " + HOOD_NAMES[Math.max(0, Math.min(HOOD_NAMES.length - 1, avatar[shopPl]))],
-                    13, DARK, true), lp(WRAP, 4));
+
+            // Three labelled tiles per row, matching the rest of the compact shop.
             final int nTiles = HOOD_ORDER.length;
-            final int rows = (nTiles + 3) / 4;
+            final int hoodColumns = 3;
+            final int rows = (nTiles + hoodColumns - 1) / hoodColumns;
             for (int r = 0; r < rows; r++) {
                 LinearLayout row = new LinearLayout(this);
                 row.setOrientation(LinearLayout.HORIZONTAL);
-                for (int q = 0; q < 4; q++) {
-                    final int idx = r * 4 + q;
+                for (int q = 0; q < hoodColumns; q++) {
+                    final int idx = r * hoodColumns + q;
                     if (idx >= nTiles) {
-                        row.addView(new View(this), weight(q == 0 ? 0 : 4, q == 3 ? 0 : 4));
+                        row.addView(new View(this), weight(q == 0 ? 0 : 5, q == hoodColumns - 1 ? 0 : 5));
                         continue;
                     }
                     final int k = HOOD_ORDER[idx];
-                    boolean on = avatar[shopPl] == k;
-                    AvatarView t = previewView(isHood(k) ? k : -1, -1, -1, 1); t.gender = genderOf[shopPl];
-                    t.setBackground(on ? box(PLAYER_COLORS[shopPl], 16) : box(GRAY, 16));
-                    t.setOnClickListener(v -> {
+                    final boolean on = avatar[shopPl] == k;
+                    LinearLayout tile = new LinearLayout(this);
+                    tile.setOrientation(LinearLayout.VERTICAL);
+                    tile.setGravity(Gravity.CENTER_HORIZONTAL);
+                    tile.setPadding(dp(3), dp(4), dp(3), dp(4));
+                    tile.setBackground(box(on ? Color.rgb(223, 246, 233) : Color.rgb(243, 241, 251), 14));
+                    AvatarView preview = previewView(isHood(k) ? k : -1, -1, -1, 1);
+                    preview.gender = genderOf[shopPl];
+                    tile.addView(preview, new LinearLayout.LayoutParams(MATCH, dp(66)));
+                    TextView label = text(HOOD_NAMES[k], 11, DARK, true);
+                    label.setGravity(Gravity.CENTER);
+                    label.setMaxLines(1);
+                    tile.addView(label, new LinearLayout.LayoutParams(MATCH, WRAP));
+                    if (on) {
+                        TextView status = text("Dipakai", 10, GREEN, true);
+                        status.setGravity(Gravity.CENTER);
+                        tile.addView(status, new LinearLayout.LayoutParams(MATCH, WRAP));
+                    }
+                    tile.setContentDescription("Tudung " + HOOD_NAMES[k] + (on ? ", sedang dipakai" : ", ketuk untuk memakai"));
+                    tile.setOnClickListener(v -> {
                         for (int j = 0; j < np; j++) {
                             if (isHood(k) && j != shopPl && avatar[j] == k) {
                                 avatar[j] = avatar[shopPl];
@@ -7336,24 +7367,28 @@ public class MainActivity extends Activity {
                         prefs.edit().putInt("avatar" + shopPl, k).apply();
                         showToko();
                     });
-                    row.addView(t, weight(q == 0 ? 0 : 4, q == 3 ? 0 : 4));
+                    row.addView(tile, weight(q == 0 ? 0 : 5, q == hoodColumns - 1 ? 0 : 5));
                 }
-                c.addView(row, lp(dp(64), 8));
+                c.addView(row, lp(WRAP, 7));
             }
-            c.addView(text("Kotak terakhir: tanpa tudung, supaya rambutmu terlihat penuh", 12, DARK, false),
-                    lp(WRAP, 6));
+
         }
         int[] slotsOfTab = shopTab == 0 ? new int[]{0} : shopTab == 1 ? new int[]{1, 2}
-                : shopTab == 2 ? new int[]{3, 4} : shopTab == 3 ? new int[]{5} : new int[]{6};
+                : shopTab == 2 ? new int[]{4} : shopTab == 3 ? new int[]{5}
+                : shopTab == 4 ? new int[]{6} : new int[]{3};
         String[] slotTitle = {"\uD83C\uDFA9 Topi", "\uD83D\uDD76\uFE0F Wajah", "\u26BD Pegang", "\uD83D\uDC23 Teman",
                 "\uD83C\uDFA8 Latar", "\uD83D\uDC55 Pakaian", "\uD83D\uDC87 Rambut"};
         for (int slot : slotsOfTab) {
             ArrayList<Integer> ids = new ArrayList<>();
             for (int i = 0; i < ITEMS.length; i++) {
-                if (itSlot(i) == slot && itFits(i, genderOf[shopPl])) {
+                // Hide incompatible 2D-only head, face, handheld and companion
+                // items. They cannot currently be rendered on the 3D avatar.
+                if (itSlot(i) == slot && itFits(i, genderOf[shopPl]) &&
+                        slot != 0 && slot != 1 && slot != 2 && slot != 3) {
                     ids.add(i);
                 }
             }
+            if (ids.isEmpty()) continue;
             if (slotsOfTab.length > 1 || shopTab == 0) {
                 c.addView(text(slotTitle[slot], 13, DARK, true), lp(WRAP, shopTab == 0 ? 14 : 12));
             }
@@ -7370,13 +7405,13 @@ public class MainActivity extends Activity {
                 c.addView(row, lp(WRAP, 10));
             }
         }
-        int have = 0;
+        int have = 0, available = 0;
         for (int i = 0; i < ITEMS.length; i++) {
-            if (owns(i)) {
-                have++;
-            }
+            if (itSlot(i) <= 3 || !itFits(i, genderOf[shopPl])) continue;
+            available++;
+            if (owns(i)) have++;
         }
-        c.addView(text("\uD83D\uDDC2\uFE0F Koleksi: " + have + "/" + ITEMS.length + " barang", 13, DARK, true),
+        c.addView(text("\uD83D\uDDC2\uFE0F Koleksi 3D: " + have + "/" + available + " barang", 13, DARK, true),
                 lp(WRAP, 16));
 
         Button back = button("Kembali", GRAY, 14);
