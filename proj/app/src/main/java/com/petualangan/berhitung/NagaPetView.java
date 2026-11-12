@@ -46,6 +46,8 @@ public class NagaPetView extends GLSurfaceView {
     }
     /** Semua naga yang sedang hidup bereaksi (overlay maupun pendamping). Aman dipanggil dari thread UI. */
     public static void reactAll(boolean benar) {
+        NagaScene.rType = benar ? 1 : 2;
+        NagaScene.rT0 = System.nanoTime();
         synchronized (ALL) {
             for (int i = ALL.size() - 1; i >= 0; i--) {
                 NagaPetView v = ALL.get(i).get();

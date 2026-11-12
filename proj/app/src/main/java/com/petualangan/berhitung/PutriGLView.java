@@ -41,6 +41,10 @@ final class PutriGLView extends GLSurfaceView {
     private volatile float zoom = 1f;
     private final android.view.ScaleGestureDetector scaleDetector;
     private final Renderer renderer = new Renderer();
+    private volatile boolean nagaOn = false;   // naga pendamping di dalam adegan (terhalang avatar saat di belakang)
+    private NagaScene naga;
+    /** Hidupkan naga pendamping: mengitari avatar lalu hinggap di kepala. Panggil sebelum/sesudah dipasang. */
+    public void setNaga(boolean on) { nagaOn = on; }
 
     PutriGLView(Context ctx) { this(ctx, 1); }
 
@@ -244,6 +248,7 @@ final class PutriGLView extends GLSurfaceView {
 
         @Override
         public void onSurfaceCreated(GL10 gl, EGLConfig cfg) {
+            naga = null;   // konteks GL baru: sumber daya naga dibuat ulang
             GLES20.glClearColor(bgR, bgG, bgB, 1f);
             GLES20.glEnable(GLES20.GL_DEPTH_TEST);
             GLES20.glDisable(GLES20.GL_CULL_FACE); // dua sisi, seperti pratinjau
@@ -413,6 +418,10 @@ final class PutriGLView extends GLSurfaceView {
             GLES20.glDisableVertexAttribArray(aNor);
             GLES20.glDisableVertexAttribArray(aCol);
             GLES20.glDisableVertexAttribArray(glossLocation);
+            if (nagaOn) {
+                if (naga == null) naga = new NagaScene(getContext());
+                naga.draw(view, proj);
+            }
         }
 
         private int compile(int type, String src) {
