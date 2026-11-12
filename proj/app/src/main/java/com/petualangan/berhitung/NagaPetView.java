@@ -31,7 +31,7 @@ public class NagaPetView extends GLSurfaceView {
         getHolder().setFormat(android.graphics.PixelFormat.TRANSLUCENT);
         if (mode == 0) setZOrderOnTop(true);
         else if (mode == 2) setZOrderMediaOverlay(true);
-        r = new R(c, mode == 1);
+        r = new R(c, mode == 1, mode == 2);
         setRenderer(r);
         synchronized (ALL) { ALL.add(new java.lang.ref.WeakReference<NagaPetView>(this)); }
     }
@@ -97,8 +97,8 @@ public class NagaPetView extends GLSurfaceView {
             for (int i = 0; i < NSP; i++) {
                 float a = i * 6.2832f / NSP + 0.6f;
                 float rad = 0.25f + 0.55f * rp;
-                pts[i * 3] = rad * (float) Math.cos(a);
-                pts[i * 3 + 1] = 0.25f + 0.45f * rp + 0.12f * (float) Math.sin(a * 2f);
+                pts[i * 3] = sx + sk * rad * (float) Math.cos(a);
+                pts[i * 3 + 1] = sy + sk * (0.25f + 0.45f * rp + 0.12f * (float) Math.sin(a * 2f));
                 pts[i * 3 + 2] = 0.15f * (float) Math.sin(a);
             }
             FloatBuffer pb = ByteBuffer.allocateDirect(pts.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
@@ -127,7 +127,22 @@ public class NagaPetView extends GLSurfaceView {
         int sprog;
         static final int NSP = 10;
         final boolean inl;
-        R(Context c, boolean inline) { ctx = c; inl = inline; }
+        final boolean comp;
+        float asp = 1.2f;
+        float ccx = 0, ccy = 0, ccz = 0, halfX = 0.5f;   // pusat & setengah lebar model (untuk mode pendamping)
+        float sx = 0, sy = 0, sk = 1;                    // posisi & skala kilau
+        R(Context c, boolean inline, boolean companion) { ctx = c; inl = inline; comp = companion; }
+        /** Lintasan mode pendamping: mengitari avatar 2 putaran, menukik, lalu hinggap di kepala. */
+        float cx(float t) { float[] r = path(t); return r[0]; }
+        float[] path(float t) {
+            float T1 = 9f, T2 = 2.6f;
+            float u = t < T1 ? 0f : Math.min(1f, (t - T1) / T2);
+            float e = u * u * (3f - 2f * u), fl = 1f - e;
+            float ang = t * 6.2832f / 4.5f;
+            float rx = Math.max(0.3f, asp - 0.5f), ry = 0.55f;
+            float cyp = 0.0f + 0.80f * e;
+            return new float[] { fl * rx * (float) Math.cos(ang), cyp + fl * ry * (float) Math.sin(ang), fl, ang };
+        }
         /** Cari di assets/characters/ dulu, lalu assets/. */
         InputStream op(String n) throws java.io.IOException {
             try { return ctx.getAssets().open("characters/" + n); } catch (java.io.IOException e) { return ctx.getAssets().open(n); }
@@ -149,6 +164,12 @@ public class NagaPetView extends GLSurfaceView {
                 ib = ByteBuffer.allocateDirect(nIdx * 2).order(ByteOrder.nativeOrder()).asShortBuffer();
                 for (int i = 0; i < nIdx; i++) ib.put(bb.getShort());
                 ib.position(0);
+                float mnx = 1e9f, mxx = -1e9f, mny = 1e9f, mxy = -1e9f, mnz = 1e9f, mxz = -1e9f;
+                for (int i = 0; i < nv; i++) {
+                    float x = vb.get(i * 8), y = vb.get(i * 8 + 1), z = vb.get(i * 8 + 2);
+                    if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y; if (z < mnz) mnz = z; if (z > mxz) mxz = z;
+                }
+                ccx = (mnx + mxx) / 2; ccy = (mny + mxy) / 2; ccz = (mnz + mxz) / 2; halfX = Math.max(0.01f, (mxx - mnx) / 2);
                 Bitmap bmp = BitmapFactory.decodeStream(op("dragon_pet.jpg"));
                 int[] t = new int[1]; GLES20.glGenTextures(1, t, 0); tex = t[0];
                 GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex);
@@ -179,7 +200,9 @@ public class NagaPetView extends GLSurfaceView {
 
         public void onSurfaceChanged(GL10 g, int w, int h) {
             GLES20.glViewport(0, 0, w, h);
-            Matrix.perspectiveM(proj, 0, 40f, (float) w / h, 0.1f, 10f);
+            asp = (float) w / h;
+            if (comp) Matrix.orthoM(proj, 0, -asp, asp, -1f, 1f, 0.1f, 10f);
+            else Matrix.perspectiveM(proj, 0, 40f, (float) w / h, 0.1f, 10f);
         }
 
         public void onDrawFrame(GL10 g) {
@@ -197,10 +220,28 @@ public class NagaPetView extends GLSurfaceView {
                 else if (reactType == 1) { dy = 0.28f * (float) Math.abs(Math.sin(rp * Math.PI * 2f)) * (1f - rp); tilt = -10f * (float) Math.sin(rp * Math.PI); }
                 else { dy = -0.12f * (float) Math.sin(rp * Math.PI); tilt = 14f * (float) Math.sin(rp * Math.PI); }
             }
-            Matrix.translateM(model, 0, 0f, dy + 0.05f * (float) Math.sin(t * 2.2f), 0f);   // mengambang + reaksi
-            Matrix.rotateM(model, 0, tilt, 1f, 0f, 0f);                                    // mengangguk/menunduk
-            Matrix.rotateM(model, 0, 30f * (float) Math.sin(t * 0.8f), 0f, 1f, 0f);     // menoleh kiri-kanan
-            Matrix.rotateM(model, 0, 6f * (float) Math.sin(t * 4.4f), 0f, 0f, 1f);      // sayap miring (kepak ringan)
+            if (comp) {
+                Matrix.setLookAtM(view, 0, 0f, 0.6f, -3f, 0f, 0f, 0f, 0f, 1f, 0f);
+                float[] ps = path(t), p2 = path(t + 0.04f);
+                float fl = ps[2];
+                float vx = (p2[0] - ps[0]) / 0.04f;
+                float yaw = 65f * Math.max(-1f, Math.min(1f, vx / 0.6f)) + (1f - fl) * 8f * (float) Math.sin(t * 1.3f);
+                float sc = (0.55f + 0.25f * fl) / (2f * halfX) * (1f - 0.18f * fl * (float) Math.sin(ps[3]));
+                float py = ps[1] + dy * 0.45f + (1f - fl) * 0.012f * (float) Math.sin(t * 2f);
+                sx = ps[0]; sy = py; sk = 0.45f;
+                Matrix.translateM(model, 0, ps[0], py, 0f);
+                Matrix.rotateM(model, 0, yaw, 0f, 1f, 0f);
+                Matrix.rotateM(model, 0, tilt, 1f, 0f, 0f);
+                Matrix.rotateM(model, 0, (3f + 5f * fl) * (float) Math.sin(t * (1.5f + 3f * fl)), 0f, 0f, 1f);
+                Matrix.scaleM(model, 0, sc, sc, sc);
+                Matrix.translateM(model, 0, -ccx, -ccy, -ccz);
+            } else {
+                sx = 0; sy = 0; sk = 1;
+                Matrix.translateM(model, 0, 0f, dy + 0.05f * (float) Math.sin(t * 2.2f), 0f);
+                Matrix.rotateM(model, 0, tilt, 1f, 0f, 0f);
+                Matrix.rotateM(model, 0, 30f * (float) Math.sin(t * 0.8f), 0f, 1f, 0f);
+                Matrix.rotateM(model, 0, 6f * (float) Math.sin(t * 4.4f), 0f, 0f, 1f);
+            }
             Matrix.multiplyMM(mv, 0, view, 0, model, 0);
             Matrix.multiplyMM(mvp, 0, proj, 0, mv, 0);
             GLES20.glUseProgram(prog);

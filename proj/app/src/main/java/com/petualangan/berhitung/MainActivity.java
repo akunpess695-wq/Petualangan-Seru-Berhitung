@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.25.0";
+    private static final String APP_VERSION = "6.25.1";
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
@@ -7349,9 +7349,8 @@ public class MainActivity extends Activity {
         // naga pendamping (kanan atas)
         if (prefs.getBoolean("nagaPakai", false)) {
             NagaPetView buddy = new NagaPetView(this, 2);
-            FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams((int) (avSize * 0.36f), (int) (avSize * 0.25f),
-                    Gravity.TOP | Gravity.END);
-            bl.setMargins(0, 0, 0, 0);   // pojok kanan atas, kecil: tidak menutupi rambut avatar
+            // naga terbang di seluruh panel: mengitari avatar lalu hinggap di kepala
+            FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams(MATCH, MATCH);
             stage.addView(buddy, bl);
         }
         String[] sp = {"✦", "✧"};
