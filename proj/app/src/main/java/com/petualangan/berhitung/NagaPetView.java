@@ -131,7 +131,8 @@ public class NagaPetView extends GLSurfaceView {
         final boolean inl;
         final boolean comp;
         float asp = 1.2f;
-        float ccx = 0, ccy = 0, ccz = 0, halfX = 0.5f;   // pusat & setengah lebar model (untuk mode pendamping)
+        float ccx = 0, ccy = 0, ccz = 0, halfX = 0.5f, halfZ = 0.34f;
+        float phF = 0, phT = 0, amp = 0.06f, tAmp = 0.16f;   // fase kepak sayap & ayun ekor (diintegralkan), amplitudo   // pusat & setengah lebar model (untuk mode pendamping)
         float sx = 0, sy = 0, sk = 1, flap = 0, yawS = 0, rollS = 0, pitchS = 0; long lastN = 0;                    // posisi & skala kilau
         R(Context c, boolean inline, boolean companion) { ctx = c; inl = inline; comp = companion; }
         /** Lintasan mode pendamping: mengitari avatar 2 putaran, menukik, lalu hinggap di kepala. */
@@ -171,7 +172,7 @@ public class NagaPetView extends GLSurfaceView {
                     float x = vb.get(i * 8), y = vb.get(i * 8 + 1), z = vb.get(i * 8 + 2);
                     if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y; if (z < mnz) mnz = z; if (z > mxz) mxz = z;
                 }
-                ccx = (mnx + mxx) / 2; ccy = (mny + mxy) / 2; ccz = (mnz + mxz) / 2; halfX = Math.max(0.01f, (mxx - mnx) / 2);
+                ccx = (mnx + mxx) / 2; ccy = (mny + mxy) / 2; ccz = (mnz + mxz) / 2; halfX = Math.max(0.01f, (mxx - mnx) / 2); halfZ = Math.max(0.01f, (mxz - mnz) / 2);
                 Bitmap bmp = BitmapFactory.decodeStream(op("dragon_pet.jpg"));
                 int[] t = new int[1]; GLES20.glGenTextures(1, t, 0); tex = t[0];
                 GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex);
@@ -179,8 +180,18 @@ public class NagaPetView extends GLSurfaceView {
                 GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
                 GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0); bmp.recycle();
             } catch (Exception e) { nIdx = 0; return; }
-            String vs = "uniform mat4 uMVP,uM;uniform float uFl,uCx,uHx;attribute vec3 aP,aN;attribute vec2 aT;varying vec2 vT;varying float vL;"
-                + "void main(){vec3 p=aP;float k=abs(p.x-uCx)/uHx;p.y+=uFl*uHx*k*k;gl_Position=uMVP*vec4(p,1.);vT=aT;vec3 n=normalize(mat3(uM)*aN);"
+            String vs = "uniform mat4 uMVP,uM;uniform float uPh,uAmp,uTP,uTA,uTO,uCx,uHx,uCz,uHz;attribute vec3 aP,aN;attribute vec2 aT;varying vec2 vT;varying float vL;"
+                + "void main(){vec3 p=aP;float k=abs(p.x-uCx)/uHx;"
+                + "float ph=uPh-k*1.1;float st=sin(ph)+.28*sin(2.*ph+.6);"
+                + "p.y+=uAmp*uHx*(.15*k+.85*k*k)*st;"
+                + "p.z+=uAmp*uHx*.22*k*k*sin(ph-.9);"
+                + "p.x=uCx+(p.x-uCx)*(1.-.35*uAmp*k*max(st,0.));"
+                + "float b=1.-smoothstep(.04,.2,k);float zt=(p.z-uCz)/uHz;"
+                + "float tw=clamp(zt,0.,1.);tw=tw*tw;float wv=uTP-zt*2.8;"
+                + "p.x+=(uTA*sin(wv)+uTO)*uHz*tw*b;p.y+=uTA*.45*sin(wv+1.4)*uHz*tw*b;"
+                + "float hw=clamp(-zt-.78,0.,.22)/.22;"
+                + "p.x-=.3*uTA*sin(wv+.9)*uHz*hw*b;p.y+=uAmp*.35*uHz*hw*sin(uPh+1.5)*b;"
+                + "gl_Position=uMVP*vec4(p,1.);vT=aT;vec3 n=normalize(mat3(uM)*aN);"
                 + "vL=.55+.6*max(dot(n,normalize(vec3(.3,.8,-.6))),0.);}";
             String fs = "precision mediump float;uniform sampler2D uS;varying vec2 vT;varying float vL;"
                 + "void main(){vec4 c=texture2D(uS,vT);gl_FragColor=vec4(c.rgb*vL*1.15,1.);}";
@@ -207,6 +218,24 @@ public class NagaPetView extends GLSurfaceView {
             else Matrix.perspectiveM(proj, 0, 40f, (float) w / h, 0.1f, 10f);
         }
 
+        /** Gerak sayap & ekor: terbang = kepak-kepak lalu meluncur; diam = sesekali mengibas. Fase diintegralkan (tanpa lompatan). */
+        void wingState(float t, float dt, float fl, float rp) {
+            float burst = 0.5f + 0.5f * (float) Math.sin(t * 1.15f + 0.5f); burst = burst * burst * (3f - 2f * burst);
+            float pulse = (float) Math.pow(Math.max(0.0, Math.sin(t * 1.25f)), 10.0);
+            float ampP = 0.05f + 0.15f * pulse, ampF = 0.17f + 0.19f * burst;
+            float omP = 3.5f + 5f * pulse, omF = 6.2f + 3.6f * burst;
+            amp = ampP + (ampF - ampP) * fl;
+            float om = omP + (omF - omP) * fl;
+            if (rp >= 0f) {
+                float sn = (float) Math.sin(rp * Math.PI);
+                if (reactType == 1) { amp += 0.22f * sn; om += 3f; }          // senang: sayap mengepak
+                else amp *= 1f - 0.65f * sn;                                   // sedih: sayap terkulai
+            }
+            phF = (phF + dt * om) % 6.2831853f;
+            phT = (phT + dt * (2.2f + 1.4f * fl)) % 6.2831853f;
+            tAmp = 0.16f + 0.10f * fl;
+        }
+
         public void onDrawFrame(GL10 g) {
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
             if (nIdx == 0) return;
@@ -222,19 +251,19 @@ public class NagaPetView extends GLSurfaceView {
                 else if (reactType == 1) { dy = 0.28f * (float) Math.abs(Math.sin(rp * Math.PI * 2f)) * (1f - rp); tilt = -10f * (float) Math.sin(rp * Math.PI); }
                 else { dy = -0.12f * (float) Math.sin(rp * Math.PI); tilt = 14f * (float) Math.sin(rp * Math.PI); }
             }
+            long nn = System.nanoTime();
+            float dt = lastN == 0 ? 0.016f : Math.min(0.1f, (nn - lastN) / 1e9f); lastN = nn;
             if (comp) {
                 Matrix.setLookAtM(view, 0, 0f, 0.6f, -3f, 0f, 0f, 0f, 0f, 1f, 0f);
                 float[] ps = path(t), p2 = path(t + 0.05f);
                 float fl = ps[2];
                 float vx = (p2[0] - ps[0]) / 0.05f, vy = (p2[1] - ps[1]) / 0.05f;
-                long nn = System.nanoTime();
-                float dt = lastN == 0 ? 0.016f : Math.min(0.1f, (nn - lastN) / 1e9f); lastN = nn;
                 float a1 = 1f - (float) Math.exp(-dt * 3.5f);   // penghalus: belokan mengalir, tidak patah
                 float yawT = 55f * Math.max(-1f, Math.min(1f, vx / 0.7f)) + (1f - fl) * 8f * (float) Math.sin(t * 1.3f);
                 float rollT = -18f * Math.max(-1f, Math.min(1f, vx / 0.7f)) * fl;
                 float pitchT = 22f * Math.max(-1f, Math.min(1f, vy / 0.7f)) * fl - (1f - fl) * 4f;
                 yawS += (yawT - yawS) * a1; rollS += (rollT - rollS) * a1; pitchS += (pitchT - pitchS) * a1;
-                flap = (0.08f + 0.38f * fl) * (float) Math.sin(t * (2.5f + 7f * fl));
+                wingState(t, dt, fl, rp);
                 float yaw = yawS;
                 tilt += pitchS;
                 float sc = (0.7f + 0.3f * fl) / (2f * halfX) * (1f - 0.15f * fl * (float) Math.sin(ps[3]));
@@ -247,11 +276,11 @@ public class NagaPetView extends GLSurfaceView {
                 Matrix.scaleM(model, 0, sc, sc, sc);
                 Matrix.translateM(model, 0, -ccx, -ccy, -ccz);
             } else {
-                sx = 0; sy = 0; sk = 1; flap = 0.06f * (float) Math.sin(t * 4.4f);
+                sx = 0; sy = 0; sk = 1; wingState(t, dt, 0f, rp);
                 Matrix.translateM(model, 0, 0f, dy + 0.05f * (float) Math.sin(t * 2.2f), 0f);
                 Matrix.rotateM(model, 0, tilt, 1f, 0f, 0f);
                 Matrix.rotateM(model, 0, 30f * (float) Math.sin(t * 0.8f), 0f, 1f, 0f);
-                Matrix.rotateM(model, 0, 6f * (float) Math.sin(t * 4.4f), 0f, 0f, 1f);
+                Matrix.rotateM(model, 0, 3.5f * (float) Math.sin(phF), 0f, 0f, 1f);
             }
             Matrix.multiplyMM(mv, 0, view, 0, model, 0);
             Matrix.multiplyMM(mvp, 0, proj, 0, mv, 0);
@@ -261,7 +290,13 @@ public class NagaPetView extends GLSurfaceView {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex);
             GLES20.glUniform1i(GLES20.glGetUniformLocation(prog, "uS"), 0);
-            GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uFl"), flap);
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uPh"), phF);
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uAmp"), amp);
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uTP"), phT);
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uTA"), tAmp);
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uTO"), 0f);
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uCz"), ccz);
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uHz"), halfZ);
             GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uCx"), ccx);
             GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uHx"), halfX);
             int p = GLES20.glGetAttribLocation(prog, "aP"), n = GLES20.glGetAttribLocation(prog, "aN"), u = GLES20.glGetAttribLocation(prog, "aT");

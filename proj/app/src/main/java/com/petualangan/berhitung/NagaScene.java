@@ -22,7 +22,8 @@ final class NagaScene {
 
     private FloatBuffer vb; private ShortBuffer ib;
     private int nIdx, prog, sprog, tex;
-    private float ccx, ccy, ccz, halfX = 0.5f;
+    private float ccx, ccy, ccz, halfX = 0.5f, halfZ = 0.34f;
+    private float phF = 0f, phT = 0f;                              // fase kepak sayap & ayun ekor (diintegralkan agar tidak melompat)
     private final long t0 = System.nanoTime();
     private long lastN = 0;
     private float hx = 0f, hz = 1f, pitchS = 0f, rollS = 0f;   // arah hadap (vektor) & sudut yang dihaluskan
@@ -52,6 +53,7 @@ final class NagaScene {
                 if (z < mnz) mnz = z; if (z > mxz) mxz = z;
             }
             ccx = (mnx + mxx) / 2; ccy = (mny + mxy) / 2; ccz = (mnz + mxz) / 2; halfX = Math.max(0.01f, (mxx - mnx) / 2);
+            halfZ = Math.max(0.01f, (mxz - mnz) / 2);
             Bitmap bmp = BitmapFactory.decodeStream(op(ctx, "dragon_pet.jpg"));
             int[] t = new int[1]; GLES20.glGenTextures(1, t, 0); tex = t[0];
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex);
@@ -59,8 +61,20 @@ final class NagaScene {
             GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
             GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0); bmp.recycle();
         } catch (Exception e) { nIdx = 0; return; }
-        String vs = "uniform mat4 uMVP,uM;uniform float uFl,uCx,uHx;attribute vec3 aP,aN;attribute vec2 aT;varying vec2 vT;varying float vL;"
-            + "void main(){vec3 p=aP;float k=abs(p.x-uCx)/uHx;p.y+=uFl*uHx*k*k;gl_Position=uMVP*vec4(p,1.);vT=aT;"
+        String vs = "uniform mat4 uMVP,uM;uniform float uPh,uAmp,uTP,uTA,uTO,uCx,uHx,uCz,uHz;attribute vec3 aP,aN;attribute vec2 aT;varying vec2 vT;varying float vL;"
+            + "void main(){vec3 p=aP;float k=abs(p.x-uCx)/uHx;"
+            // sayap: gelombang kepak merambat dari pangkal ke ujung (ujung tertinggal), turun lebih kuat dari naik, ujung menyapu & menguncup
+            + "float ph=uPh-k*1.1;float st=sin(ph)+.28*sin(2.*ph+.6);"
+            + "p.y+=uAmp*uHx*(.15*k+.85*k*k)*st;"
+            + "p.z+=uAmp*uHx*.22*k*k*sin(ph-.9);"
+            + "p.x=uCx+(p.x-uCx)*(1.-.35*uAmp*k*max(st,0.));"
+            // badan tengah: ekor melenggok (gelombang berjalan), kepala menyeimbangkan & mengangguk
+            + "float b=1.-smoothstep(.04,.2,k);float zt=(p.z-uCz)/uHz;"
+            + "float tw=clamp(zt,0.,1.);tw=tw*tw;float wv=uTP-zt*2.8;"
+            + "p.x+=(uTA*sin(wv)+uTO)*uHz*tw*b;p.y+=uTA*.45*sin(wv+1.4)*uHz*tw*b;"
+            + "float hw=clamp(-zt-.78,0.,.22)/.22;"
+            + "p.x-=.3*uTA*sin(wv+.9)*uHz*hw*b;p.y+=uAmp*.35*uHz*hw*sin(uPh+1.5)*b;"
+            + "gl_Position=uMVP*vec4(p,1.);vT=aT;"
             + "vec3 n=normalize(mat3(uM)*aN);vL=.55+.6*max(dot(n,normalize(vec3(.3,.8,.6))),0.);}";
         String fs = "precision mediump float;uniform sampler2D uS;varying vec2 vT;varying float vL;"
             + "void main(){vec4 c=texture2D(uS,vT);gl_FragColor=vec4(c.rgb*vL*1.15,1.);}";
@@ -83,18 +97,26 @@ final class NagaScene {
         return p;
     }
 
-    /** Lintasan (satuan dunia avatar: tinggi karakter ~90, pusat di y=0, kamera di +Z). Hasil: x,y,z, fl(terbang 1..0), sudut. */
+    private static final float W = 6.2832f / 4.5f;          // laju putaran dasar (rad/dtk)
+
+    /** Lintasan (satuan dunia avatar: tinggi karakter ~90, pusat di y=0, kamera di +Z).
+     *  Hasil: x, y, z, fl (terbang 1..0), sudut, u (kemajuan mendarat 0..1), rate (laju putar relatif). */
     private static float[] path(float t) {
         float T1 = 9f, T2 = 2.8f;
         float u = t < T1 ? 0f : Math.min(1f, (t - T1) / T2);
         float e = u * u * (3f - 2f * u), fl = 1f - e;
-        float ang = t * 6.2832f / 4.5f;
-        float rx = 34f, rz = 46f;
+        // laju putar bervariasi pelan (melambat-mempercepat) + orbit yang sedikit "bernapas" -> tidak mekanis
+        float ang = t * W + 0.35f * (float) Math.sin(t * 0.9f);
+        float rate = (W + 0.315f * (float) Math.cos(t * 0.9f)) / W;
+        float rx = 34f + 2.5f * (float) Math.sin(t * 0.7f), rz = 46f + 3f * (float) Math.sin(t * 0.53f + 1f);
         float x = fl * rx * (float) Math.cos(ang);
         float z = fl * rz * (float) Math.sin(ang);
-        float y = 4f + 40f * e + fl * 12f * (float) Math.sin(ang * 1.0f + 1.2f);
-        return new float[] { x, y, z, fl, ang };
+        float y = 4f + 40f * e + fl * (11f * (float) Math.sin(ang + 1.2f) + 2.5f * (float) Math.sin(t * 1.7f));
+        return new float[] { x, y, z, fl, ang, u, rate };
     }
+
+    private static float stroke(float ph) { return (float) (Math.sin(ph) + 0.28 * Math.sin(2 * ph + 0.6)); }
+    private static float smooth01(float a, float b, float x) { float k = Math.max(0f, Math.min(1f, (x - a) / (b - a))); return k * k * (3f - 2f * k); }
 
     void draw(float[] view, float[] proj) {
         if (nIdx == 0) return;
@@ -102,7 +124,7 @@ final class NagaScene {
         long nn = System.nanoTime();
         float dt = lastN == 0 ? 0.016f : Math.min(0.1f, (nn - lastN) / 1e9f); lastN = nn;
         float[] p0 = path(t), p1 = path(t + 0.05f);
-        float fl = p0[3];
+        float fl = p0[3], u = p0[5], rate = p0[6];
         float vx = (p1[0] - p0[0]) / 0.05f, vy = (p1[1] - p0[1]) / 0.05f, vz = (p1[2] - p0[2]) / 0.05f;
         float sp = (float) Math.sqrt(vx * vx + vz * vz);
         // arah hadap: searah terbang, makin menghadap kamera (+Z) saat hinggap
@@ -111,28 +133,55 @@ final class NagaScene {
         float a1 = 1f - (float) Math.exp(-dt * 4f);
         hx += (tx - hx) * a1; hz += (tz - hz) * a1;
         float yaw = (float) Math.toDegrees(Math.atan2(-hx, -hz));
-        float pitchT = 18f * Math.max(-1f, Math.min(1f, vy / 25f)) * fl - (1f - fl) * 3f;
-        float rollT = -16f * fl;
-        pitchS += (pitchT - pitchS) * a1; rollS += (rollT - rollS) * a1;
+        yaw += (1f - fl) * (9f * (float) Math.sin(t * 0.62f) + 3f * (float) Math.sin(t * 1.7f));   // hinggap: menoleh pelan ke kiri-kanan
+
+        // fase pergerakan: terbang = kepak-kepak lalu meluncur; hinggap = diam, sesekali mengibas; mendarat = kepak kuat (flare)
+        float burst = smooth01(0f, 1f, 0.5f + 0.5f * (float) Math.sin(t * 1.15f + 0.5f));
+        float pulse = (float) Math.pow(Math.max(0.0, Math.sin(t * 1.25f)), 10.0);
+        float flare = (float) Math.sin(Math.PI * smooth01(0.45f, 1f, u));
+        float ampP = 0.05f + 0.15f * pulse, ampF = 0.17f + 0.19f * burst;
+        float omP = 3.5f + 5f * pulse, omF = 6.2f + 3.6f * burst;
+        float amp = ampP + (ampF - ampP) * fl + 0.16f * flare;
+        float om = omP + (omF - omP) * fl + 5f * flare;
 
         float dy = 0f, tilt = 0f, rp = -1f; int rt = rType;
         if (rt != 0) {
             float dur = rt == 1 ? 0.9f : 1.1f;
             rp = (nn - rT0) / 1e9f / dur;
             if (rp >= 1f) { rType = 0; rp = -1f; }
-            else if (rt == 1) { dy = 12f * (float) Math.abs(Math.sin(rp * Math.PI * 2f)) * (1f - rp); tilt = -10f * (float) Math.sin(rp * Math.PI); }
-            else { dy = -5f * (float) Math.sin(rp * Math.PI); tilt = 14f * (float) Math.sin(rp * Math.PI); }
+            else if (rt == 1) {
+                dy = 12f * (float) Math.abs(Math.sin(rp * Math.PI * 2f)) * (1f - rp); tilt = -10f * (float) Math.sin(rp * Math.PI);
+                amp += 0.22f * (float) Math.sin(rp * Math.PI); om += 3f;                 // senang: sayap mengepak
+            } else {
+                dy = -5f * (float) Math.sin(rp * Math.PI); tilt = 14f * (float) Math.sin(rp * Math.PI);
+                amp *= 1f - 0.65f * (float) Math.sin(rp * Math.PI);                        // sedih: sayap terkulai
+            }
         }
-        float flap = (0.08f + 0.38f * fl) * (float) Math.sin(t * (2.5f + 7f * fl));
-        float span = 44f + 16f * fl;                                  // lebar sayap (satuan dunia)
-        float sc = span / (2f * halfX);
-        float py = p0[1] + dy + (1f - fl) * 0.6f * (float) Math.sin(t * 2f);
+        phF = (phF + dt * om) % 6.2831853f;
+        phT = (phT + dt * (2.2f + 1.4f * fl)) % 6.2831853f;
+        float tAmp = 0.16f + 0.10f * fl;
+        float tOff = -0.10f * fl * rate;                              // saat berbelok, ekor tertinggal ke sisi luar
+
+        // kemiringan: miring ke dalam belokan, naik-turun mengikuti ketinggian, flare saat mendarat; goyang halus mengikuti kepakan
+        float pitchT = 18f * Math.max(-1f, Math.min(1f, vy / 25f)) * fl - (1f - fl) * 3f + 24f * flare;
+        float rollT = -16f * fl * rate * rate;
+        pitchS += (pitchT - pitchS) * a1; rollS += (rollT - rollS) * a1;
+        float pitch = pitchS + tilt + 2.5f * fl * (float) Math.sin(phF + 0.4f);
+        float roll = rollS + 2.2f * fl * (float) Math.sin(phF);
+
+        float ap = smooth01(0f, 0.8f, t);                             // muncul pelan dari kecil
+        float span = (44f + 16f * fl) * (0.35f + 0.65f * ap);        // lebar sayap (satuan dunia)
+        float sc = span / (2f * halfX) * (1f + (1f - fl) * 0.012f * (float) Math.sin(t * 2.6f));   // hinggap: bernapas
+        // badan naik saat sayap menekan ke bawah, turun saat sayap terangkat; melayang saat hinggap
+        float bob = -1.6f * fl * (amp / 0.36f) * stroke(phF - 0.4f)
+                  + (1f - fl) * (1.0f * (float) Math.sin(t * 1.9f) + 0.4f * (float) Math.sin(t * 3.3f));
+        float py = p0[1] + dy + bob;
 
         Matrix.setIdentityM(model, 0);
         Matrix.translateM(model, 0, p0[0], py, p0[2]);
         Matrix.rotateM(model, 0, yaw, 0f, 1f, 0f);
-        Matrix.rotateM(model, 0, pitchS + tilt, 1f, 0f, 0f);
-        Matrix.rotateM(model, 0, rollS, 0f, 0f, 1f);
+        Matrix.rotateM(model, 0, pitch, 1f, 0f, 0f);
+        Matrix.rotateM(model, 0, roll, 0f, 0f, 1f);
         Matrix.scaleM(model, 0, sc, sc, sc);
         Matrix.translateM(model, 0, -ccx, -ccy, -ccz);
         Matrix.multiplyMM(mv, 0, view, 0, model, 0);
@@ -144,19 +193,25 @@ final class NagaScene {
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
         GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(prog, "uMVP"), 1, false, mvp, 0);
         GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(prog, "uM"), 1, false, model, 0);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uFl"), flap);
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uPh"), phF);
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uAmp"), amp);
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uTP"), phT);
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uTA"), tAmp);
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uTO"), tOff);
         GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uCx"), ccx);
         GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uHx"), halfX);
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uCz"), ccz);
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uHz"), halfZ);
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex);
         GLES20.glUniform1i(GLES20.glGetUniformLocation(prog, "uS"), 0);
-        int p = GLES20.glGetAttribLocation(prog, "aP"), n = GLES20.glGetAttribLocation(prog, "aN"), u = GLES20.glGetAttribLocation(prog, "aT");
+        int p = GLES20.glGetAttribLocation(prog, "aP"), n = GLES20.glGetAttribLocation(prog, "aN"), uv = GLES20.glGetAttribLocation(prog, "aT");
         vb.position(0); GLES20.glVertexAttribPointer(p, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(p);
         vb.position(3); GLES20.glVertexAttribPointer(n, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(n);
-        vb.position(6); GLES20.glVertexAttribPointer(u, 2, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(u);
+        vb.position(6); GLES20.glVertexAttribPointer(uv, 2, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(uv);
         ib.position(0);
         GLES20.glDrawElements(GLES20.GL_TRIANGLES, nIdx, GLES20.GL_UNSIGNED_SHORT, ib);
-        GLES20.glDisableVertexAttribArray(p); GLES20.glDisableVertexAttribArray(n); GLES20.glDisableVertexAttribArray(u);
+        GLES20.glDisableVertexAttribArray(p); GLES20.glDisableVertexAttribArray(n); GLES20.glDisableVertexAttribArray(uv);
 
         if (rp >= 0f && rt == 1) sparkle(view, proj, p0[0], py, p0[2], rp);
     }
