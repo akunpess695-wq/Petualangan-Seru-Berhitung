@@ -89,7 +89,7 @@ final class NagaScene {
         float u = t < T1 ? 0f : Math.min(1f, (t - T1) / T2);
         float e = u * u * (3f - 2f * u), fl = 1f - e;
         float ang = t * 6.2832f / 4.5f;
-        float rx = 46f, rz = 48f;
+        float rx = 34f, rz = 46f;
         float x = fl * rx * (float) Math.cos(ang);
         float z = fl * rz * (float) Math.sin(ang);
         float y = 4f + 40f * e + fl * 12f * (float) Math.sin(ang * 1.0f + 1.2f);
@@ -124,7 +124,7 @@ final class NagaScene {
             else { dy = -5f * (float) Math.sin(rp * Math.PI); tilt = 14f * (float) Math.sin(rp * Math.PI); }
         }
         float flap = (0.08f + 0.38f * fl) * (float) Math.sin(t * (2.5f + 7f * fl));
-        float span = 44f + 26f * fl;                                  // lebar sayap (satuan dunia)
+        float span = 44f + 16f * fl;                                  // lebar sayap (satuan dunia)
         float sc = span / (2f * halfX);
         float py = p0[1] + dy + (1f - fl) * 0.6f * (float) Math.sin(t * 2f);
 

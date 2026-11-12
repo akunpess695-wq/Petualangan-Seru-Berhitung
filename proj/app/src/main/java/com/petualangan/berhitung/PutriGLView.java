@@ -44,7 +44,11 @@ final class PutriGLView extends GLSurfaceView {
     private volatile boolean nagaOn = false;   // naga pendamping di dalam adegan (terhalang avatar saat di belakang)
     private NagaScene naga;
     /** Hidupkan naga pendamping: mengitari avatar lalu hinggap di kepala. Panggil sebelum/sesudah dipasang. */
-    public void setNaga(boolean on) { nagaOn = on; }
+    public void setNaga(boolean on) {
+        nagaOn = on;
+        setRenderMode(on ? RENDERMODE_CONTINUOUSLY : RENDERMODE_WHEN_DIRTY);   // naga bergerak terus, tanpa perlu disentuh
+        requestRender();
+    }
 
     PutriGLView(Context ctx) { this(ctx, 1); }
 
