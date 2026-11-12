@@ -22,13 +22,16 @@ public class NagaPetView extends GLSurfaceView {
     private final R r;
     public NagaPetView(Context c) { this(c, false); }
     /** inline=true: dipasang di dalam kartu (latar ungu muda, bukan melayang). */
-    public NagaPetView(Context c, boolean inline) {
+    public NagaPetView(Context c, boolean inline) { this(c, inline ? 1 : 0); }
+    /** mode 0 = melayang di atas semua; 1 = di dalam kartu (latar ungu); 2 = pendamping transparan di atas avatar. */
+    public NagaPetView(Context c, int mode) {
         super(c);
         setEGLContextClientVersion(2);
         setEGLConfigChooser(8, 8, 8, 8, 16, 0);
         getHolder().setFormat(android.graphics.PixelFormat.TRANSLUCENT);
-        if (!inline) setZOrderOnTop(true);
-        r = new R(c, inline);
+        if (mode == 0) setZOrderOnTop(true);
+        else if (mode == 2) setZOrderMediaOverlay(true);
+        r = new R(c, mode == 1);
         setRenderer(r);
     }
     /** Tidak menangkap sentuhan: tombol di bawahnya tetap bisa ditekan. */
