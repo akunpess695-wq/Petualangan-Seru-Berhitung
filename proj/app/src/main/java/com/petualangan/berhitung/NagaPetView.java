@@ -33,6 +33,25 @@ public class NagaPetView extends GLSurfaceView {
         else if (mode == 2) setZOrderMediaOverlay(true);
         r = new R(c, mode == 1);
         setRenderer(r);
+        synchronized (ALL) { ALL.add(new java.lang.ref.WeakReference<NagaPetView>(this)); }
+    }
+
+    private static final java.util.ArrayList<java.lang.ref.WeakReference<NagaPetView>> ALL =
+            new java.util.ArrayList<java.lang.ref.WeakReference<NagaPetView>>();
+
+    /** Reaksi naga: benar = lompat kecil + kilau; salah = menunduk pelan (tanpa hukuman). */
+    public void react(boolean benar) {
+        r.reactType = benar ? 1 : 2;
+        r.reactT0 = System.nanoTime();
+    }
+    /** Semua naga yang sedang hidup bereaksi (overlay maupun pendamping). Aman dipanggil dari thread UI. */
+    public static void reactAll(boolean benar) {
+        synchronized (ALL) {
+            for (int i = ALL.size() - 1; i >= 0; i--) {
+                NagaPetView v = ALL.get(i).get();
+                if (v == null) ALL.remove(i); else v.react(benar);
+            }
+        }
     }
     /** Tidak menangkap sentuhan: tombol di bawahnya tetap bisa ditekan. */
     @Override public boolean onTouchEvent(MotionEvent e) { return false; }
@@ -73,10 +92,40 @@ public class NagaPetView extends GLSurfaceView {
     }
 
     static class R implements Renderer {
+        void drawSparkle(float rp) {
+            float[] pts = new float[NSP * 3];
+            for (int i = 0; i < NSP; i++) {
+                float a = i * 6.2832f / NSP + 0.6f;
+                float rad = 0.25f + 0.55f * rp;
+                pts[i * 3] = rad * (float) Math.cos(a);
+                pts[i * 3 + 1] = 0.25f + 0.45f * rp + 0.12f * (float) Math.sin(a * 2f);
+                pts[i * 3 + 2] = 0.15f * (float) Math.sin(a);
+            }
+            FloatBuffer pb = ByteBuffer.allocateDirect(pts.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+            pb.put(pts).position(0);
+            float[] m2 = new float[16];
+            Matrix.multiplyMM(m2, 0, proj, 0, view, 0);
+            GLES20.glUseProgram(sprog);
+            GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+            GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(sprog, "uMVP"), 1, false, m2, 0);
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(sprog, "uSz"), 14f + 10f * (1f - rp));
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(sprog, "uA"), 1f - rp);
+            int ap = GLES20.glGetAttribLocation(sprog, "aP");
+            GLES20.glVertexAttribPointer(ap, 3, GLES20.GL_FLOAT, false, 12, pb);
+            GLES20.glEnableVertexAttribArray(ap);
+            GLES20.glDrawArrays(GLES20.GL_POINTS, 0, NSP);
+            GLES20.glDisableVertexAttribArray(ap);
+            GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+        }
+
         final Context ctx;
         FloatBuffer vb; ShortBuffer ib; int nIdx, prog, tex;
         final float[] proj = new float[16], view = new float[16], model = new float[16], mv = new float[16], mvp = new float[16];
         long t0 = System.nanoTime();
+        volatile int reactType = 0;      // 0 diam, 1 benar, 2 salah
+        volatile long reactT0 = 0;
+        int sprog;
+        static final int NSP = 10;
         final boolean inl;
         R(Context c, boolean inline) { ctx = c; inl = inline; }
         /** Cari di assets/characters/ dulu, lalu assets/. */
@@ -118,6 +167,13 @@ public class NagaPetView extends GLSurfaceView {
             GLES20.glLinkProgram(prog);
             if (inl) GLES20.glClearColor(0.93f, 0.91f, 1f, 1f); else GLES20.glClearColor(0, 0, 0, 0);
             GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+            String svs = "uniform mat4 uMVP;uniform float uSz;attribute vec3 aP;void main(){gl_Position=uMVP*vec4(aP,1.);gl_PointSize=uSz;}";
+            String sfs = "precision mediump float;uniform float uA;void main(){vec2 d=gl_PointCoord-vec2(.5);float r=length(d)*2.;"
+                + "if(r>1.)discard;gl_FragColor=vec4(1.,.92,.45,1.)*(1.-r*.5)*uA;}";
+            sprog = GLES20.glCreateProgram();
+            GLES20.glAttachShader(sprog, sh(GLES20.GL_VERTEX_SHADER, svs));
+            GLES20.glAttachShader(sprog, sh(GLES20.GL_FRAGMENT_SHADER, sfs));
+            GLES20.glLinkProgram(sprog);
         }
         static int sh(int type, String s) { int h = GLES20.glCreateShader(type); GLES20.glShaderSource(h, s); GLES20.glCompileShader(h); return h; }
 
@@ -133,7 +189,16 @@ public class NagaPetView extends GLSurfaceView {
             // kamera di depan-atas naga (kepala naga menghadap -Z)
             Matrix.setLookAtM(view, 0, 0f, 0.7f, -1.2f, 0f, 0f, 0f, 0f, 1f, 0f);
             Matrix.setIdentityM(model, 0);
-            Matrix.translateM(model, 0, 0f, 0.05f * (float) Math.sin(t * 2.2f), 0f);   // mengambang
+            float dy = 0f, tilt = 0f, rp = -1f;
+            if (reactType != 0) {
+                float dur = reactType == 1 ? 0.9f : 1.1f;
+                rp = (System.nanoTime() - reactT0) / 1e9f / dur;
+                if (rp >= 1f) { reactType = 0; rp = -1f; }
+                else if (reactType == 1) { dy = 0.28f * (float) Math.abs(Math.sin(rp * Math.PI * 2f)) * (1f - rp); tilt = -10f * (float) Math.sin(rp * Math.PI); }
+                else { dy = -0.12f * (float) Math.sin(rp * Math.PI); tilt = 14f * (float) Math.sin(rp * Math.PI); }
+            }
+            Matrix.translateM(model, 0, 0f, dy + 0.05f * (float) Math.sin(t * 2.2f), 0f);   // mengambang + reaksi
+            Matrix.rotateM(model, 0, tilt, 1f, 0f, 0f);                                    // mengangguk/menunduk
             Matrix.rotateM(model, 0, 30f * (float) Math.sin(t * 0.8f), 0f, 1f, 0f);     // menoleh kiri-kanan
             Matrix.rotateM(model, 0, 6f * (float) Math.sin(t * 4.4f), 0f, 0f, 1f);      // sayap miring (kepak ringan)
             Matrix.multiplyMM(mv, 0, view, 0, model, 0);
@@ -149,6 +214,7 @@ public class NagaPetView extends GLSurfaceView {
             vb.position(3); GLES20.glVertexAttribPointer(n, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(n);
             vb.position(6); GLES20.glVertexAttribPointer(u, 2, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(u);
             GLES20.glDrawElements(GLES20.GL_TRIANGLES, nIdx, GLES20.GL_UNSIGNED_SHORT, ib);
+            if (rp >= 0f && reactType == 1) drawSparkle(rp);
             try { Thread.sleep(16); } catch (InterruptedException ignored) {}
         }
     }
