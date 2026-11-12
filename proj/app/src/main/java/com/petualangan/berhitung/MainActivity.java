@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.21.1";
+    private static final String APP_VERSION = "6.22.0";
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
@@ -812,6 +812,7 @@ public class MainActivity extends Activity {
         }
         pauseGame();
         if (putriGL != null) putriGL.onPause();
+        if (nagaOverlay != null) nagaOverlay.onPause();
         super.onPause();
     }
 
@@ -819,6 +820,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (putriGL != null) putriGL.onResume();
+        if (nagaOverlay != null) nagaOverlay.onResume();
         resumeGame();
     }
 
@@ -1433,10 +1435,30 @@ public class MainActivity extends Activity {
         return l;
     }
 
+    // Naga pendamping: melayang di atas layar bila dipakai (dipasang di decorView agar tidak hilang saat ganti layar)
+    private NagaPetView nagaOverlay;
+    private boolean nagaHide = false;
+
+    private void syncNaga(boolean show) {
+        boolean want = show && prefs != null && prefs.getBoolean("nagaPakai", false);
+        if (want && nagaOverlay == null) {
+            nagaOverlay = NagaPetView.overlay(this);
+        }
+        if (nagaOverlay != null) {
+            nagaOverlay.setVisibility(want ? View.VISIBLE : View.GONE);
+        }
+    }
+
     private void wrap(LinearLayout c) {
+        wrapBg(c, background());
+    }
+
+    private void wrapBg(LinearLayout c, Drawable bg) {
+        syncNaga(!nagaHide);
+        nagaHide = false;
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
-        sv.setBackground(background());
+        sv.setBackground(bg);
         if (getResources().getDisplayMetrics().widthPixels > dp(700)) {
             // Layar lebar (TV/tablet): isi dibuat di tengah dengan lebar terbatas
             FrameLayout fl = new FrameLayout(this);
@@ -7198,12 +7220,24 @@ public class MainActivity extends Activity {
             shopPl = 0;
         }
 
+        nagaHide = true;
         LinearLayout c = column();
+        // Spanduk judul gaya "Toko Avatar 3D"
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(text("Avatar Studio", 20, Color.rgb(91, 59, 174), true), new LinearLayout.LayoutParams(0, WRAP, 1f));
-        head.addView(pill("\uD83D\uDCB0 " + coins(), ORANGE), new LinearLayout.LayoutParams(WRAP, WRAP));
+        head.setPadding(dp(14), dp(10), dp(12), dp(10));
+        GradientDrawable headBg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.rgb(126, 94, 232), Color.rgb(94, 62, 198)});
+        headBg.setCornerRadius(dp(24));
+        headBg.setStroke(dp(2), Color.rgb(196, 176, 255));
+        head.setBackground(headBg);
+        LinearLayout headText = new LinearLayout(this);
+        headText.setOrientation(LinearLayout.VERTICAL);
+        headText.addView(text("🛍️ Toko Avatar 3D", 20, Color.WHITE, true));
+        headText.addView(text("Geser untuk memilih avatar 3D", 11, Color.rgb(228, 218, 255), false));
+        head.addView(headText, new LinearLayout.LayoutParams(0, WRAP, 1f));
+        head.addView(pill("💰 " + coins(), ORANGE), new LinearLayout.LayoutParams(WRAP, WRAP));
         c.addView(head, lp(WRAP, 0));
 
         if (np > 1) {
@@ -7220,36 +7254,23 @@ public class MainActivity extends Activity {
                 });
                 pr.addView(t, weight(i == 0 ? 0 : 4, 0));
             }
-            c.addView(pr, lp(dp(44), 12));
+            c.addView(pr, lp(dp(44), 10));
         }
 
-        LinearLayout pv = card();
-        pv.setGravity(Gravity.CENTER_HORIZONTAL);
-        GradientDrawable studioBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(237, 233, 255), Color.rgb(251, 243, 255)});
-        studioBg.setCornerRadius(dp(22));
-        studioBg.setStroke(dp(1), Color.rgb(219, 206, 255));
-        pv.setBackground(studioBg);
-        pv.addView(text("Geser untuk memutar avatar 3D", 11, Color.rgb(91, 59, 174), true), lp(WRAP, 2));
-        if (USE_PUTRI_GL) {
-            putriGL = new PutriGLView(this, genderOf[shopPl]);
-            applyLook3D(putriGL, shopPl);
-            int avatarSize = Math.min(dp(228), getResources().getDisplayMetrics().widthPixels - dp(64));
-            pv.addView(putriGL, new LinearLayout.LayoutParams(avatarSize, avatarSize));
-            android.widget.TextView resetAvatar = text("↺ Tampak depan · cubit untuk zoom", 12, Color.rgb(91, 59, 174), true);
-            resetAvatar.setPadding(dp(6), dp(5), dp(6), dp(5));
-            resetAvatar.setOnClickListener(v -> { if (putriGL != null) putriGL.resetView(); });
-            pv.addView(resetAvatar);
-        } else {
-            putriGL = null;
-            pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(dp(238), dp(238)));
-        }
+        LinearLayout panes = new LinearLayout(this);
+        panes.setOrientation(LinearLayout.HORIZONTAL);
+
+        // ---- Panel kiri: Putra/Putri, Peci/Tas, kategori ----
+        LinearLayout left = new LinearLayout(this);
+        left.setOrientation(LinearLayout.VERTICAL);
+        left.setPadding(dp(7), dp(7), dp(7), dp(7));
+        left.setBackground(box(Color.argb(235, 247, 244, 255), 22));
         LinearLayout gr = new LinearLayout(this);
         gr.setOrientation(LinearLayout.HORIZONTAL);
         for (int g = 0; g < 2; g++) {
             final int gg = g;
             boolean gsel = genderOf[shopPl] == g;
-            TextView gt = text(g == 0 ? "\uD83D\uDC66 Putra" : "\uD83D\uDC67 Putri", 14, gsel ? Color.WHITE : DARK, true);
+            TextView gt = text(g == 0 ? "👦 Putra" : "👧 Putri", 13, gsel ? Color.WHITE : DARK, true);
             gt.setGravity(Gravity.CENTER);
             gt.setBackground(box(gsel ? (g == 0 ? BLUE : PINK) : GRAY, 16));
             gt.setOnClickListener(v -> {
@@ -7257,15 +7278,15 @@ public class MainActivity extends Activity {
                 prefs.edit().putInt("gender" + shopPl, gg).apply();
                 showToko();
             });
-            gr.addView(gt, weight(g == 0 ? 0 : 4, 0));
+            gr.addView(gt, weight(g == 0 ? 0 : 3, 0));
         }
-        pv.addView(gr, lp(dp(44), 5));
-        if (USE_PUTRI_GL) {   // baris kedua: peci (putra) dan tas (putra dan putri), masing-masing bisa dipasang / dilepas
+        left.addView(gr, lp(dp(40), 0));
+        if (USE_PUTRI_GL) {   // peci (putra) dan tas, masing-masing bisa dipasang / dilepas
             LinearLayout gr2 = new LinearLayout(this);
             gr2.setOrientation(LinearLayout.HORIZONTAL);
             if (genderOf[shopPl] == 0) {
                 final boolean peciLepas = peciOff(shopPl);
-                TextView pc = text(peciLepas ? "\uD83E\uDDE2 Lepas" : "\uD83E\uDDE2 Peci", 14,
+                TextView pc = text(peciLepas ? "🧢 Lepas" : "🧢 Peci", 13,
                         peciLepas ? DARK : Color.WHITE, true);
                 pc.setGravity(Gravity.CENTER);
                 pc.setBackground(box(peciLepas ? GRAY : GREEN, 16));
@@ -7278,7 +7299,7 @@ public class MainActivity extends Activity {
                 gr2.addView(pc, weight(0, 0));
             }
             final boolean tasLepas = tasOff(shopPl);
-            TextView tb = text(tasLepas ? "\uD83C\uDF92 Lepas" : "\uD83C\uDF92 Tas", 14,
+            TextView tb = text(tasLepas ? "🎒 Lepas" : "🎒 Tas", 13,
                     tasLepas ? DARK : Color.WHITE, true);
             tb.setGravity(Gravity.CENTER);
             tb.setBackground(box(tasLepas ? GRAY : GREEN, 16));
@@ -7288,40 +7309,96 @@ public class MainActivity extends Activity {
                 sfx(SFX_OK);
                 showToko();
             });
-            gr2.addView(tb, weight(genderOf[shopPl] == 0 ? 4 : 0, 0));
-            pv.addView(gr2, lp(dp(44), 4));
+            gr2.addView(tb, weight(genderOf[shopPl] == 0 ? 3 : 0, 0));
+            left.addView(gr2, lp(dp(40), 6));
         }
-        c.addView(pv, lp(WRAP, 7));
-
-        // Six categories in two compact rows to avoid cramped labels on small screens.
-        LinearLayout tabRow = new LinearLayout(this);
-        tabRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout tabRow = null;
         for (int tab = 0; tab < SHOP_TAB_NAME.length; tab++) {
-            if (tab == 3) { c.addView(tabRow, lp(WRAP, 2)); tabRow = new LinearLayout(this); tabRow.setOrientation(LinearLayout.HORIZONTAL); }
-            final int tb = tab;
+            if (tab % 2 == 0) {
+                tabRow = new LinearLayout(this);
+                tabRow.setOrientation(LinearLayout.HORIZONTAL);
+                left.addView(tabRow, lp(WRAP, 6));
+            }
+            final int tbi = tab;
             boolean sel = tab == shopTab;
             String nm = (tab == 4 && genderOf[shopPl] == 1) ? "Jilbab" : SHOP_TAB_NAME[tab];
             TextView chip = text(SHOP_TAB_ICON[tab] + "\n" + nm, 11, sel ? Color.WHITE : DARK, true);
             chip.setGravity(Gravity.CENTER);
-            chip.setMinHeight(dp(48));
+            chip.setMinHeight(dp(52));
             chip.setPadding(dp(2), dp(5), dp(2), dp(5));
-            chip.setBackground(box(sel ? Color.rgb(108, 76, 205) : Color.rgb(238, 235, 249), 14));
+            chip.setBackground(box(sel ? Color.rgb(108, 76, 205) : Color.rgb(238, 235, 249), 16));
             chip.setContentDescription("Kategori " + nm + (sel ? ", dipilih" : ""));
             chip.setOnClickListener(v -> {
-                shopTab = tb;
+                shopTab = tbi;
                 showToko();
             });
             LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(0, WRAP, 1f);
-            cl.setMargins(dp(2), dp(3), dp(2), dp(3));
+            cl.setMargins(dp(2), 0, dp(2), 0);
             tabRow.addView(chip, cl);
         }
-        c.addView(tabRow, lp(WRAP, 5));
-        c.addView(text(shopTab == 5 ? "Naga Merah, temanmu · Red Dragon by GadgetHamster (CC-BY 4.0)" :
+        panes.addView(left, new LinearLayout.LayoutParams(0, WRAP, 1f));
+
+        // ---- Panel kanan: avatar 3D ----
+        LinearLayout pv = new LinearLayout(this);
+        pv.setOrientation(LinearLayout.VERTICAL);
+        pv.setGravity(Gravity.CENTER_HORIZONTAL);
+        pv.setPadding(dp(5), dp(7), dp(5), dp(7));
+        GradientDrawable studioBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(237, 233, 255), Color.rgb(251, 243, 255)});
+        studioBg.setCornerRadius(dp(22));
+        studioBg.setStroke(dp(1), Color.rgb(219, 206, 255));
+        pv.setBackground(studioBg);
+        int usable = Math.min(getResources().getDisplayMetrics().widthPixels, dp(640)) - dp(44);
+        int avSize = Math.max(dp(120), usable / 2 - dp(14));
+        if (USE_PUTRI_GL) {
+            putriGL = new PutriGLView(this, genderOf[shopPl]);
+            applyLook3D(putriGL, shopPl);
+            pv.addView(putriGL, new LinearLayout.LayoutParams(avSize, avSize));
+            android.widget.TextView resetAvatar = text("↺ Tampak depan", 12, Color.rgb(91, 59, 174), true);
+            resetAvatar.setGravity(Gravity.CENTER);
+            resetAvatar.setPadding(dp(6), dp(8), dp(6), dp(8));
+            resetAvatar.setBackground(box(Color.rgb(228, 220, 252), 16));
+            resetAvatar.setOnClickListener(v -> { if (putriGL != null) putriGL.resetView(); });
+            pv.addView(resetAvatar, lp(WRAP, 6));
+            pv.addView(text("cubit untuk zoom", 10, Color.rgb(110, 90, 170), false), lp(WRAP, 2));
+        } else {
+            putriGL = null;
+            pv.addView(avatarView(shopPl), new LinearLayout.LayoutParams(avSize, avSize));
+        }
+        LinearLayout.LayoutParams pvp = new LinearLayout.LayoutParams(0, WRAP, 1f);
+        pvp.leftMargin = dp(8);
+        panes.addView(pv, pvp);
+        c.addView(panes, lp(WRAP, 10));
+
+        // Keterangan kategori
+        TextView info = text(shopTab == 5 ? "🐉 Naga Merah, temanmu · Red Dragon by GadgetHamster (CC-BY 4.0)" :
                 (shopTab == 0 || shopTab == 1 ? "Koleksi 2D lama disembunyikan sampai model 3D tersedia" :
                 "Pilih item · periksa hasilnya pada avatar 3D di atas"),
-                12, Color.rgb(67, 52, 112), false), lp(WRAP, 4));
+                12, Color.rgb(67, 52, 112), false);
+        info.setGravity(Gravity.CENTER);
+        info.setPadding(dp(12), dp(8), dp(12), dp(8));
+        info.setBackground(box(Color.argb(235, 247, 244, 255), 18));
+        c.addView(info, lp(WRAP, 10));
+
         if (shopTab == 5) {
-            c.addView(new NagaPetView(this, true), lp(dp(170), 6));
+            final boolean nagaOn = prefs.getBoolean("nagaPakai", false);
+            LinearLayout nc = new LinearLayout(this);
+            nc.setOrientation(LinearLayout.VERTICAL);
+            nc.setPadding(dp(8), dp(8), dp(8), dp(8));
+            nc.setBackground(box(Color.argb(235, 247, 244, 255), 22));
+            nc.addView(new NagaPetView(this, true), new LinearLayout.LayoutParams(MATCH, dp(150)));
+            TextView nn = text("🐉 Naga Merah" + (nagaOn ? " · Dipakai" : ""), 14, DARK, true);
+            nn.setGravity(Gravity.CENTER);
+            nc.addView(nn, lp(WRAP, 6));
+            Button nb = button(nagaOn ? "Lepas naga" : "Pakai naga", nagaOn ? GRAY : GREEN, 14);
+            if (nagaOn) nb.setTextColor(DARK);
+            nb.setOnClickListener(v -> {
+                prefs.edit().putBoolean("nagaPakai", !nagaOn).apply();
+                sfx(SFX_OK);
+                showToko();
+            });
+            nc.addView(nb, lp(dp(46), 6));
+            c.addView(nc, lp(WRAP, 10));
         }
 
         if (shopTab == 0) {
@@ -7422,7 +7499,12 @@ public class MainActivity extends Activity {
         c.addView(back, lp(dp(46), 18));
         back.setOnClickListener(v -> showMenu());
 
-        wrap(c);
+        wrapBg(c, tokoBg());
+    }
+
+    private Drawable tokoBg() {
+        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.rgb(160, 128, 242), Color.rgb(205, 188, 250), Color.rgb(241, 233, 255)});
     }
 
     private void dialogAvatar() {

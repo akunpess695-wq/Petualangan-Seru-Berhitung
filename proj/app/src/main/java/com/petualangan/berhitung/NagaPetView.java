@@ -34,6 +34,17 @@ public class NagaPetView extends GLSurfaceView {
     /** Tidak menangkap sentuhan: tombol di bawahnya tetap bisa ditekan. */
     @Override public boolean onTouchEvent(MotionEvent e) { return false; }
 
+    /** Naga melayang kecil di pojok kanan bawah, dipasang di decorView (bertahan antar layar), tidak menangkap sentuhan. */
+    public static NagaPetView overlay(android.app.Activity a) {
+        float d = a.getResources().getDisplayMetrics().density;
+        NagaPetView v = new NagaPetView(a, false);
+        android.widget.FrameLayout.LayoutParams p = new android.widget.FrameLayout.LayoutParams(
+                (int) (120 * d), (int) (84 * d), android.view.Gravity.BOTTOM | android.view.Gravity.END);
+        p.bottomMargin = (int) (64 * d);
+        ((android.view.ViewGroup) a.getWindow().getDecorView()).addView(v, p);
+        return v;
+    }
+
     /** Pasang pet di pojok kanan bawah. Ketuk = tampil kredit; tekan lama = sembunyikan/tampilkan (tersimpan). */
     public static void attach(final android.app.Activity a) {
         final android.content.SharedPreferences sp = a.getSharedPreferences("naga_pet", 0);
