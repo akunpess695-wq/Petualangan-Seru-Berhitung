@@ -20,13 +20,15 @@ import javax.microedition.khronos.opengles.GL10;
  *  Red Dragon by GadgetHamster (CC-BY 4.0) - tampilkan di layar Kredit. */
 public class NagaPetView extends GLSurfaceView {
     private final R r;
-    public NagaPetView(Context c) {
+    public NagaPetView(Context c) { this(c, false); }
+    /** inline=true: dipasang di dalam kartu (latar ungu muda, bukan melayang). */
+    public NagaPetView(Context c, boolean inline) {
         super(c);
         setEGLContextClientVersion(2);
         setEGLConfigChooser(8, 8, 8, 8, 16, 0);
         getHolder().setFormat(android.graphics.PixelFormat.TRANSLUCENT);
-        setZOrderOnTop(true);
-        r = new R(c);
+        if (!inline) setZOrderOnTop(true);
+        r = new R(c, inline);
         setRenderer(r);
     }
     /** Tidak menangkap sentuhan: tombol di bawahnya tetap bisa ditekan. */
@@ -61,11 +63,16 @@ public class NagaPetView extends GLSurfaceView {
         FloatBuffer vb; ShortBuffer ib; int nIdx, prog, tex;
         final float[] proj = new float[16], view = new float[16], model = new float[16], mv = new float[16], mvp = new float[16];
         long t0 = System.nanoTime();
-        R(Context c) { ctx = c; }
+        final boolean inl;
+        R(Context c, boolean inline) { ctx = c; inl = inline; }
+        /** Cari di assets/characters/ dulu, lalu assets/. */
+        InputStream op(String n) throws java.io.IOException {
+            try { return ctx.getAssets().open("characters/" + n); } catch (java.io.IOException e) { return ctx.getAssets().open(n); }
+        }
 
         public void onSurfaceCreated(GL10 g, EGLConfig cfg) {
             try {
-                InputStream in = ctx.getAssets().open("dragon_pet.bin");
+                InputStream in = op("dragon_pet.bin");
                 byte[] b = new byte[in.available()]; int n = 0;
                 while (n < b.length) { int k = in.read(b, n, b.length - n); if (k < 0) break; n += k; }
                 in.close();
@@ -79,7 +86,7 @@ public class NagaPetView extends GLSurfaceView {
                 ib = ByteBuffer.allocateDirect(nIdx * 2).order(ByteOrder.nativeOrder()).asShortBuffer();
                 for (int i = 0; i < nIdx; i++) ib.put(bb.getShort());
                 ib.position(0);
-                Bitmap bmp = BitmapFactory.decodeStream(ctx.getAssets().open("dragon_pet.jpg"));
+                Bitmap bmp = BitmapFactory.decodeStream(op("dragon_pet.jpg"));
                 int[] t = new int[1]; GLES20.glGenTextures(1, t, 0); tex = t[0];
                 GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex);
                 GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
@@ -95,7 +102,7 @@ public class NagaPetView extends GLSurfaceView {
             GLES20.glAttachShader(prog, sh(GLES20.GL_VERTEX_SHADER, vs));
             GLES20.glAttachShader(prog, sh(GLES20.GL_FRAGMENT_SHADER, fs));
             GLES20.glLinkProgram(prog);
-            GLES20.glClearColor(0, 0, 0, 0);
+            if (inl) GLES20.glClearColor(0.93f, 0.91f, 1f, 1f); else GLES20.glClearColor(0, 0, 0, 0);
             GLES20.glEnable(GLES20.GL_DEPTH_TEST);
         }
         static int sh(int type, String s) { int h = GLES20.glCreateShader(type); GLES20.glShaderSource(h, s); GLES20.glCompileShader(h); return h; }

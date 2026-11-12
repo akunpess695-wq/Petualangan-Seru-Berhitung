@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.21.0";
+    private static final String APP_VERSION = "6.21.1";
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
@@ -7259,7 +7259,7 @@ public class MainActivity extends Activity {
             });
             gr.addView(gt, weight(g == 0 ? 0 : 4, 0));
         }
-        pv.addView(gr, lp(dp(12), 5));
+        pv.addView(gr, lp(dp(44), 5));
         if (USE_PUTRI_GL) {   // baris kedua: peci (putra) dan tas (putra dan putri), masing-masing bisa dipasang / dilepas
             LinearLayout gr2 = new LinearLayout(this);
             gr2.setOrientation(LinearLayout.HORIZONTAL);
@@ -7289,7 +7289,7 @@ public class MainActivity extends Activity {
                 showToko();
             });
             gr2.addView(tb, weight(genderOf[shopPl] == 0 ? 4 : 0, 0));
-            pv.addView(gr2, lp(dp(8), 4));
+            pv.addView(gr2, lp(dp(44), 4));
         }
         c.addView(pv, lp(WRAP, 7));
 
@@ -7316,10 +7316,13 @@ public class MainActivity extends Activity {
             tabRow.addView(chip, cl);
         }
         c.addView(tabRow, lp(WRAP, 5));
-        c.addView(text(shopTab == 5 ? "Teman 3D sedang dikembangkan: berjalan dan terbang mengitari avatar" :
+        c.addView(text(shopTab == 5 ? "Naga Merah, temanmu · Red Dragon by GadgetHamster (CC-BY 4.0)" :
                 (shopTab == 0 || shopTab == 1 ? "Koleksi 2D lama disembunyikan sampai model 3D tersedia" :
                 "Pilih item · periksa hasilnya pada avatar 3D di atas"),
                 12, Color.rgb(67, 52, 112), false), lp(WRAP, 4));
+        if (shopTab == 5) {
+            c.addView(new NagaPetView(this, true), lp(dp(170), 6));
+        }
 
         if (shopTab == 0) {
 
