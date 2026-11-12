@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.24.0";
+    private static final String APP_VERSION = "6.24.1";
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
@@ -7264,7 +7264,7 @@ public class MainActivity extends Activity {
         studioBg.setStroke(dp(1), Color.rgb(219, 206, 255));
         pv.setBackground(studioBg);
         int usable = Math.min(getResources().getDisplayMetrics().widthPixels, dp(640)) - dp(44);
-        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.46f);
+        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.36f);
         int avSize = Math.max(dp(150), Math.min(usable, maxH));
         FrameLayout stage = new FrameLayout(this);
         if (USE_PUTRI_GL) {
@@ -7372,12 +7372,6 @@ public class MainActivity extends Activity {
         hs.addView(tabs);
         c.addView(hs, lp(WRAP, 10));
 
-        if (shopTab == 0 || shopTab == 1) {
-            TextView info = text("Koleksi 2D lama disembunyikan sampai model 3D tersedia", 11, Color.rgb(67, 52, 112), false);
-            info.setGravity(Gravity.CENTER);
-            c.addView(info, lp(WRAP, 8));
-        }
-
         if (shopTab == 5) {
             final boolean nagaOn = prefs.getBoolean("nagaPakai", false);
             LinearLayout nc = new LinearLayout(this);
@@ -7405,21 +7399,10 @@ public class MainActivity extends Activity {
             c.addView(nc, lp(WRAP, 10));
         }
 
+        // ---- Barang: dua baris, digeser ke samping (tanpa gulir ke bawah) ----
+        final ArrayList<View> cells = new ArrayList<>();
         if (shopTab == 0) {
-
-            // Three labelled tiles per row, matching the rest of the compact shop.
-            final int nTiles = HOOD_ORDER.length;
-            final int hoodColumns = 3;
-            final int rows = (nTiles + hoodColumns - 1) / hoodColumns;
-            for (int r = 0; r < rows; r++) {
-                LinearLayout row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                for (int q = 0; q < hoodColumns; q++) {
-                    final int idx = r * hoodColumns + q;
-                    if (idx >= nTiles) {
-                        row.addView(new View(this), weight(q == 0 ? 0 : 5, q == hoodColumns - 1 ? 0 : 5));
-                        continue;
-                    }
+            for (int idx = 0; idx < HOOD_ORDER.length; idx++) {
                     final int k = HOOD_ORDER[idx];
                     final boolean on = avatar[shopPl] == k;
                     LinearLayout tile = new LinearLayout(this);
@@ -7451,43 +7434,40 @@ public class MainActivity extends Activity {
                         prefs.edit().putInt("avatar" + shopPl, k).apply();
                         showToko();
                     });
-                    row.addView(tile, weight(q == 0 ? 0 : 5, q == hoodColumns - 1 ? 0 : 5));
-                }
-                c.addView(row, lp(WRAP, 7));
+                cells.add(tile);
             }
-
         }
         int[] slotsOfTab = shopTab == 0 ? new int[]{0} : shopTab == 1 ? new int[]{1, 2}
                 : shopTab == 2 ? new int[]{4} : shopTab == 3 ? new int[]{5}
                 : shopTab == 4 ? new int[]{6} : new int[]{3};
-        String[] slotTitle = {"\uD83C\uDFA9 Topi", "\uD83D\uDD76\uFE0F Wajah", "\u26BD Pegang", "\uD83D\uDC23 Teman",
-                "\uD83C\uDFA8 Latar", "\uD83D\uDC55 Pakaian", "\uD83D\uDC87 Rambut"};
         for (int slot : slotsOfTab) {
-            ArrayList<Integer> ids = new ArrayList<>();
             for (int i = 0; i < ITEMS.length; i++) {
-                // Hide incompatible 2D-only head, face, handheld and companion
-                // items. They cannot currently be rendered on the 3D avatar.
+                // 2D-only head/face/handheld/companion items cannot be rendered on the 3D avatar
                 if (itSlot(i) == slot && itFits(i, genderOf[shopPl]) &&
                         slot != 0 && slot != 1 && slot != 2 && slot != 3) {
-                    ids.add(i);
+                    cells.add(shopCell(i));
                 }
             }
-            if (ids.isEmpty()) continue;
-            if (slotsOfTab.length > 1 || shopTab == 0) {
-                c.addView(text(slotTitle[slot], 13, DARK, true), lp(WRAP, shopTab == 0 ? 14 : 12));
-            }
-            for (int s = 0; s < ids.size(); s += 3) {
-                LinearLayout row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                for (int q = 0; q < 3; q++) {
-                    if (s + q < ids.size()) {
-                        row.addView(shopCell(ids.get(s + q)), weight(q == 0 ? 0 : 5, q == 2 ? 0 : 5));
-                    } else {
-                        row.addView(new View(this), weight(q == 0 ? 0 : 5, q == 2 ? 0 : 5));
-                    }
+        }
+        if (!cells.isEmpty()) {
+            android.widget.HorizontalScrollView sh = new android.widget.HorizontalScrollView(this);
+            sh.setHorizontalScrollBarEnabled(false);
+            LinearLayout strip = new LinearLayout(this);
+            strip.setOrientation(LinearLayout.HORIZONTAL);
+            for (int i = 0; i < cells.size(); i += 2) {
+                LinearLayout col = new LinearLayout(this);
+                col.setOrientation(LinearLayout.VERTICAL);
+                for (int q = 0; q < 2 && i + q < cells.size(); q++) {
+                    LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(dp(104), WRAP);
+                    cellLp.bottomMargin = dp(6);
+                    col.addView(cells.get(i + q), cellLp);
                 }
-                c.addView(row, lp(WRAP, 10));
+                LinearLayout.LayoutParams colLp = new LinearLayout.LayoutParams(WRAP, WRAP);
+                colLp.rightMargin = dp(6);
+                strip.addView(col, colLp);
             }
+            sh.addView(strip);
+            c.addView(sh, lp(WRAP, 8));
         }
         int have = 0, available = 0;
         for (int i = 0; i < ITEMS.length; i++) {
@@ -7495,15 +7475,15 @@ public class MainActivity extends Activity {
             available++;
             if (owns(i)) have++;
         }
-        {
-            c.addView(text("\uD83D\uDDC2\uFE0F Koleksi 3D: " + have + "/" + available + " barang", 13, DARK, true),
-                    lp(WRAP, 16));
-
-            Button back = button("Kembali", GRAY, 14);
-            back.setTextColor(DARK);
-            c.addView(back, lp(dp(46), 18));
-            back.setOnClickListener(v -> showMenu());
-        }
+        LinearLayout foot = new LinearLayout(this);
+        foot.setOrientation(LinearLayout.HORIZONTAL);
+        foot.setGravity(Gravity.CENTER_VERTICAL);
+        foot.addView(text("\uD83D\uDDC2\uFE0F Koleksi 3D: " + have + "/" + available, 13, DARK, true),
+                new LinearLayout.LayoutParams(0, WRAP, 1f));
+        Button back = button("Kembali", Color.rgb(108, 76, 205), 14);
+        back.setOnClickListener(v -> showMenu());
+        foot.addView(back, new LinearLayout.LayoutParams(dp(130), dp(46)));
+        c.addView(foot, lp(WRAP, 4));
 
         wrapBg(c, tokoBg());
     }
