@@ -97,22 +97,51 @@ final class NagaScene {
         return p;
     }
 
-    private static final float W = 6.2832f / 4.5f;          // laju putaran dasar (rad/dtk)
+    private static final float W = 6.2832f / 4f;            // laju putar dasar (rad/dtk): 1 putaran = 4 dtk
+    private static final float D = 3.4f, EY = 46f;          // lama pendaratan (dtk), tinggi hinggap di atas kepala
+    private static final float T1;                           // saat mulai mendarat: tepat ketika naga di BELAKANG avatar
+    private static final float[] S, V0;                      // posisi & kecepatan naga saat mulai mendarat
+
+    private static float angOf(float t) { return t * W + 0.35f * (float) Math.sin(t * 0.9f); }
+
+    /** Orbit mengelilingi avatar. Sayap (lebar 40) dijauhkan dari badan: rx 44 -> ujung dalam >= 22 dari sumbu avatar. */
+    private static float[] orb(float t) {
+        float a = angOf(t);
+        float rx = 44f + 2f * (float) Math.sin(t * 0.7f), rz = 52f + 2.5f * (float) Math.sin(t * 0.53f + 1f);
+        return new float[] { rx * (float) Math.cos(a), 31f + 6f * (float) Math.sin(a + 1.2f) + 2f * (float) Math.sin(t * 1.7f),
+                             rz * (float) Math.sin(a) };
+    }
+
+    static {
+        // cari t (>= 7 dtk) pertama saat sudut orbit = 3pi/2 (z paling jauh = di belakang avatar, bergerak ke kanan)
+        double base = 1.5 * Math.PI;
+        int n = (int) Math.ceil((angOf(7f) - base) / (2 * Math.PI));
+        double tgt = base + 2 * Math.PI * n, lo = 7, hi = 20;
+        for (int i = 0; i < 60; i++) { double m = (lo + hi) / 2; if (angOf((float) m) < tgt) lo = m; else hi = m; }
+        T1 = (float) hi;
+        S = orb(T1);
+        float[] o2 = orb(T1 + 0.01f);
+        V0 = new float[] { (o2[0] - S[0]) / 0.01f, (o2[1] - S[1]) / 0.01f, (o2[2] - S[2]) / 0.01f };
+    }
 
     /** Lintasan (satuan dunia avatar: tinggi karakter ~90, pusat di y=0, kamera di +Z).
+     *  Orbit sampai T1 (naga di belakang avatar), lalu kurva Hermite halus: dari belakang, naik ke atas kepala, hinggap menghadap kamera.
      *  Hasil: x, y, z, fl (terbang 1..0), sudut, u (kemajuan mendarat 0..1), rate (laju putar relatif). */
     private static float[] path(float t) {
-        float T1 = 9f, T2 = 2.8f;
-        float u = t < T1 ? 0f : Math.min(1f, (t - T1) / T2);
-        float e = u * u * (3f - 2f * u), fl = 1f - e;
-        // laju putar bervariasi pelan (melambat-mempercepat) + orbit yang sedikit "bernapas" -> tidak mekanis
-        float ang = t * W + 0.35f * (float) Math.sin(t * 0.9f);
-        float rate = (W + 0.315f * (float) Math.cos(t * 0.9f)) / W;
-        float rx = 34f + 2.5f * (float) Math.sin(t * 0.7f), rz = 46f + 3f * (float) Math.sin(t * 0.53f + 1f);
-        float x = fl * rx * (float) Math.cos(ang);
-        float z = fl * rz * (float) Math.sin(ang);
-        float y = 4f + 40f * e + fl * (11f * (float) Math.sin(ang + 1.2f) + 2.5f * (float) Math.sin(t * 1.7f));
-        return new float[] { x, y, z, fl, ang, u, rate };
+        if (t <= T1) {
+            float[] o = orb(t);
+            float rate = (W + 0.315f * (float) Math.cos(t * 0.9f)) / W;
+            return new float[] { o[0], o[1], o[2], 1f, angOf(t), 0f, rate };
+        }
+        float s = Math.min(1f, (t - T1) / D);
+        float h00 = 2 * s * s * s - 3 * s * s + 1, h10 = s * s * s - 2 * s * s + s, h01 = -2 * s * s * s + 3 * s * s, h11 = s * s * s - s * s;
+        float ex = 0f, ey = EY, ez = 0f, vex = 0f, vey = 0f, vez = 12f;                 // titik akhir & kecepatan akhir (menuju kamera)
+        float x = h00 * S[0] + h10 * D * V0[0] + h01 * ex + h11 * D * vex;
+        float y = h00 * S[1] + h10 * D * V0[1] + h01 * ey + h11 * D * vey;
+        float z = h00 * S[2] + h10 * D * V0[2] + h01 * ez + h11 * D * vez;
+        float fl = 1f - smooth01(0.3f, 1f, s);
+        float rate = (W + 0.315f * (float) Math.cos(T1 * 0.9f)) / W * (1f - s);
+        return new float[] { x, y, z, fl, angOf(T1), s, rate };
     }
 
     private static float stroke(float ph) { return (float) (Math.sin(ph) + 0.28 * Math.sin(2 * ph + 0.6)); }
@@ -129,7 +158,8 @@ final class NagaScene {
         float sp = (float) Math.sqrt(vx * vx + vz * vz);
         // arah hadap: searah terbang, makin menghadap kamera (+Z) saat hinggap
         float tx = sp > 1e-3f ? vx / sp : 0f, tz = sp > 1e-3f ? vz / sp : 1f;
-        tx = tx * fl; tz = tz * fl + (1f - fl) * 1f;
+        float wb = smooth01(0.55f, 1f, u);                           // mendarat: arah hadap pelan-pelan beralih menghadap kamera
+        tx = tx * (1f - wb); tz = tz * (1f - wb) + wb;
         float a1 = 1f - (float) Math.exp(-dt * 4f);
         hx += (tx - hx) * a1; hz += (tz - hz) * a1;
         float yaw = (float) Math.toDegrees(Math.atan2(-hx, -hz));
@@ -170,7 +200,7 @@ final class NagaScene {
         float roll = rollS + 2.2f * fl * (float) Math.sin(phF);
 
         float ap = smooth01(0f, 0.8f, t);                             // muncul pelan dari kecil
-        float span = (44f + 16f * fl) * (0.35f + 0.65f * ap);        // lebar sayap (satuan dunia)
+        float span = (40f + 4f * (1f - fl)) * (0.35f + 0.65f * ap);        // lebar sayap (satuan dunia)
         float sc = span / (2f * halfX) * (1f + (1f - fl) * 0.012f * (float) Math.sin(t * 2.6f));   // hinggap: bernapas
         // badan naik saat sayap menekan ke bawah, turun saat sayap terangkat; melayang saat hinggap
         float bob = -1.6f * fl * (amp / 0.36f) * stroke(phF - 0.4f)
