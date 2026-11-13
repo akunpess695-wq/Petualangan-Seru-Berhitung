@@ -4997,6 +4997,11 @@ public class MainActivity extends Activity {
         return prefs.getBoolean("tasOff" + pl, false);
     }
 
+    /** Model OBJ baru bersifat opsional; avatar prosedural lama tetap tersimpan dan menjadi bawaan. */
+    private boolean avatarExt() {
+        return prefs.getBoolean("avatarExt", false);
+    }
+
     /**
      * Gaya rambut 3D putra menurut nomor barang (nomor barang tetap, lihat catatan ITEMS):
      * 39 Cepak Hitam dan 40 Cepak Kemerahan = cepak, 41 Belah Samping, 42 Ikal Ringan, 56 Bergelombang, 57 Messy, 58 Quiff, 59 Ikat Kecil. 43 Pendek Rapi = bentuk bawaan.
@@ -5018,6 +5023,7 @@ public class MainActivity extends Activity {
     /** Pasang pakaian, rambut (putra) / warna jilbab (putri), latar, dan peci milik pemain pl ke tampilan 3D. */
     private void applyLook3D(PutriGLView v, int pl) {
         int ba = eqValid(pl, 5), hr = eqValid(pl, 6), bg = eqValid(pl, 4);
+        v.setExternalModel(avatarExt());
         v.setHood(isHood(avatar[pl]) ? avatar[pl] : -1); // tudung hewan 3D (putra dan putri)
         v.setTas(!tasOff(pl));
         v.setLook(ba >= 0 ? itIcon(ba) : null, hr >= 0 ? itIcon(hr) : null, bg >= 0 ? itIcon(bg) : null,
@@ -7429,7 +7435,19 @@ public class MainActivity extends Activity {
             side.addView(gt, gl);
         }
         if (USE_PUTRI_GL) {
-            if (genderOf[shopPl] == 0) {
+            final boolean ext = avatarExt();
+            TextView xm = orb("3D", ext, PURPLE);
+            xm.setContentDescription(ext ? "Model 3D baru aktif. Ketuk untuk memakai avatar lama"
+                    : "Avatar lama aktif. Ketuk untuk mencoba model 3D baru");
+            xm.setOnClickListener(v -> {
+                prefs.edit().putBoolean("avatarExt", !ext).apply();
+                sfx(SFX_OK);
+                showToko();
+            });
+            LinearLayout.LayoutParams xml = new LinearLayout.LayoutParams(dp(44), dp(44));
+            xml.bottomMargin = dp(6);
+            side.addView(xm, xml);
+            if (!ext && genderOf[shopPl] == 0) {
                 final boolean peciLepas = peciOff(shopPl);
                 TextView pc = orb("🧢", !peciLepas, GREEN);
                 pc.setContentDescription(peciLepas ? "Peci dilepas. Ketuk untuk memakai peci" : "Peci dipakai. Ketuk untuk melepas peci");
@@ -7442,15 +7460,17 @@ public class MainActivity extends Activity {
                 pl2.bottomMargin = dp(6);
                 side.addView(pc, pl2);
             }
-            final boolean tasLepas = tasOff(shopPl);
-            TextView tb = orb("🎒", !tasLepas, GREEN);
-            tb.setContentDescription(tasLepas ? "Tas dilepas. Ketuk untuk memakai tas" : "Tas dipakai. Ketuk untuk melepas tas");
-            tb.setOnClickListener(v -> {
-                prefs.edit().putBoolean("tasOff" + shopPl, !tasLepas).apply();
-                sfx(SFX_OK);
-                showToko();
-            });
-            side.addView(tb, new LinearLayout.LayoutParams(dp(44), dp(44)));
+            if (!ext) {
+                final boolean tasLepas = tasOff(shopPl);
+                TextView tb = orb("🎒", !tasLepas, GREEN);
+                tb.setContentDescription(tasLepas ? "Tas dilepas. Ketuk untuk memakai tas" : "Tas dipakai. Ketuk untuk melepas tas");
+                tb.setOnClickListener(v -> {
+                    prefs.edit().putBoolean("tasOff" + shopPl, !tasLepas).apply();
+                    sfx(SFX_OK);
+                    showToko();
+                });
+                side.addView(tb, new LinearLayout.LayoutParams(dp(44), dp(44)));
+            }
         }
         FrameLayout.LayoutParams sdl = new FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP | Gravity.START);
         sdl.setMargins(dp(8), dp(8), 0, 0);

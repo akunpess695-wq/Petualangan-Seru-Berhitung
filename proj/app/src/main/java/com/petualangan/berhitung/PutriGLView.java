@@ -26,8 +26,11 @@ import javax.microedition.khronos.opengles.GL10;
 final class PutriGLView extends GLSurfaceView {
     private static PutriMesh sMesh;     // putri, dibuat sekali, dipakai ulang
     private static PutraMesh sMeshPutra; // putra
+    private static final ExternalCharacterMesh[] sExternal = new ExternalCharacterMesh[2];
+    private static final boolean[] sExternalTried = new boolean[2];
     private static final HoodMesh[][] sHood = new HoodMesh[2][HoodMesh.COUNT]; // tudung per gender dan hewan, dibuat saat dipakai
     private final int gender;            // 0 = putra, 1 = putri
+    private volatile boolean useExternal = false; // model OBJ baru; mesh prosedural tetap menjadi cadangan
 
     private volatile float yaw = 0f, pitch = 0f; // derajat
     private volatile float bgR = 1f, bgG = 1f, bgB = 1f; // warna latar (default putih = warna kartu)
@@ -92,6 +95,17 @@ final class PutriGLView extends GLSurfaceView {
 
     /** Pasang / lepas ransel putra. Panggil sebelum setLook, yang memuat ulang mesh. */
     void setTas(boolean on) { showTas = on; }
+
+    /** Mode model OBJ baru. Tudung hewan dan gaya rambut khusus otomatis memakai mesh lama. */
+    void setExternalModel(boolean on) { useExternal = on; }
+
+    private ExternalCharacterMesh externalMesh() {
+        if (!sExternalTried[gender]) {
+            sExternal[gender] = ExternalCharacterMesh.tryLoad(getContext(), gender);
+            sExternalTried[gender] = true;
+        }
+        return sExternal[gender];
+    }
 
     void setLook(String pakaian, String rambut, String latar, boolean peci, int gayaRambut) {
         lookPakaian = pakaian; lookRambut = rambut; showPeci = peci; hairStyle = gayaRambut;
@@ -285,11 +299,22 @@ final class PutriGLView extends GLSurfaceView {
 
         /** Susun ulang buffer GPU dari mesh bersama + salinan warna/indeks untuk tampilan ini. Dipanggil di thread GL. */
         void uploadMesh() {
-            float[] mpos, mnor, mcol;
+            float[] mpos, mnor, mcol, mgloss = null;
             byte[] parts;
             int[] midx;
             int mvc;
-            if (gender == 0) {
+            boolean extEligible = useExternal && hood < 0
+                    && (gender == 1 || hairStyle == PutraMesh.STYLE_DEFAULT);
+            ExternalCharacterMesh ext = extEligible ? externalMesh() : null;
+            if (ext != null) {
+                parts = null;
+                mpos = ext.pos;
+                mnor = ext.nor;
+                midx = ext.indices;
+                mvc = ext.vertexCount;
+                mcol = ext.outfitColors(lookPakaian, lookRambut);
+                mgloss = ext.gloss;
+            } else if (gender == 0) {
                 if (sMeshPutra == null) sMeshPutra = PutraMesh.build();
                 PutraMesh m = sMeshPutra;
                 parts = m.part;
@@ -344,7 +369,7 @@ final class PutriGLView extends GLSurfaceView {
                     System.arraycopy(mpos, old * 3, packed, off, 3);
                     System.arraycopy(mnor, old * 3, packed, off + 3, 3);
                     System.arraycopy(mcol, old * 3, packed, off + 6, 3);
-                    packed[off + 9] = glossFor(parts[old]);
+                    packed[off + 9] = mgloss != null ? mgloss[old] : glossFor(parts[old]);
                 } else {
                     int hi = old - mvc;
                     System.arraycopy(hm.pos, hi * 3, packed, off, 3);
