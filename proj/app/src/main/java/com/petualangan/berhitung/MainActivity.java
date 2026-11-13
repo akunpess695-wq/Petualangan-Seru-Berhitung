@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.27.1";
+    private static final String APP_VERSION = "6.28.0";
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
@@ -7351,6 +7351,7 @@ public class MainActivity extends Activity {
             // naga digambar di dalam adegan 3D avatar (terhalang avatar saat di belakang)
             if (putriGL != null) putriGL.setNaga(true);
         }
+        if (putriGL != null && prefs.getBoolean("gojiPakai", false)) putriGL.setGoji(true);
         String[] sp = {"✦", "✧"};
         int[] spg = {Gravity.BOTTOM | Gravity.START, Gravity.CENTER_VERTICAL | Gravity.END};
         for (int q = 0; q < 2; q++) {
@@ -7415,6 +7416,30 @@ public class MainActivity extends Activity {
             cr.setGravity(Gravity.CENTER);
             nc.addView(cr, lp(WRAP, 4));
             c.addView(nc, lp(WRAP, 10));
+
+            final boolean gojiOn = prefs.getBoolean("gojiPakai", false);
+            LinearLayout gc = new LinearLayout(this);
+            gc.setOrientation(LinearLayout.VERTICAL);
+            gc.setPadding(dp(8), dp(8), dp(8), dp(8));
+            gc.setBackground(box(Color.argb(235, 247, 244, 255), 22));
+            LinearLayout gr = new LinearLayout(this);
+            gr.setOrientation(LinearLayout.HORIZONTAL);
+            gr.setGravity(Gravity.CENTER_VERTICAL);
+            gr.addView(text("\uD83E\uDD96 Godzilla Mini" + (gojiOn ? " · Dipakai" : ""), 14, DARK, true),
+                    new LinearLayout.LayoutParams(0, WRAP, 1f));
+            Button gb = button(gojiOn ? "Lepas Godzilla" : "Pakai Godzilla", gojiOn ? GRAY : GREEN, 13);
+            if (gojiOn) gb.setTextColor(DARK);
+            gb.setOnClickListener(v -> {
+                prefs.edit().putBoolean("gojiPakai", !gojiOn).apply();
+                sfx(SFX_OK);
+                showToko();
+            });
+            gr.addView(gb, new LinearLayout.LayoutParams(dp(150), dp(42)));
+            gc.addView(gr, lp(WRAP, 6));
+            TextView gcr = text("Godzilla Minus Zero by Dola (CC-BY 4.0)", 10, Color.rgb(110, 90, 170), false);
+            gcr.setGravity(Gravity.CENTER);
+            gc.addView(gcr, lp(WRAP, 4));
+            c.addView(gc, lp(WRAP, 10));
         }
 
         // ---- Barang: dua baris, digeser ke samping (tanpa gulir ke bawah) ----

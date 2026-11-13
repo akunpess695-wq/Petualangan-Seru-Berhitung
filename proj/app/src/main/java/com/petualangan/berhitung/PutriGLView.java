@@ -43,10 +43,17 @@ final class PutriGLView extends GLSurfaceView {
     private final Renderer renderer = new Renderer();
     private volatile boolean nagaOn = false;   // naga pendamping di dalam adegan (terhalang avatar saat di belakang)
     private NagaScene naga;
+    private volatile boolean gojiOn = false;   // Godzilla mini berdiri di samping avatar
+    private GodzillaScene goji;
+    public void setGoji(boolean on) {
+        gojiOn = on;
+        setRenderMode(on || nagaOn ? RENDERMODE_CONTINUOUSLY : RENDERMODE_WHEN_DIRTY);
+        requestRender();
+    }
     /** Hidupkan naga pendamping: mengitari avatar lalu hinggap di kepala. Panggil sebelum/sesudah dipasang. */
     public void setNaga(boolean on) {
         nagaOn = on;
-        setRenderMode(on ? RENDERMODE_CONTINUOUSLY : RENDERMODE_WHEN_DIRTY);   // naga bergerak terus, tanpa perlu disentuh
+        setRenderMode(on || gojiOn ? RENDERMODE_CONTINUOUSLY : RENDERMODE_WHEN_DIRTY);   // naga bergerak terus, tanpa perlu disentuh
         requestRender();
     }
 
@@ -253,6 +260,7 @@ final class PutriGLView extends GLSurfaceView {
         @Override
         public void onSurfaceCreated(GL10 gl, EGLConfig cfg) {
             naga = null;   // konteks GL baru: sumber daya naga dibuat ulang
+            goji = null;
             GLES20.glClearColor(bgR, bgG, bgB, 1f);
             GLES20.glEnable(GLES20.GL_DEPTH_TEST);
             GLES20.glDisable(GLES20.GL_CULL_FACE); // dua sisi, seperti pratinjau
@@ -425,6 +433,10 @@ final class PutriGLView extends GLSurfaceView {
             if (nagaOn) {
                 if (naga == null) naga = new NagaScene(getContext());
                 naga.draw(view, proj);
+            }
+            if (gojiOn) {
+                if (goji == null) goji = new GodzillaScene(getContext());
+                goji.draw(view, proj);
             }
         }
 
