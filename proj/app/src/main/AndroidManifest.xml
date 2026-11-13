@@ -10,7 +10,7 @@
         android:allowBackup="true"
         android:icon="@drawable/logo"
         android:banner="@drawable/logo"
-        android:label="Belajar Bersama"
+        android:label="Salamuda Quest"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
