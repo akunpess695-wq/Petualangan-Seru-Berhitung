@@ -678,16 +678,33 @@ public class MainActivity extends Activity {
                 : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE));
     }
 
+    private void setScreen(int s) {
+        screen = s;
+        if (s == 0) {
+            int p = tampilProfile;
+            setRequestedOrientation(p == 1 ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    : (p == 2 ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE));
+        } else {
+            // Layar permainan tidak dibangun ulang saat rotasi; kunci ke arah saat ini.
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED);
+        }
+    }
+
     @Override
     public void onConfigurationChanged(android.content.res.Configuration nc) {
         super.onConfigurationChanged(nc);
         if (prefs == null) {
             return;
         }
+        if (screen != 0) {
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED);
+            return;
+        }
         applyDisplayProfile();
         boolean dialogUp = (menuDialog != null && menuDialog.isShowing())
                 || (pickDialog != null && pickDialog.isShowing());
-        if (screen == 0 && !dialogUp) {
+        if (!dialogUp) {
             showMenu();
         }
     }
@@ -1597,7 +1614,7 @@ public class MainActivity extends Activity {
 
     private void showMenu() {
         handler.removeCallbacksAndMessages(null);
-        screen = 0;
+        setScreen(0);
         advLevel = -1;
         nameFields = null;
         loadPrefs();
@@ -2817,7 +2834,7 @@ public class MainActivity extends Activity {
 
     private void showRekor() {
         handler.removeCallbacksAndMessages(null);
-        screen = 8;
+        setScreen(8);
         nameFields = null;
 
         LinearLayout c = column();
@@ -2953,7 +2970,7 @@ public class MainActivity extends Activity {
 
     private void showMath() {
         handler.removeCallbacksAndMessages(null);
-        screen = 6;
+        setScreen(6);
         advLevel = -1;
         nameFields = null;
 
@@ -3419,7 +3436,7 @@ public class MainActivity extends Activity {
 
     private void showGuru() {
         handler.removeCallbacksAndMessages(null);
-        screen = 7;
+        setScreen(7);
         nameFields = null;
 
         LinearLayout c = column();
@@ -3992,7 +4009,7 @@ public class MainActivity extends Activity {
 
     private void showLaporan() {
         handler.removeCallbacksAndMessages(null);
-        screen = 11;
+        setScreen(11);
         nameFields = null;
 
         LinearLayout c = column();
@@ -7224,7 +7241,7 @@ public class MainActivity extends Activity {
 
     private void showToko() {
         handler.removeCallbacksAndMessages(null);
-        screen = 20;
+        setScreen(20);
         nameFields = null;
         loadPrefs();
         if (shopPl >= np) {
@@ -7759,7 +7776,7 @@ public class MainActivity extends Activity {
 
     private void showMatch() {
         handler.removeCallbacksAndMessages(null);
-        screen = 9;
+        setScreen(9);
         matchBusy = false;
         selL = -1;
         selR = -1;
@@ -7880,7 +7897,7 @@ public class MainActivity extends Activity {
 
     private void showMatchResult() {
         handler.removeCallbacksAndMessages(null);
-        screen = 9;
+        setScreen(9);
         saveStats();
         int stars = matchWrong == 0 ? 3 : matchWrong <= 2 ? 2 : 1;
         freshBadges = awardBadges(2, stars, matchWrong == 0, false);
@@ -8067,7 +8084,7 @@ public class MainActivity extends Activity {
 
     private void showSusun() {
         handler.removeCallbacksAndMessages(null);
-        screen = 12;
+        setScreen(12);
         susunBusy = false;
         susunSeq.clear();
         susunTarget = susunPool[susunIdx];
@@ -8228,7 +8245,7 @@ public class MainActivity extends Activity {
 
     private void showSusunResult() {
         handler.removeCallbacksAndMessages(null);
-        screen = 9;
+        setScreen(9);
         saveStats();
         int stars = susunWrong == 0 ? 3 : susunWrong <= 2 ? 2 : 1;
         freshBadges = awardBadges(3, stars, false, false);
@@ -8436,6 +8453,12 @@ public class MainActivity extends Activity {
             }
             if (ok) {
                 nums.add(x);
+            }
+        }
+        if (nums.size() < 4) {
+            nums.clear();
+            for (int i = 0; i < 4; i++) {
+                nums.add(lo + i);
             }
         }
         ArrayList<Integer> sorted = new ArrayList<>(nums);
@@ -8669,7 +8692,7 @@ public class MainActivity extends Activity {
 
     private void showPass() {
         handler.removeCallbacksAndMessages(null);
-        screen = 3;
+        setScreen(3);
         LinearLayout c = column();
         c.setGravity(Gravity.CENTER);
 
@@ -8769,7 +8792,7 @@ public class MainActivity extends Activity {
     }
 
     private void showGame() {
-        screen = 1;
+        setScreen(1);
         gamePaused = false;
         resumeNext = false;
         LinearLayout c = column();
@@ -9047,7 +9070,7 @@ public class MainActivity extends Activity {
             showAdvResult();
             return;
         }
-        screen = 2;
+        setScreen(2);
         String key = bestKey();
         int best = prefs.getInt(key, 0);
         rekorNow = countsForRecord() && pScore[0] > best;
@@ -9074,7 +9097,7 @@ public class MainActivity extends Activity {
     }
 
     private void renderSoloResult(boolean fx) {
-        screen = 2;
+        setScreen(2);
         boolean rekor = rekorNow;
         int stars = soloStars();
 
@@ -9123,7 +9146,7 @@ public class MainActivity extends Activity {
     }
 
     private void showRanking(boolean fx) {
-        screen = 2;
+        setScreen(2);
         Integer[] order = new Integer[np];
         for (int i = 0; i < np; i++) {
             order[i] = i;
@@ -9223,7 +9246,7 @@ public class MainActivity extends Activity {
 
     private void showReview() {
         handler.removeCallbacksAndMessages(null);
-        screen = 5;
+        setScreen(5);
         int p = reviewPlayer;
 
         LinearLayout c = column();
@@ -9911,7 +9934,7 @@ public class MainActivity extends Activity {
 
     private void showPeta() {
         handler.removeCallbacksAndMessages(null);
-        screen = 10;
+        setScreen(10);
         advLevel = -1;
         nameFields = null;
         final int k = kelas;
@@ -10233,6 +10256,11 @@ public class MainActivity extends Activity {
             pool.addAll(distinctPairs(new ArrayList<>(Arrays.asList(pp))));
         }
         Collections.shuffle(pool, rnd);
+        if (pool.size() < 4) {
+            tebak = false;
+            buildBuiltin();
+            return;
+        }
         total = Math.min(qCount(), pool.size());
         for (int i = 0; i < total; i++) {
             String[] it0 = pool.get(i);
@@ -10245,7 +10273,7 @@ public class MainActivity extends Activity {
             Collections.shuffle(wrong, rnd);
             ArrayList<String> opts = new ArrayList<>();
             opts.add(it0[1]);
-            for (int j = 0; j < 3 && j < wrong.size(); j++) {
+            for (int j = 0; j < 3; j++) {
                 opts.add(wrong.get(j));
             }
             Collections.shuffle(opts, rnd);
@@ -10254,7 +10282,7 @@ public class MainActivity extends Activity {
             q.full = q.text;
             q.sopts = new String[4];
             for (int j = 0; j < 4; j++) {
-                q.sopts[j] = opts.get(j % opts.size());
+                q.sopts[j] = opts.get(j);
                 if (q.sopts[j].equals(it0[1])) {
                     q.correctIdx = j;
                 }
@@ -10909,7 +10937,7 @@ public class MainActivity extends Activity {
     // ---------- Hasil level peta ----------
 
     private void showAdvResult() {
-        screen = 2;
+        setScreen(2);
         int stars = advStarsFor(pCorrect[0], total);
         boolean perfect = total >= 5 && pCorrect[0] == total;
         int old = advStarsOf(advK, advLevel);
@@ -10921,7 +10949,7 @@ public class MainActivity extends Activity {
     }
 
     private void renderAdvResult(boolean fx) {
-        screen = 2;
+        setScreen(2);
         final int stars = advStarsFor(pCorrect[0], total);
         boolean passed = stars >= 1;
         String[] p = lv(advK, advLevel);
