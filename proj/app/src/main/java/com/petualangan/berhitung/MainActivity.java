@@ -110,6 +110,13 @@ public class MainActivity extends Activity {
     private static final int SILVER = Color.parseColor("#90A4AE");
     private static final int BRONZE = Color.parseColor("#A1887F");
     private static final int INDIGO = Color.parseColor("#5C6BC0");
+    // Token desain premium: permukaan hangat, tinta lembut, dan aksen emas.
+    private static final int CREAM = Color.parseColor("#FFF8EC");
+    private static final int CREAM_DEEP = Color.parseColor("#FFEFD6");
+    private static final int INK = Color.parseColor("#2E241F");
+    private static final int INK_SOFT = Color.parseColor("#866F63");
+    private static final int GOLD_DEEP = Color.parseColor("#C58A1A");
+    private static final int HAIRLINE = Color.argb(64, 197, 138, 26);
 
     // Tingkat kesulitan = kelas SD (indeks 0..5 untuk kelas 1..6)
     private static final String[] KELAS_LABEL = {"1", "2", "3", "4", "5", "6"};
@@ -1100,6 +1107,71 @@ public class MainActivity extends Activity {
         return g;
     }
 
+    // Permukaan kartu premium: putih ke krem dengan garis rambut emas.
+    private GradientDrawable premiumSurface(int radiusDp) {
+        GradientDrawable g = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.WHITE, CREAM});
+        g.setCornerRadius(dp(radiusDp));
+        g.setStroke(dp(1), HAIRLINE);
+        return g;
+    }
+
+    // Tombol utama: gradasi tiga tingkat + garis tepi putih tipis agar terlihat mengkilap.
+    private GradientDrawable premiumButtonBg(int color, int radiusDp) {
+        GradientDrawable g = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{mixColor(color, Color.WHITE, 0.24f), color, mixColor(color, Color.BLACK, 0.18f)});
+        g.setCornerRadius(dp(radiusDp));
+        g.setStroke(dp(2), Color.argb(150, 255, 255, 255));
+        return g;
+    }
+
+    private GradientDrawable optionBg(int color) {
+        GradientDrawable g = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{mixColor(color, Color.WHITE, 0.16f), color, mixColor(color, Color.BLACK, 0.14f)});
+        g.setCornerRadius(dp(20));
+        g.setStroke(dp(2), Color.argb(130, 255, 255, 255));
+        return g;
+    }
+
+    private GradientDrawable timerBg(int color) {
+        GradientDrawable g = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{mixColor(color, Color.WHITE, 0.28f), color, mixColor(color, Color.BLACK, 0.14f)});
+        g.setCornerRadius(dp(20));
+        return g;
+    }
+
+    private GradientDrawable pillBg(int color) {
+        GradientDrawable g = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{mixColor(color, Color.WHITE, 0.2f), color});
+        g.setCornerRadius(dp(20));
+        g.setStroke(dp(1), Color.argb(110, 255, 255, 255));
+        return g;
+    }
+
+    // Tombol sekunder: permukaan krem dengan garis emas, untuk aksi yang tidak dominan.
+    private GradientDrawable ghostButtonBg() {
+        GradientDrawable g = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.WHITE, CREAM_DEEP});
+        g.setCornerRadius(dp(22));
+        g.setStroke(dp(2), GOLD);
+        return g;
+    }
+
+    private GradientDrawable medallionBg(int color, int strokeDp) {
+        GradientDrawable g = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{mixColor(color, Color.WHITE, 0.28f), color, mixColor(color, Color.BLACK, 0.2f)});
+        g.setShape(GradientDrawable.OVAL);
+        g.setStroke(dp(strokeDp), Color.argb(200, 255, 255, 255));
+        return g;
+    }
+
     private boolean menuBgOn = false;
 
     private Drawable background() {
@@ -1233,16 +1305,34 @@ public class MainActivity extends Activity {
         return row;
     }
 
+    /** Chip statistik ringkas: ikon dalam medali kecil dan satu nilai. */
+    private LinearLayout statChip(String icon, String value, int accent) {
+        LinearLayout t = new LinearLayout(this);
+        t.setOrientation(LinearLayout.HORIZONTAL);
+        t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setPadding(dp(8), dp(4), dp(12), dp(4));
+        t.setBackground(premiumSurface(20));
+        t.setElevation(dp(3));
+        TextView ic = text(icon, 14, Color.WHITE, false);
+        ic.setBackground(medallionBg(accent, 1));
+        LinearLayout.LayoutParams icp = new LinearLayout.LayoutParams(dp(28), dp(28));
+        icp.rightMargin = dp(6);
+        t.addView(ic, icp);
+        TextView n = text(value, 13, INK, true);
+        t.addView(n, new LinearLayout.LayoutParams(WRAP, WRAP));
+        return t;
+    }
+
     /** Kartu putih kecil: ikon berwarna dalam lingkaran dan satu label. */
     private LinearLayout miniCard(String icon, String label, int accent) {
         LinearLayout t = new LinearLayout(this);
         t.setOrientation(LinearLayout.HORIZONTAL);
         t.setGravity(Gravity.CENTER_VERTICAL);
         t.setPadding(dp(10), 0, dp(10), 0);
-        t.setBackground(box(Color.WHITE, 24));
+        t.setBackground(premiumSurface(24));
         t.setElevation(dp(4));
         TextView ic = text(icon, 18, Color.WHITE, false);
-        ic.setBackground(box(accent, 18));
+        ic.setBackground(medallionBg(accent, 2));
         LinearLayout.LayoutParams icp = new LinearLayout.LayoutParams(dp(36), dp(36));
         icp.rightMargin = dp(8);
         t.addView(ic, icp);
@@ -1408,7 +1498,7 @@ public class MainActivity extends Activity {
 
     private TextView pill(String s, int color) {
         TextView t = text(s, 15, Color.WHITE, true);
-        t.setBackground(box(color, 20));
+        t.setBackground(pillBg(color));
         t.setPadding(dp(14), dp(6), dp(14), dp(6));
         return t;
     }
@@ -1420,7 +1510,7 @@ public class MainActivity extends Activity {
         b.setTextSize(sp * ui);
         b.setTextColor(Color.WHITE);
         b.setTypeface(ROUND_BOLD);
-        b.setBackground(box(color, 22));
+        b.setBackground(premiumButtonBg(color, 22));
         b.setOnTouchListener((v, e) -> {
             int act = e.getActionMasked();
             if (act == MotionEvent.ACTION_DOWN) {
@@ -1458,8 +1548,8 @@ public class MainActivity extends Activity {
         LinearLayout l = new LinearLayout(this);
         l.setOrientation(LinearLayout.VERTICAL);
         l.setPadding(dp(16), dp(14), dp(16), dp(16));
-        l.setBackground(box(Color.WHITE, 26));
-        l.setElevation(dp(5));
+        l.setBackground(premiumSurface(26));
+        l.setElevation(dp(6));
         return l;
     }
 
@@ -1628,8 +1718,8 @@ public class MainActivity extends Activity {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        TextView snd = text(sfxOn ? "\uD83D\uDD0A" : "\uD83D\uDD07", 22, DARK, false);
-        snd.setBackground(box(Color.WHITE, 26));
+        TextView snd = text(sfxOn ? "\uD83D\uDD0A" : "\uD83D\uDD07", 22, INK, false);
+        snd.setBackground(premiumSurface(26));
         snd.setContentDescription(sfxOn ? "Suara menyala" : "Suara mati");
         snd.setElevation(dp(3));
         snd.setOnClickListener(v -> {
@@ -1639,8 +1729,8 @@ public class MainActivity extends Activity {
         });
         bar.addView(snd, new LinearLayout.LayoutParams(dp(52), dp(52)));
         // v6.21.0: satu pintu Pengaturan (tampilan layar, Soal Guru); ikon TV dan Soal Guru tidak lagi di menu utama
-        TextView dsp = text("\u2699\uFE0F", 22, DARK, false);
-        dsp.setBackground(box(Color.WHITE, 26));
+        TextView dsp = text("\u2699\uFE0F", 22, INK, false);
+        dsp.setBackground(premiumSurface(26));
         dsp.setContentDescription("Pengaturan");
         dsp.setElevation(dp(3));
         dsp.setOnClickListener(v -> dialogPengaturan());
@@ -1694,6 +1784,17 @@ public class MainActivity extends Activity {
         hero.addView(htx, new LinearLayout.LayoutParams(0, WRAP, 1f));
         c.addView(hero, lp(WRAP, 12));
 
+        // Ringkasan progres: bintang dan koin tampil sebagai chip premium di bawah spanduk
+        LinearLayout stats = new LinearLayout(this);
+        stats.setOrientation(LinearLayout.HORIZONTAL);
+        stats.setGravity(Gravity.CENTER_VERTICAL);
+        stats.addView(statChip("\u2B50", String.valueOf(totalStars()), GOLD_DEEP),
+                new LinearLayout.LayoutParams(0, dp(40), 1f));
+        LinearLayout.LayoutParams coinLp = new LinearLayout.LayoutParams(0, dp(40), 1f);
+        coinLp.leftMargin = dp(8);
+        stats.addView(statChip("\uD83D\uDCB0", String.valueOf(coins()), ORANGE_DARK), coinLp);
+        c.addView(stats, lp(WRAP, 10));
+
         // Kelas dan Cara main: dua pil. Pemain, waktu, dan nyawa dulu tiga kontrol terpisah; kini satu pintu "Cara main"
         LinearLayout opt = new LinearLayout(this);
         opt.setOrientation(LinearLayout.HORIZONTAL);
@@ -1711,7 +1812,7 @@ public class MainActivity extends Activity {
             GradientDrawable sgBg = sg == 0
                     ? new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                     new int[]{mixColor(KELAS_COLOR[kelas], Color.WHITE, 0.22f), KELAS_COLOR[kelas]})
-                    : box(Color.WHITE, 26);
+                    : premiumSurface(26);
             sgBg.setCornerRadius(dp(26));
             sgBg.setStroke(dp(sg == 0 ? 3 : 1),
                     sg == 0 ? Color.argb(130, 255, 255, 255) : Color.argb(50, 96, 125, 139));
@@ -2242,7 +2343,7 @@ public class MainActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        int lineC = Color.argb(70, 38, 120, 140);
+        int lineC = Color.argb(120, 197, 138, 26);
         View l1 = new View(this);
         l1.setBackground(box(lineC, 2));
         View l2 = new View(this);
@@ -2252,7 +2353,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams b = new LinearLayout.LayoutParams(0, dp(2), 1f);
         b.leftMargin = dp(8);
         row.addView(l1, a);
-        row.addView(text("\uD83C\uDF3F " + s + " \uD83C\uDF3F", 18, Color.parseColor("#1A3C6E"), true),
+        row.addView(text("\uD83C\uDF3F " + s + " \uD83C\uDF3F", 18, INK, true),
                 new LinearLayout.LayoutParams(WRAP, WRAP));
         row.addView(l2, b);
         return row;
@@ -8811,15 +8912,21 @@ public class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(WRAP, WRAP));
         top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
         tvHearts = text("", 18, DARK, false);
+        tvHearts.setBackground(premiumSurface(18));
+        tvHearts.setPadding(dp(10), dp(5), dp(10), dp(5));
+        tvHearts.setElevation(dp(3));
         top.addView(tvHearts, new LinearLayout.LayoutParams(WRAP, WRAP));
 
-        // Penanda kemajuan soal
+        // Penanda kemajuan soal di dalam lintasan lembut
         LinearLayout dotsRow = new LinearLayout(this);
         dotsRow.setOrientation(LinearLayout.HORIZONTAL);
-        c.addView(dotsRow, lp(dp(8), 16));
+        dotsRow.setGravity(Gravity.CENTER_VERTICAL);
+        dotsRow.setPadding(dp(6), dp(4), dp(6), dp(4));
+        dotsRow.setBackground(premiumSurface(10));
+        c.addView(dotsRow, lp(dp(16), 14));
         for (int i = 0; i < total; i++) {
             View d = new View(this);
-            d.setBackground(box(GRAY_D, 4));
+            d.setBackground(box(GRAY_D, 5));
             dotsRow.addView(d, weight(i == 0 ? 0 : 2, i == total - 1 ? 0 : 2));
             dots[i] = d;
         }
@@ -8827,24 +8934,30 @@ public class MainActivity extends Activity {
         // Nomor soal dan skor
         LinearLayout info = new LinearLayout(this);
         info.setOrientation(LinearLayout.HORIZONTAL);
+        info.setGravity(Gravity.CENTER_VERTICAL);
+        info.setBackground(premiumSurface(18));
+        info.setPadding(dp(14), dp(9), dp(14), dp(9));
+        info.setElevation(dp(3));
         c.addView(info, lp(WRAP, 10));
-        tvStep = text("", 15, DARK, true);
+        tvStep = text("", 15, INK, true);
         tvStep.setGravity(Gravity.START);
         info.addView(tvStep, new LinearLayout.LayoutParams(0, WRAP, 1f));
-        tvScore = text("", 15, ORANGE_DARK, true);
+        tvScore = text("", 15, GOLD_DEEP, true);
         tvScore.setGravity(Gravity.END);
         info.addView(tvScore, new LinearLayout.LayoutParams(0, WRAP, 1f));
 
         // Penghitung waktu
-        tvTimer = text(" ", 15, DARK, true);
+        tvTimer = text(" ", 15, INK, true);
         c.addView(tvTimer, lp(WRAP, 10));
         timerBox = new FrameLayout(this);
-        timerBox.setBackground(box(GRAY, 6));
+        GradientDrawable track = box(GRAY, 8);
+        track.setStroke(dp(1), HAIRLINE);
+        timerBox.setBackground(track);
         timerFill = new View(this);
-        timerFill.setBackground(box(GREEN, 6));
+        timerFill.setBackground(timerBg(GREEN));
         timerFill.setPivotX(0f);
         timerBox.addView(timerFill, new FrameLayout.LayoutParams(MATCH, MATCH));
-        c.addView(timerBox, lp(dp(10), 6));
+        c.addView(timerBox, lp(dp(12), 6));
         if (!timed) {
             tvTimer.setVisibility(View.GONE);
             timerBox.setVisibility(View.GONE);
@@ -8854,9 +8967,9 @@ public class MainActivity extends Activity {
         cardQ = new LinearLayout(this);
         cardQ.setOrientation(LinearLayout.VERTICAL);
         cardQ.setGravity(Gravity.CENTER);
-        cardQ.setBackground(box(Color.WHITE, 24));
-        cardQ.setElevation(dp(6));
-        cardQ.setPadding(dp(16), dp(28), dp(16), dp(28));
+        cardQ.setBackground(premiumSurface(28));
+        cardQ.setElevation(dp(8));
+        cardQ.setPadding(dp(18), dp(30), dp(18), dp(30));
         tvQuestion = text("", 46, ORANGE_DARK, true);
         cardQ.addView(tvQuestion, new LinearLayout.LayoutParams(MATCH, WRAP));
         c.addView(cardQ, lp(WRAP, 18));
@@ -8879,7 +8992,8 @@ public class MainActivity extends Activity {
         }
 
         Button back = button(advLevel >= 0 ? "Kembali ke peta" : "Kembali ke menu", GRAY, 14);
-        back.setTextColor(DARK);
+        back.setTextColor(GOLD_DEEP);
+        back.setBackground(ghostButtonBg());
         rt.addView(back, lp(dp(46), 22));
         back.setOnClickListener(v -> confirmExit());
 
@@ -8910,12 +9024,12 @@ public class MainActivity extends Activity {
             String ot = optText(q, i);
             opts[i].setText(ot);
             opts[i].setTextSize((q.sopts != null ? bankOptionSize(ot.length()) : optionSize(ot.length())) * ui);
-            opts[i].setBackground(box(OPT_COLORS[i], 16));
+            opts[i].setBackground(optionBg(OPT_COLORS[i]));
             opts[i].setAlpha(1f);
             opts[i].setOnClickListener(v -> choose(idx));
         }
         correctBtn = opts[q.correctIdx];
-        dots[qi - 1].setBackground(box(ORANGE, 4));
+        dots[qi - 1].setBackground(box(ORANGE, 5));
 
         cardQ.animate().cancel();
         cardQ.setTranslationX(dp(70));
@@ -8949,8 +9063,8 @@ public class MainActivity extends Activity {
 
     private void showTime() {
         tvTimer.setText("Sisa waktu: " + timeLeft + " detik");
-        tvTimer.setTextColor(timeLeft <= 3 ? RED : DARK);
-        timerFill.setBackground(box(timeLeft <= 3 ? RED : GREEN, 6));
+        tvTimer.setTextColor(timeLeft <= 3 ? RED : INK);
+        timerFill.setBackground(timerBg(timeLeft <= 3 ? RED : GREEN));
     }
 
     private void dimOthers(int keep1, int keep2) {
@@ -8979,8 +9093,8 @@ public class MainActivity extends Activity {
         if (idx == q.correctIdx) {
             score += 10;
             correct++;
-            opts[idx].setBackground(box(GREEN, 16));
-            dots[qi - 1].setBackground(box(GREEN, 4));
+            opts[idx].setBackground(optionBg(GREEN));
+            dots[qi - 1].setBackground(box(GREEN, 5));
             tvFeedback.setText("Benar! \uD83C\uDF89");
             tvFeedback.setTextColor(GREEN);
             sfx(SFX_CORRECT);
@@ -8991,9 +9105,9 @@ public class MainActivity extends Activity {
             pop(tvScore, 1.45f);
         } else {
             lives--;
-            opts[idx].setBackground(box(RED, 16));
-            correctBtn.setBackground(box(GREEN, 16));
-            dots[qi - 1].setBackground(box(RED, 4));
+            opts[idx].setBackground(optionBg(RED));
+            correctBtn.setBackground(optionBg(GREEN));
+            dots[qi - 1].setBackground(box(RED, 5));
             tvFeedback.setText("Oops! Jawabannya " + optText(q, q.correctIdx));
             tvFeedback.setTextColor(RED);
             sfx(SFX_WRONG);
@@ -9020,8 +9134,8 @@ public class MainActivity extends Activity {
         tvTimer.setText("Waktu habis!");
         tvTimer.setTextColor(RED);
         dimOthers(q.correctIdx, q.correctIdx);
-        correctBtn.setBackground(box(GREEN, 16));
-        dots[qi - 1].setBackground(box(RED, 4));
+        correctBtn.setBackground(optionBg(GREEN));
+        dots[qi - 1].setBackground(box(RED, 5));
         tvFeedback.setText("Jawabannya " + optText(q, q.correctIdx));
         tvFeedback.setTextColor(RED);
         sfx(SFX_TIMEOUT);
@@ -9044,6 +9158,7 @@ public class MainActivity extends Activity {
             h.append("\uD83D\uDC9A Santai");
         }
         tvHearts.setText(h.toString());
+        tvHearts.setVisibility(h.length() == 0 ? View.GONE : View.VISIBLE);
         tvStep.setText("Soal " + qi + " dari " + total);
         tvScore.setText("\u2B50 " + score);
     }
@@ -9103,9 +9218,12 @@ public class MainActivity extends Activity {
 
         LinearLayout c = column();
         c.setGravity(Gravity.CENTER);
-        c.addView(text(av(0), 48, Color.WHITE, false), lp(WRAP, 0));
-        TextView title = text(lives <= 0 ? "Nyawa habis!" : "Selesai!", 32, ORANGE_DARK, true);
-        c.addView(title, lp(WRAP, 4));
+        TextView avt = text(av(0), 40, Color.WHITE, false);
+        avt.setBackground(medallionBg(KELAS_COLOR[kelas], 3));
+        avt.setElevation(dp(6));
+        c.addView(avt, new LinearLayout.LayoutParams(dp(86), dp(86)));
+        TextView title = text(lives <= 0 ? "Nyawa habis!" : "Selesai!", 32, INK, true);
+        c.addView(title, lp(WRAP, 10));
         c.addView(pill(KELAS_NAMES[kelas] + " \u2022 " + modeLabel(), KELAS_COLOR[kelas]), lpw(10));
 
         LinearLayout card = card();
@@ -9115,17 +9233,17 @@ public class MainActivity extends Activity {
         starRow.setGravity(Gravity.CENTER);
         TextView[] st = new TextView[3];
         for (int i = 0; i < 3; i++) {
-            st[i] = text(i < stars ? "\u2B50" : "\u2606", 44, ORANGE, false);
+            st[i] = text(i < stars ? "\u2B50" : "\u2606", 46, i < stars ? ORANGE : Color.parseColor("#D9C7A0"), false);
             starRow.addView(st[i], new LinearLayout.LayoutParams(WRAP, WRAP));
         }
         card.addView(starRow, lp(WRAP, 0));
-        TextView sc = text("Skor: " + pScore[0], 30, DARK, true);
+        TextView sc = text("Skor: " + pScore[0], 32, INK, true);
         card.addView(sc, lp(WRAP, 10));
-        TextView ben = text("Benar " + pCorrect[0] + " dari " + total, 16, DARK, false);
+        TextView ben = text("Benar " + pCorrect[0] + " dari " + total, 16, INK_SOFT, false);
         card.addView(ben, lp(WRAP, 6));
-        card.addView(text("\uD83C\uDF1F Total bintang: " + totalStars(), 14, DARK, false), lp(WRAP, 6));
+        card.addView(text("\uD83C\uDF1F Total bintang: " + totalStars(), 14, GOLD_DEEP, true), lp(WRAP, 6));
         if (!countsForRecord()) {
-            card.addView(text("Mode santai: skor tidak masuk rekor", 12, DARK, false), lp(WRAP, 4));
+            card.addView(text("Mode santai: skor tidak masuk rekor", 12, INK_SOFT, false), lp(WRAP, 4));
         }
         TextView rekorPill = null;
         if (rekor) {
@@ -9170,14 +9288,15 @@ public class MainActivity extends Activity {
 
         LinearLayout c = column();
         c.setGravity(Gravity.CENTER);
-        c.addView(text("Hasil Akhir", 32, ORANGE_DARK, true), lp(WRAP, 0));
+        c.addView(text("Hasil Akhir", 32, INK, true), lp(WRAP, 0));
         c.addView(pill(KELAS_NAMES[kelas] + " \u2022 " + modeLabel(), KELAS_COLOR[kelas]), lpw(10));
 
         TextView banner = text(winners > 1 ? "Seri! Skor sama \uD83E\uDD1D"
-                : "\uD83C\uDFC6 " + names[order[0]] + " menang!", 22, Color.WHITE, true);
-        banner.setBackground(box(winners > 1 ? PURPLE : GOLD, 20));
-        banner.setPadding(dp(16), dp(14), dp(16), dp(14));
-        banner.setElevation(dp(4));
+                : "\uD83C\uDFC6 " + names[order[0]] + " menang!", 22,
+                winners > 1 ? Color.WHITE : INK, true);
+        banner.setBackground(premiumButtonBg(winners > 1 ? PURPLE : GOLD, 20));
+        banner.setPadding(dp(16), dp(16), dp(16), dp(16));
+        banner.setElevation(dp(6));
         c.addView(banner, lp(WRAP, 18));
         if (fx) {
             banner.setScaleX(0f);
@@ -9192,22 +9311,22 @@ public class MainActivity extends Activity {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setBackground(box(Color.WHITE, 18));
-            row.setElevation(dp(3));
+            row.setBackground(premiumSurface(18));
+            row.setElevation(dp(4));
             row.setPadding(dp(12), dp(10), dp(14), dp(10));
 
-            TextView rank = text(String.valueOf(r + 1), 18, Color.WHITE, true);
-            rank.setBackground(box(rankColor[r], 18));
-            row.addView(rank, new LinearLayout.LayoutParams(dp(36), dp(36)));
+            TextView rank = text(String.valueOf(r + 1), 18, r == 0 ? INK : Color.WHITE, true);
+            rank.setBackground(medallionBg(rankColor[r], 2));
+            row.addView(rank, new LinearLayout.LayoutParams(dp(38), dp(38)));
 
-            TextView nm = text(av(p) + " " + names[p], 18, DARK, true);
+            TextView nm = text(av(p) + " " + names[p], 18, INK, true);
             nm.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             LinearLayout.LayoutParams nmp = new LinearLayout.LayoutParams(0, WRAP, 1f);
             nmp.leftMargin = dp(12);
             row.addView(nm, nmp);
 
             TextView sc = text(pScore[p] + " poin\nbenar " + pCorrect[p] + "/" + total,
-                    14, PURPLE, true);
+                    14, GOLD_DEEP, true);
             sc.setGravity(Gravity.END);
             row.addView(sc, new LinearLayout.LayoutParams(WRAP, WRAP));
 
@@ -9251,7 +9370,7 @@ public class MainActivity extends Activity {
 
         LinearLayout c = column();
         c.setGravity(Gravity.CENTER_HORIZONTAL);
-        c.addView(text("Pembahasan", 30, ORANGE_DARK, true), lp(WRAP, 0));
+        c.addView(text("Pembahasan", 30, INK, true), lp(WRAP, 0));
         c.addView(pill(KELAS_NAMES[kelas] + " \u2022 " + modeLabel(), KELAS_COLOR[kelas]), lpw(10));
 
         if (np > 1) {
@@ -9285,7 +9404,7 @@ public class MainActivity extends Activity {
                     : "Semua jawaban yang sempat dikerjakan benar!", 18, GREEN, true), lp(WRAP, 8));
             c.addView(ok, lp(WRAP, 16));
         } else {
-            c.addView(text("Ini soal yang masih salah. Yuk, lihat jawaban yang benar.", 14, DARK, false),
+            c.addView(text("Ini soal yang masih salah. Yuk, lihat jawaban yang benar.", 14, INK_SOFT, false),
                     lp(WRAP, 14));
         }
 
@@ -9344,7 +9463,9 @@ public class MainActivity extends Activity {
         boolean mistakes = hasMistakes();
         if (mistakes) {
             Button rev = button("Lihat Pembahasan", BLUE, 20);
-            rev.setElevation(dp(4));
+            rev.setBackground(ghostButtonBg());
+            rev.setTextColor(BLUE);
+            rev.setElevation(dp(2));
             c.addView(rev, lp(dp(60), 22));
             rev.setOnClickListener(v -> {
                 reviewPlayer = 0;
@@ -9352,12 +9473,14 @@ public class MainActivity extends Activity {
             });
         }
         Button again = button("Main Lagi", GREEN, 22);
-        again.setElevation(dp(4));
+        again.setElevation(dp(6));
         c.addView(again, lp(dp(64), mistakes ? 12 : 26));
         again.setOnClickListener(v -> startGame(mode));
 
         Button menu = button("Menu Utama", ORANGE, 20);
-        menu.setElevation(dp(4));
+        menu.setBackground(ghostButtonBg());
+        menu.setTextColor(ORANGE_DARK);
+        menu.setElevation(dp(2));
         c.addView(menu, lp(dp(60), 12));
         menu.setOnClickListener(v -> showMenu());
     }
@@ -10956,9 +11079,12 @@ public class MainActivity extends Activity {
 
         LinearLayout c = column();
         c.setGravity(Gravity.CENTER);
-        c.addView(text(BUDDY_ICON[advK], 48, Color.WHITE, false), lp(WRAP, 0));
-        TextView title = text(passed ? "Level selesai!" : "Ayo coba lagi!", 30, ORANGE_DARK, true);
-        c.addView(title, lp(WRAP, 4));
+        TextView avt = text(BUDDY_ICON[advK], 40, Color.WHITE, false);
+        avt.setBackground(medallionBg(KELAS_COLOR[advK], 3));
+        avt.setElevation(dp(6));
+        c.addView(avt, new LinearLayout.LayoutParams(dp(86), dp(86)));
+        TextView title = text(passed ? "Level selesai!" : "Ayo coba lagi!", 30, INK, true);
+        c.addView(title, lp(WRAP, 10));
         c.addView(pill("Level " + (advLevel + 1) + " \u2022 " + p[1], KELAS_COLOR[advK]), lpw(10));
 
         LinearLayout card = card();
@@ -10968,18 +11094,18 @@ public class MainActivity extends Activity {
         starRow.setGravity(Gravity.CENTER);
         TextView[] st = new TextView[3];
         for (int i = 0; i < 3; i++) {
-            st[i] = text(i < stars ? "\u2B50" : "\u2606", 44, ORANGE, false);
+            st[i] = text(i < stars ? "\u2B50" : "\u2606", 46, i < stars ? ORANGE : Color.parseColor("#D9C7A0"), false);
             starRow.addView(st[i], new LinearLayout.LayoutParams(WRAP, WRAP));
         }
         card.addView(starRow, lp(WRAP, 0));
-        TextView sc = text("Skor: " + pScore[0], 24, DARK, true);
+        TextView sc = text("Skor: " + pScore[0], 26, INK, true);
         card.addView(sc, lp(WRAP, 10));
-        TextView ben = text("Benar " + pCorrect[0] + " dari " + total, 16, DARK, false);
+        TextView ben = text("Benar " + pCorrect[0] + " dari " + total, 16, INK_SOFT, false);
         card.addView(ben, lp(WRAP, 6));
         String hint = !passed ? "Butuh benar separuh atau lebih untuk membuka level berikutnya."
                 : stars < 3 ? "Benar 90% ke atas dapat 3 bintang." : "Sempurna! Tiga bintang di level ini.";
-        card.addView(text(hint, 13, DARK, false), lp(WRAP, 6));
-        card.addView(text("\uD83C\uDF1F Total bintang: " + totalStars(), 14, DARK, false), lp(WRAP, 6));
+        card.addView(text(hint, 13, INK_SOFT, false), lp(WRAP, 6));
+        card.addView(text("\uD83C\uDF1F Total bintang: " + totalStars(), 14, GOLD_DEEP, true), lp(WRAP, 6));
         c.addView(card, lp(WRAP, 18));
 
         if (advWorldNew) {
@@ -11016,17 +11142,25 @@ public class MainActivity extends Activity {
         final boolean hasNext = passed && advLevel + 1 < LEVELS[advK].length;
         if (hasNext) {
             Button nx = button("Level berikutnya \u25B6", GREEN, 22);
-            nx.setElevation(dp(4));
+            nx.setElevation(dp(6));
             c.addView(nx, lp(dp(64), 18));
             nx.setOnClickListener(v -> startLevel(advLevel + 1));
         }
         Button again = button("Ulangi level", hasNext ? BLUE : GREEN, hasNext ? 18 : 22);
-        again.setElevation(dp(4));
+        if (hasNext) {
+            again.setBackground(ghostButtonBg());
+            again.setTextColor(BLUE);
+            again.setElevation(dp(2));
+        } else {
+            again.setElevation(dp(6));
+        }
         c.addView(again, lp(dp(hasNext ? 56 : 64), hasNext ? 12 : 18));
         again.setOnClickListener(v -> startLevel(advLevel));
 
         Button map = button("\uD83D\uDDFA\uFE0F Kembali ke Peta", ORANGE, 20);
-        map.setElevation(dp(4));
+        map.setBackground(ghostButtonBg());
+        map.setTextColor(ORANGE_DARK);
+        map.setElevation(dp(2));
         c.addView(map, lp(dp(60), 12));
         map.setOnClickListener(v -> showPeta());
     }
