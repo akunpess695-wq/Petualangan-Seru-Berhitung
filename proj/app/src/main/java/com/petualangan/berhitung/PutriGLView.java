@@ -44,7 +44,7 @@ final class PutriGLView extends GLSurfaceView {
     private volatile boolean nagaOn = false;   // naga pendamping di dalam adegan (terhalang avatar saat di belakang)
     private NagaScene naga;
     private volatile boolean gojiOn = false;   // Godzilla mini berdiri di samping avatar
-    private GodzillaScene goji;
+    private GodzillaScene2 goji;
     public void setGoji(boolean on) {
         gojiOn = on;
         setRenderMode(on || nagaOn ? RENDERMODE_CONTINUOUSLY : RENDERMODE_WHEN_DIRTY);
@@ -435,7 +435,7 @@ final class PutriGLView extends GLSurfaceView {
                 naga.draw(view, proj);
             }
             if (gojiOn) {
-                if (goji == null) goji = new GodzillaScene(getContext());
+                if (goji == null) goji = new GodzillaScene2(getContext());
                 goji.draw(view, proj);
             }
         }
