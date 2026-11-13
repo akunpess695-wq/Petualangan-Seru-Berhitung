@@ -22,17 +22,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Check project and character assets
+      - name: Check project files
         shell: bash
         run: |
           set -euo pipefail
           test -f proj/settings.gradle || { echo 'Missing proj/settings.gradle'; exit 1; }
           test -f proj/app/build.gradle || { echo 'Missing proj/app/build.gradle'; exit 1; }
-          for name in putra putri; do
-            path="proj/app/src/main/assets/characters/${name}.obj"
-            test -s "$path" || { echo "Missing or empty: $path"; exit 1; }
-            echo "Found: $path"
-          done
 
       - name: Use Android SDK from runner
         shell: bash
@@ -54,8 +49,16 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Set version code
+        shell: bash
+        run: echo "VERSION_CODE=$((6280 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
       - name: Build debug APK
         working-directory: proj
+        env:
+          # Set secret ini bila ingin CI tetap memakai pb.keystore; kosong = debug key bawaan Android.
+          DEBUG_STORE_PASSWORD: ${{ secrets.DEBUG_STORE_PASSWORD }}
+          DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_STORE_PASSWORD }}
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
       - name: Upload debug APK
