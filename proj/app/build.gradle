@@ -10,16 +10,23 @@ android {
         applicationId "com.petualangan.belajarbersama"
         minSdk 21
         targetSdk 34
-        versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '11')
-        versionName "6.6.3"
+        versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '6280')
+        // Samakan dengan APP_VERSION di MainActivity.java.
+        versionName "6.28.0"
     }
 
     signingConfigs {
-        debug {
-            storeFile file('pb.keystore')
-            storePassword 'berhitung123'
-            keyAlias 'berhitung'
-            keyPassword 'berhitung123'
+        // Isi lewat env DEBUG_KEYSTORE/DEBUG_STORE_PASSWORD. Tanpa env, Gradle memakai
+        // debug keystore bawaan Android; jangan simpan password keystore di repo.
+        def debugStore = System.getenv('DEBUG_KEYSTORE') ?: 'pb.keystore'
+        def debugStorePass = System.getenv('DEBUG_STORE_PASSWORD')
+        if (debugStorePass && file(debugStore).exists()) {
+            debug {
+                storeFile file(debugStore)
+                storePassword debugStorePass
+                keyAlias System.getenv('DEBUG_KEY_ALIAS') ?: 'berhitung'
+                keyPassword System.getenv('DEBUG_KEY_PASSWORD') ?: debugStorePass
+            }
         }
         release {
             // Diisi dari GitHub Secrets (lihat langkah "Siapkan keystore release")
