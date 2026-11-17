@@ -10676,7 +10676,7 @@ public class MainActivity extends Activity {
         topRow.setOrientation(LinearLayout.HORIZONTAL);
         topRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView avaBadge = text(avatarStr(0), 24, INK, false);
+        TextView avaBadge = text(av(0), 24, INK, false);
         avaBadge.setBackground(plainBox(Color.parseColor("#FEF3C7"), Color.parseColor("#FCD34D")));
         avaBadge.setPadding(dp(8), dp(6), dp(8), dp(6));
         topRow.addView(avaBadge, new LinearLayout.LayoutParams(WRAP, WRAP));
