@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.28.0";
+    private static final String APP_VERSION = "6.29.0";
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
@@ -1637,7 +1637,7 @@ public class MainActivity extends Activity {
     }
 
     private String bestKey() {
-        return "best_k" + kelas + (mode == 7 ? "_b" + subj + (alamOn() ? "a" : "") + (tebakOn() ? "g" : "") : "") + (timed ? "_t" : "");
+        return "best_k" + kelas + (mode == 7 ? "_b" + subj + (alamOn() ? "a" : "") + (tebakOn() ? "g" : "") + (sambungOn() ? "s" : "") : "") + (timed ? "_t" : "");
     }
 
     private String timeLabel() {
@@ -1648,7 +1648,7 @@ public class MainActivity extends Activity {
         if (advLevel >= 0) {
             return "Petualangan \u2022 " + timeLabel();
         }
-        String base = mode == 7 ? (alamOn() ? "Kuis Alam \u2022 " : tebakOn() ? "Tebak Gambar \u2022 " : "") + SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
+        String base = mode == 7 ? (alamOn() ? "Kuis Alam \u2022 " : tebakOn() ? "Tebak Gambar \u2022 " : sambungOn() ? "Sambung Ayat \u2022 " : "") + SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
         return (relaxed && mode != 7) ? base + " \u2022 Santai" : base;
     }
 
@@ -1885,6 +1885,11 @@ public class MainActivity extends Activity {
         natureTile(tk, PINK, 3);
         tk.setOnClickListener(v -> showToko());
         c.addView(tk, lp(dp(84), 18));
+
+        // Sambung Ayat + Kebun Hafalan (Juz 30)
+        LinearLayout sa = miniCard("\uD83C\uDF33", "Sambung Ayat \u2022 Kebun Hafalan", GREEN);
+        sa.setOnClickListener(v -> showSambung());
+        c.addView(sa, lp(dp(58), 18));
 
         // Rekor & Lencana (Soal Guru pindah ke Pengaturan, bukan untuk anak)
         LinearLayout rk = miniCard("\uD83C\uDFC5", "Rekor & Lencana", Color.parseColor("#F9A825"));
@@ -3064,6 +3069,7 @@ public class MainActivity extends Activity {
         advPart = -1;
         alam = false;
         tebak = false;
+        sambung = false;
         startGame(7);
     }
 
@@ -3505,6 +3511,10 @@ public class MainActivity extends Activity {
             buildAlam();
             return;
         }
+        if (sambungOn()) {
+            buildSambung();
+            return;
+        }
         if (tebakOn()) {
             buildTebak();
             return;
@@ -3836,7 +3846,7 @@ public class MainActivity extends Activity {
             return "Tabel " + tableN;
         }
         if (mode == 7) {
-            return alamOn() ? "Kuis Alam" : tebakOn() ? "Tebak Gambar" : "Kuis soal";
+            return alamOn() ? "Kuis Alam" : tebakOn() ? "Tebak Gambar" : sambungOn() ? "Sambung Ayat" : "Kuis soal";
         }
         if (mode == 5) {
             return "3 Bilangan";
@@ -3922,6 +3932,9 @@ public class MainActivity extends Activity {
     }
 
     private void recordAnswer(Q q, boolean ok) {
+        if (ok && sambungOn()) {
+            sambungCatat(q);
+        }
         try {
             int sj = (mode == 7) ? subj : 0;
             bumpStat(stTopic, sj + "|" + kelas + "|" + topicOf(q), ok);
@@ -10369,7 +10382,217 @@ public class MainActivity extends Activity {
         advPart = -1;
         alam = true;
         tebak = false;
+        sambung = false;
         startGame(7);
+    }
+
+    // ---------- Sambung Ayat + Kebun Hafalan (versi 6.29.0), Juz 30 ----------
+    private boolean sambung;
+    private int sambungSurah = -1;
+
+    private boolean sambungOn() {
+        return sambung && mode == 7 && advLevel < 0;
+    }
+
+    private void startSambung(int si) {
+        if (!SambungAyat.load(this)) {
+            Toast.makeText(this, "Data ayat tidak bisa dibuka", Toast.LENGTH_LONG).show();
+            return;
+        }
+        sambungSurah = si;
+        subj = 1;
+        advPart = -1;
+        alam = false;
+        tebak = false;
+        sambung = true;
+        startGame(7);
+    }
+
+    // Soal: ayat sebelumnya -> pilih ayat berikutnya. Ayat ke-1 ditanya lewat nama surahnya.
+    private void buildSambung() {
+        if (!SambungAyat.load(this)) {
+            sambung = false;
+            buildBuiltin();
+            return;
+        }
+        final int ns = SambungAyat.JUMLAH_SURAH;
+        ArrayList<int[]> items = new ArrayList<>();
+        for (int si = 0; si < ns; si++) {
+            if (sambungSurah >= 0 && si != sambungSurah) {
+                continue;
+            }
+            for (int ai = 0; ai < SambungAyat.jumlahAyat(si); ai++) {
+                items.add(new int[]{si, ai});
+            }
+        }
+        Collections.shuffle(items, rnd);
+        total = Math.min(qCount(), items.size());
+        for (int i = 0; i < total; i++) {
+            int si = items.get(i)[0];
+            int ai = items.get(i)[1];
+            String right = SambungAyat.ayat(si, ai);
+            String stem = ai > 0 ? SambungAyat.ayat(si, ai - 1) : "";
+            ArrayList<String> cand = new ArrayList<>();
+            if (ai == 0) {
+                for (int s2 = 0; s2 < ns; s2++) {
+                    if (s2 != si) {
+                        cand.add(SambungAyat.ayat(s2, 0));
+                    }
+                }
+            } else {
+                for (int a2 = 0; a2 < SambungAyat.jumlahAyat(si); a2++) {
+                    if (a2 != ai && a2 != ai - 1) {
+                        cand.add(SambungAyat.ayat(si, a2));
+                    }
+                }
+            }
+            Collections.shuffle(cand, rnd);
+            ArrayList<String> wrong = new ArrayList<>();
+            for (String s : cand) {
+                if (wrong.size() == 3) {
+                    break;
+                }
+                if (!s.equals(right) && !s.equals(stem) && !wrong.contains(s)) {
+                    wrong.add(s);
+                }
+            }
+            // Surah sangat pendek: lengkapi pengecoh dari surah lain
+            int guard = 0;
+            while (wrong.size() < 3 && guard++ < 500) {
+                int s2 = rnd.nextInt(ns);
+                String s = SambungAyat.ayat(s2, rnd.nextInt(SambungAyat.jumlahAyat(s2)));
+                if (!s.equals(right) && !s.equals(stem) && !wrong.contains(s)) {
+                    wrong.add(s);
+                }
+            }
+            ArrayList<String> opts = new ArrayList<>();
+            opts.add(right);
+            opts.addAll(wrong);
+            Collections.shuffle(opts, rnd);
+            Q q = new Q();
+            q.text = ai == 0
+                    ? "Surah " + SambungAyat.NAMA[si] + "\nDimulai dengan ayat…?"
+                    : stem + "\n" + SambungAyat.NAMA[si] + " ayat " + ai + " → ayat berikutnya?";
+            q.full = q.text;
+            q.sopts = new String[4];
+            for (int j = 0; j < 4; j++) {
+                q.sopts[j] = opts.get(j);
+                if (q.sopts[j].equals(right)) {
+                    q.correctIdx = j;
+                }
+            }
+            q.expl = "QS. " + SambungAyat.NAMA[si] + ": " + (ai + 1) + " — " + SambungAyat.terjemah(si, ai);
+            q.key = si + ":" + ai;
+            qs[i] = q;
+        }
+    }
+
+    // Murid menjawab benar: ayat itu naik satu hari latihan (hanya sekali per hari)
+    private void sambungCatat(Q q) {
+        try {
+            int c = q.key == null ? -1 : q.key.indexOf(':');
+            if (c > 0) {
+                SambungAyat.benar(prefs, Integer.parseInt(q.key.substring(0, c)),
+                        Integer.parseInt(q.key.substring(c + 1)));
+            }
+        } catch (Exception e) {
+            // pencatatan tidak boleh mengganggu permainan
+        }
+    }
+
+    private void showSambung() {
+        handler.removeCallbacksAndMessages(null);
+        setScreen(8);
+        nameFields = null;
+        if (!SambungAyat.load(this)) {
+            Toast.makeText(this, "Data ayat tidak bisa dibuka", Toast.LENGTH_LONG).show();
+            showMenu();
+            return;
+        }
+        final int ns = SambungAyat.JUMLAH_SURAH;
+        int tot = 0;
+        int done = 0;
+        for (int si = 0; si < ns; si++) {
+            tot += SambungAyat.jumlahAyat(si);
+            done += SambungAyat.jumlahDikuasai(prefs, si);
+        }
+        LinearLayout c = column();
+        c.addView(text("🌳 Kebun Hafalan", 28, ORANGE_DARK, true), lp(WRAP, 0));
+        c.addView(text("Sambung Ayat Juz 30 • " + done + " dari " + tot + " ayat dikuasai", 15, DARK, true), lp(WRAP, 6));
+        c.addView(text("Ayat dikuasai setelah dijawab benar di " + SambungAyat.BUTUH_HARI
+                + " hari berbeda. Pohon tidak akan mati; kalau lama tidak dilatih, ia hanya haus.", 13, DARK, false), lp(WRAP, 6));
+        Button acak = button("🎲  Acak seluruh Juz 30", PURPLE, 18);
+        flat(acak);
+        c.addView(acak, lp(dp(60), 14));
+        acak.setOnClickListener(v -> startSambung(-1));
+        c.addView(sectionTitleLeaf("Pilih surah (mulai dari yang pendek)"), lp(WRAP, 18));
+
+        int hari = SambungAyat.hariIni();
+        for (int si = ns - 1; si >= 0; si--) {
+            final int fsi = si;
+            int n = SambungAyat.jumlahAyat(si);
+            int m = SambungAyat.jumlahDikuasai(prefs, si);
+            boolean pernah = SambungAyat.pernahLatih(prefs, si);
+            double f = (double) m / n;
+            String emo;
+            String tahap;
+            if (m >= n) {
+                emo = "🌳🍎";
+                tahap = "Berbuah";
+            } else if (f >= 0.67) {
+                emo = "🌳";
+                tahap = "Pohon tinggi";
+            } else if (f >= 0.34) {
+                emo = "🌿";
+                tahap = "Pohon kecil";
+            } else if (pernah) {
+                emo = "🌱";
+                tahap = "Tunas";
+            } else {
+                emo = "🌰";
+                tahap = "Biji";
+            }
+            boolean haus = m < n && pernah && hari - SambungAyat.hariTerakhir(prefs, si) >= SambungAyat.HARI_HAUS;
+
+            LinearLayout row = card();
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.addView(text(emo, 26 + Math.min(14, n / 3), INK, false), new LinearLayout.LayoutParams(dp(70), WRAP));
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            TextView nm = text(SambungAyat.NAMA[si] + " • " + n + " ayat", 17, DARK, true);
+            nm.setGravity(Gravity.START);
+            col.addView(nm, lp(WRAP, 0));
+            LinearLayout bar = new LinearLayout(this);
+            bar.setOrientation(LinearLayout.HORIZONTAL);
+            if (m > 0) {
+                View fill = new View(this);
+                fill.setBackground(box(haus ? Color.parseColor("#A5B87A") : GREEN, 4));
+                bar.addView(fill, new LinearLayout.LayoutParams(0, MATCH, m));
+            }
+            if (n - m > 0) {
+                View rest = new View(this);
+                rest.setBackground(box(Color.parseColor("#D7CCC8"), 4));
+                bar.addView(rest, new LinearLayout.LayoutParams(0, MATCH, n - m));
+            }
+            col.addView(bar, lp(dp(8), 6));
+            TextView st = text(tahap + " • " + m + "/" + n + " ayat dikuasai"
+                    + (haus ? " • 💧 haus, ayo disiram" : ""), 13, DARK, false);
+            st.setGravity(Gravity.START);
+            col.addView(st, lp(WRAP, 6));
+            row.addView(col, new LinearLayout.LayoutParams(0, WRAP, 1f));
+            row.setClickable(true);
+            row.setFocusable(true);
+            pressable(row);
+            row.setOnClickListener(v -> startSambung(fsi));
+            c.addView(row, lp(WRAP, 10));
+        }
+
+        Button back = button("Kembali", GRAY, 14);
+        back.setTextColor(DARK);
+        c.addView(back, lp(dp(46), 18));
+        back.setOnClickListener(v -> showMenu());
+        wrap(c);
     }
 
     // ---------- Tebak Gambar (versi 6.10.0): "Ini gambar apa?", memakai set pasangan bergambar ----------
@@ -10389,6 +10612,7 @@ public class MainActivity extends Activity {
         advPart = -1;
         alam = false;
         tebak = true;
+        sambung = false;
         startGame(7);
     }
 
