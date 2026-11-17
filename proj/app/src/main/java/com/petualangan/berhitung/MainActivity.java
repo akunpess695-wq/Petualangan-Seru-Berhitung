@@ -1973,13 +1973,27 @@ public class MainActivity extends Activity {
         if (saBmp != null) {
             ImageView saImg = new ImageView(this);
             saImg.setImageBitmap(saBmp);
-            saImg.setAdjustViewBounds(true);
-            saImg.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            saImg.setScaleType(ImageView.ScaleType.FIT_XY);
             saImg.setContentDescription("Sambung Ayat");
             saImg.setOnClickListener(v -> showSambung());
-            LinearLayout.LayoutParams saLp = new LinearLayout.LayoutParams(MATCH, WRAP);
-            saLp.topMargin = dp(12);
-            c.addView(saImg, saLp);
+            saImg.setOnTouchListener((v, ev) -> {
+                int a = ev.getActionMasked();
+                if (a == MotionEvent.ACTION_DOWN) {
+                    v.animate().scaleX(0.96f).scaleY(0.96f).setDuration(90).start();
+                } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+                }
+                return false;
+            });
+            // napas pelan agar terasa hidup
+            ObjectAnimator saBreath = ObjectAnimator.ofPropertyValuesHolder(saImg,
+                    android.animation.PropertyValuesHolder.ofFloat(View.ROTATION, -0.7f, 0.7f));
+            saBreath.setDuration(1500);
+            saBreath.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+            saBreath.setRepeatMode(ValueAnimator.REVERSE);
+            saBreath.setRepeatCount(ValueAnimator.INFINITE);
+            loopWhileAttached(saImg, saBreath);
+            c.addView(saImg, lp(dp(96), 18));
         } else {
             LinearLayout sa = miniCard("\uD83C\uDF33", "Sambung Ayat \u2022 Kebun Hafalan", GREEN);
             sa.setOnClickListener(v -> showSambung());
