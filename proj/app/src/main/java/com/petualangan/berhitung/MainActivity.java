@@ -1128,6 +1128,13 @@ public class MainActivity extends Activity {
     }
 
     private GradientDrawable optionBg(int color) {
+        if (plainUi) {
+            GradientDrawable p = new GradientDrawable();
+            p.setColor(color == GREEN ? Color.parseColor("#E8F5E9") : color == RED ? Color.parseColor("#FFEBEE") : Color.WHITE);
+            p.setCornerRadius(dp(20));
+            p.setStroke(dp(2), color == GREEN ? GREEN : color == RED ? RED : Color.parseColor("#CFD8DC"));
+            return p;
+        }
         GradientDrawable g = new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{mixColor(color, Color.WHITE, 0.16f), color, mixColor(color, Color.BLACK, 0.14f)});
@@ -1567,8 +1574,11 @@ public class MainActivity extends Activity {
         }
     }
 
+    // Layar Sambung Ayat: latar putih polos, pilihan putih berbingkai abu-abu
+    private boolean plainUi;
+
     private void wrap(LinearLayout c) {
-        wrapBg(c, background());
+        wrapBg(c, plainUi ? new android.graphics.drawable.ColorDrawable(Color.WHITE) : background());
     }
 
     private void wrapBg(LinearLayout c, Drawable bg) {
@@ -1637,7 +1647,7 @@ public class MainActivity extends Activity {
     }
 
     private String bestKey() {
-        return "best_k" + kelas + (mode == 7 ? "_b" + subj + (alamOn() ? "a" : "") + (tebakOn() ? "g" : "") + (sambungOn() ? (urut ? "ur" : "s") : "") : "") + (timed ? "_t" : "");
+        return "best_k" + kelas + (mode == 7 ? "_b" + subj + (alamOn() ? "a" : "") + (tebakOn() ? "g" : "") + (sambungOn() ? (urut ? "ur" : "s") + (SambungAyat.juz != 30 ? "j" + SambungAyat.juz : "") : "") : "") + (timed ? "_t" : "");
     }
 
     private String timeLabel() {
@@ -1704,6 +1714,7 @@ public class MainActivity extends Activity {
 
     private void showMenu() {
         handler.removeCallbacksAndMessages(null);
+        plainUi = false;
         setScreen(0);
         advLevel = -1;
         nameFields = null;
@@ -8426,6 +8437,7 @@ public class MainActivity extends Activity {
         saveNames();
         nameFields = null;
         mode = m;
+        plainUi = sambungOn();
         if (m != 7) {
             subj = 0;
         }
@@ -9058,6 +9070,9 @@ public class MainActivity extends Activity {
             opts[i].setText(ot);
             opts[i].setTextSize((q.sopts != null ? bankOptionSize(ot.length()) : optionSize(ot.length())) * ui);
             opts[i].setBackground(optionBg(OPT_COLORS[i]));
+            if (plainUi) {
+                opts[i].setTextColor(Color.BLACK);
+            }
             opts[i].setAlpha(1f);
             opts[i].setOnClickListener(v -> choose(idx));
         }
@@ -10585,8 +10600,17 @@ public class MainActivity extends Activity {
         }
     }
 
+    private GradientDrawable plainBox(int fill, int line) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(fill);
+        g.setCornerRadius(dp(16));
+        g.setStroke(dp(2), line);
+        return g;
+    }
+
     private void showSambung() {
         handler.removeCallbacksAndMessages(null);
+        plainUi = true;
         setScreen(8);
         nameFields = null;
         if (!SambungAyat.load(this)) {
@@ -10602,19 +10626,40 @@ public class MainActivity extends Activity {
             done += SambungAyat.jumlahDikuasai(prefs, si);
         }
         LinearLayout c = column();
-        c.addView(text("🌳 Kebun Hafalan", 28, ORANGE_DARK, true), lp(WRAP, 0));
-        c.addView(text("Sambung Ayat Juz 30 • " + done + " dari " + tot + " ayat dikuasai", 15, DARK, true), lp(WRAP, 6));
+        c.addView(text("🌳 Kebun Hafalan", 28, DARK, true), lp(WRAP, 0));
+        LinearLayout jr = new LinearLayout(this);
+        jr.setOrientation(LinearLayout.HORIZONTAL);
+        for (int jj = 30; jj >= 28; jj--) {
+            final int fj = jj;
+            boolean ok = SambungAyat.ada(this, jj);
+            boolean pilih = jj == SambungAyat.juz;
+            Button jb = button("Juz " + jj + (ok ? "" : "\n(segera)"), GRAY, 14);
+            jb.setTextColor(ok ? Color.BLACK : Color.GRAY);
+            jb.setBackground(plainBox(pilih ? Color.parseColor("#E8F5E9") : Color.WHITE, pilih ? GREEN : Color.parseColor("#CFD8DC")));
+            jb.setEnabled(ok);
+            LinearLayout.LayoutParams jlp = new LinearLayout.LayoutParams(0, dp(52), 1f);
+            jlp.setMargins(dp(3), 0, dp(3), 0);
+            jr.addView(jb, jlp);
+            jb.setOnClickListener(v -> {
+                SambungAyat.pilihJuz(fj);
+                showSambung();
+            });
+        }
+        c.addView(jr, lp(WRAP, 10));
+        c.addView(text("Sambung Ayat Juz " + SambungAyat.juz + " • " + done + " dari " + tot + " ayat dikuasai", 15, DARK, true), lp(WRAP, 6));
         c.addView(text("Ayat dikuasai setelah dijawab benar di " + SambungAyat.BUTUH_HARI
                 + " hari berbeda. Pohon tidak akan mati; kalau lama tidak dilatih, ia hanya haus.", 13, DARK, false), lp(WRAP, 6));
-        Button acak = button("🎲  Acak seluruh Juz 30", PURPLE, 18);
-        flat(acak);
+        Button acak = button("🎲  Acak seluruh Juz " + SambungAyat.juz, GRAY, 18);
+        acak.setTextColor(Color.BLACK);
+        acak.setBackground(plainBox(Color.WHITE, Color.parseColor("#CFD8DC")));
         c.addView(acak, lp(dp(60), 14));
         acak.setOnClickListener(v -> startSambung(-1));
-        Button urutBtn = button("🧩  Urut Ayat (urutkan 3 ayat)", GREEN, 18);
-        flat(urutBtn);
+        Button urutBtn = button("🧩  Urut Ayat (urutkan 3 ayat)", GRAY, 18);
+        urutBtn.setTextColor(Color.BLACK);
+        urutBtn.setBackground(plainBox(Color.WHITE, Color.parseColor("#CFD8DC")));
         c.addView(urutBtn, lp(dp(60), 10));
         urutBtn.setOnClickListener(v -> startUrut(-1));
-        c.addView(sectionTitleLeaf("Pilih surah (mulai dari yang pendek)"), lp(WRAP, 18));
+        c.addView(sectionTitleLeaf(SambungAyat.juz == 30 ? "Pilih surah (mulai dari yang pendek)" : "Pilih surah"), lp(WRAP, 18));
 
         int hari = SambungAyat.hariIni();
         for (int si = ns - 1; si >= 0; si--) {

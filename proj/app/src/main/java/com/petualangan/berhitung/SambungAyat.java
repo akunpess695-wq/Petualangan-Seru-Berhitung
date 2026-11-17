@@ -17,13 +17,16 @@ import java.util.TimeZone;
  * Indeks surah 0 = An-Naba' (78) sampai 36 = An-Nas (114).
  */
 final class SambungAyat {
-    static final int JUMLAH_SURAH = 37;
+    /** Juz yang sedang dipilih (30, 29, atau 28). Juz 30 memakai kunci simpanan lama "sa_". */
+    static int juz = 30;
+    static int JUMLAH_SURAH = 37;
+    private static int pertama = 78;
     /** Satu ayat dianggap "dikuasai" bila dijawab benar di sekian hari yang berbeda. */
     static final int BUTUH_HARI = 3;
     /** Pohon "haus" bila sudah sekian hari tidak disiram (dilatih). */
     static final int HARI_HAUS = 7;
 
-    static final String[] NAMA = {
+    private static final String[] NAMA30 = {
             "An-Naba'", "An-Nazi'at", "'Abasa", "At-Takwir", "Al-Infithar", "Al-Muthaffifin",
             "Al-Insyiqaq", "Al-Buruj", "Ath-Thariq", "Al-A'la", "Al-Ghasyiyah", "Al-Fajr",
             "Al-Balad", "Asy-Syams", "Al-Lail", "Adh-Dhuha", "Al-Insyirah", "At-Tin",
@@ -31,6 +34,35 @@ final class SambungAyat {
             "At-Takatsur", "Al-'Ashr", "Al-Humazah", "Al-Fil", "Quraisy", "Al-Ma'un",
             "Al-Kautsar", "Al-Kafirun", "An-Nashr", "Al-Lahab", "Al-Ikhlas", "Al-Falaq", "An-Nas"
     };
+    private static final String[] NAMA29 = {
+            "Al-Mulk", "Al-Qalam", "Al-Haqqah", "Al-Ma'arij", "Nuh", "Al-Jinn",
+            "Al-Muzzammil", "Al-Muddatsir", "Al-Qiyamah", "Al-Insan", "Al-Mursalat"
+    };
+    private static final String[] NAMA28 = {
+            "Al-Mujadilah", "Al-Hasyr", "Al-Mumtahanah", "Ash-Shaff", "Al-Jumu'ah",
+            "Al-Munafiqun", "At-Taghabun", "Ath-Thalaq", "At-Tahrim"
+    };
+    static String[] NAMA = NAMA30;
+
+    /** Ganti juz aktif; data dimuat ulang saat load() berikutnya. */
+    static synchronized void pilihJuz(int j) {
+        juz = j == 29 ? 29 : j == 28 ? 28 : 30;
+        NAMA = juz == 29 ? NAMA29 : juz == 28 ? NAMA28 : NAMA30;
+        JUMLAH_SURAH = NAMA.length;
+        pertama = juz == 29 ? 67 : juz == 28 ? 58 : 78;
+        ayat = null;
+        terjemah = null;
+    }
+
+    /** Berkas data juz ada di assets/quran/juz<N>.json? */
+    static boolean ada(Context ctx, int j) {
+        try {
+            ctx.getAssets().open("quran/juz" + j + ".json").close();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     private static String[][] ayat;
     private static String[][] terjemah;
@@ -43,7 +75,7 @@ final class SambungAyat {
             return true;
         }
         try {
-            InputStream in = ctx.getAssets().open("quran/juz30.json");
+            InputStream in = ctx.getAssets().open("quran/juz" + juz + ".json");
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
             int n;
@@ -81,7 +113,7 @@ final class SambungAyat {
     }
 
     static int nomorSurah(int si) {
-        return 78 + si;
+        return pertama + si;
     }
 
     /** Teks ayat untuk ditampilkan. Tanda penanda ruku' (U+08D6) dibuang karena tidak ada di semua font HP. */
@@ -101,7 +133,7 @@ final class SambungAyat {
     }
 
     private static String key(int si, int ai) {
-        return "sa_" + si + "_" + ai;
+        return (juz == 30 ? "sa_" : "sa" + juz + "_") + si + "_" + ai;
     }
 
     /** {jumlah hari benar, hari terakhir} */
