@@ -10790,9 +10790,11 @@ public class MainActivity extends Activity {
             float z = s * k;
             float cy = by - z * 0.6f;
             if (stage == 3) {
-                p.setShader(new android.graphics.RadialGradient(cx, cy, z * 0.62f,
-                        Color.argb(95, 246, 200, 75), Color.argb(0, 246, 200, 75), Shader.TileMode.CLAMP));
-                c.drawCircle(cx, cy, z * 0.62f, p);
+                float pulse = (float) (0.5 + 0.5 * Math.sin(tw));
+                float gr = z * (0.7f + 0.08f * pulse);
+                p.setShader(new android.graphics.RadialGradient(cx, cy, gr,
+                        Color.argb((int) (120 + 60 * pulse), 255, 214, 90), Color.argb(0, 255, 214, 90), Shader.TileMode.CLAMP));
+                c.drawCircle(cx, cy, gr, p);
                 p.setShader(null);
             }
             p.setColor(Color.parseColor("#A96C3D"));
@@ -10853,7 +10855,8 @@ public class MainActivity extends Activity {
         protected void onDraw(Canvas c) {
             float w = getWidth();
             float h = getHeight();
-            drawPlant(c, p, w / 2f, h * 0.9f, Math.min(w, h) * 1.05f, stage, 0f, 0f, false);
+            float sz = Math.min(w, h) * (stage == 0 ? 1.7f : 0.82f);
+            drawPlant(c, p, w / 2f, h * (stage == 0 ? 0.78f : 0.94f), sz, stage, 0f, 0f, false);
         }
     }
 
@@ -10898,8 +10901,8 @@ public class MainActivity extends Activity {
             p.setStrokeCap(Paint.Cap.ROUND);
             p.setStrokeWidth(w * 0.025f);
             p.setColor(Color.parseColor("#F6C84B"));
-            float sx = cx + bw * 0.55f;
-            float sy = top - h * 0.02f;
+            float sx = cx + bw * 0.42f;
+            float sy = top + h * 0.02f;
             float r = w * 0.08f;
             c.drawLine(sx - r, sy, sx + r, sy, p);
             c.drawLine(sx, sy - r, sx, sy + r, p);
@@ -11158,6 +11161,36 @@ public class MainActivity extends Activity {
             rf.set(sl, st, sr, st + d * 8);
             c.drawRoundRect(rf, d * 8, d * 8, p);
 
+            // rumput di tepi atas tanah
+            p.setColor(Color.parseColor("#68B84B"));
+            for (int i = 0; i < 14; i++) {
+                float gx = sl + (sr - sl) * ((i * 29 % 100) / 100f);
+                float gh = d * (6 + (i % 3) * 2);
+                path.reset();
+                path.moveTo(gx - d * 3, st + d * 2);
+                path.lineTo(gx, st - gh + d * 4);
+                path.lineTo(gx + d * 3, st + d * 2);
+                path.close();
+                c.drawPath(path, p);
+            }
+            // batu kecil
+            p.setColor(Color.parseColor("#B8B2A6"));
+            c.drawOval(new RectF(sr - d * 34, sb - d * 20, sr - d * 16, sb - d * 10), p);
+            p.setColor(Color.parseColor("#9C968A"));
+            c.drawOval(new RectF(sr - d * 26, sb - d * 24, sr - d * 12, sb - d * 14), p);
+            c.drawOval(new RectF(sl + d * 14, sb - d * 18, sl + d * 28, sb - d * 10), p);
+            // kupu-kupu terbang pelan
+            for (int k = 0; k < 2; k++) {
+                float bx = w * (0.3f + 0.4f * k) + (float) Math.sin(tm + k * 2.4f) * d * 36;
+                float by2 = st + ih * (0.25f + 0.25f * k) + (float) Math.cos(tm * 2 + k) * d * 10;
+                float flap = (float) (0.35 + 0.65 * Math.abs(Math.sin(tm * 9 + k)));
+                p.setColor(k == 0 ? Color.parseColor("#FFB74D") : Color.parseColor("#F48FB1"));
+                c.drawOval(new RectF(bx - d * 7 * flap, by2 - d * 5, bx, by2 + d * 2), p);
+                c.drawOval(new RectF(bx, by2 - d * 5, bx + d * 7 * flap, by2 + d * 2), p);
+                p.setColor(Color.parseColor("#5A3416"));
+                c.drawRect(bx - d * 0.8f, by2 - d * 4, bx + d * 0.8f, by2 + d * 3, p);
+            }
+
             // tanaman
             int n = si.length;
             float ix = sl + d * 8;
@@ -11179,7 +11212,8 @@ public class MainActivity extends Activity {
             }
             int cols = (int) Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n * iw / ih))));
             int rows = (int) Math.ceil(n / (double) cols);
-            float cell = Math.min(Math.min(iw / cols, ih / rows), d * 84);
+            float cap = n <= 3 ? d * 150 : (n <= 8 ? d * 110 : d * 84);
+            float cell = Math.min(Math.min(iw / cols, ih / rows), cap);
             float gx0 = ix + (iw - cell * cols) / 2f;
             float gy0 = iy + (ih - cell * rows) / 2f;
             hr = cell / 2f;
@@ -11471,7 +11505,7 @@ public class MainActivity extends Activity {
         LinearLayout sh = new LinearLayout(this);
         sh.setOrientation(LinearLayout.HORIZONTAL);
         sh.setGravity(Gravity.CENTER_VERTICAL);
-        sh.addView(new SeedIcon(this, 0), new LinearLayout.LayoutParams(dp(24), dp(24)));
+        sh.addView(new SeedIcon(this, 1), new LinearLayout.LayoutParams(dp(28), dp(28)));
         TextView shT = text("Pilihan Benih Lainnya", 14, cDark, true);
         shT.setPadding(dp(6), 0, dp(8), 0);
         sh.addView(shT, new LinearLayout.LayoutParams(WRAP, WRAP));
@@ -11495,8 +11529,8 @@ public class MainActivity extends Activity {
             LinearLayout in = new LinearLayout(this);
             in.setOrientation(LinearLayout.VERTICAL);
             in.setGravity(Gravity.CENTER_HORIZONTAL);
-            in.setPadding(dp(6), dp(10), dp(6), dp(8));
-            in.addView(new SeedIcon(this, tahapAll[s2] == 0 ? 0 : tahapAll[s2]), new LinearLayout.LayoutParams(dp(44), dp(44)));
+            in.setPadding(dp(6), dp(8), dp(6), dp(8));
+            in.addView(new SeedIcon(this, tahapAll[s2]), new LinearLayout.LayoutParams(dp(54), dp(54)));
             TextView nm = text(SambungAyat.NAMA[s2], 12, cDark, true);
             nm.setSingleLine(true);
             nm.setEllipsize(TextUtils.TruncateAt.END);
@@ -11519,7 +11553,7 @@ public class MainActivity extends Activity {
                 kebunScrollX = hsv.getScrollX();
                 kebunPilih(fs);
             });
-            LinearLayout.LayoutParams fcp = new LinearLayout.LayoutParams(dp(84), dp(106));
+            LinearLayout.LayoutParams fcp = new LinearLayout.LayoutParams(dp(88), dp(116));
             fcp.rightMargin = dp(8);
             seedRow.addView(fc, fcp);
         }
