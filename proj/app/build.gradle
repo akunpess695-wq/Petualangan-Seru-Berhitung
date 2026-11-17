@@ -12,7 +12,7 @@ android {
         targetSdk 34
         versionCode Integer.parseInt(System.getenv('VERSION_CODE') ?: '6280')
         // Samakan dengan APP_VERSION di MainActivity.java.
-        versionName "6.28.0"
+        versionName "6.29.0"
     }
 
     signingConfigs {
