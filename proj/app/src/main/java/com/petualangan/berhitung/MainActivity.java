@@ -1652,6 +1652,8 @@ public class MainActivity extends Activity {
         wrapBg(c, plainUi ? new android.graphics.drawable.ColorDrawable(Color.WHITE) : background());
     }
 
+    private boolean noWrapAnim = false;
+
     private void wrapBg(LinearLayout c, Drawable bg) {
         syncNaga(!nagaHide);
         nagaHide = false;
@@ -1667,6 +1669,10 @@ public class MainActivity extends Activity {
             sv.addView(c);
         }
         setContentView(sv);
+        if (noWrapAnim) {
+            noWrapAnim = false;
+            return;
+        }
         sv.setAlpha(0f);
         sv.setTranslationY(dp(12));
         sv.animate().alpha(1f).translationY(0f).setDuration(200)
@@ -10927,6 +10933,7 @@ public class MainActivity extends Activity {
         private float ry = -1f;
         private int hausN = 0;
         private long tapMs = 0L;
+        private long lastInv = 0L;
         private float grow = 0f;
         private float tm = 0f;
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -10975,9 +10982,29 @@ public class MainActivity extends Activity {
             tA.setInterpolator(new android.view.animation.LinearInterpolator());
             tA.addUpdateListener(a -> {
                 tm = (float) a.getAnimatedValue();
-                invalidate();
+                long nw = android.os.SystemClock.uptimeMillis();
+                if (nw - lastInv >= 33L) {
+                    lastInv = nw;
+                    invalidate();
+                }
             });
             tA.start();
+        }
+
+        @Override
+        protected void onWindowVisibilityChanged(int visibility) {
+            super.onWindowVisibilityChanged(visibility);
+            try {
+                if (tA != null) {
+                    if (visibility == View.VISIBLE) {
+                        tA.resume();
+                    } else {
+                        tA.pause();
+                    }
+                }
+            } catch (Exception e) {
+                android.util.Log.w("Kebun", "jeda animasi gagal", e);
+            }
         }
 
         @Override
@@ -11190,9 +11217,9 @@ public class MainActivity extends Activity {
             c.drawOval(new RectF(sl + d * 14, sb - d * 18, sl + d * 28, sb - d * 10), p);
             // kupu-kupu terbang pelan
             for (int k = 0; k < 2; k++) {
-                float bx = w * (0.3f + 0.4f * k) + (float) Math.sin(tm + k * 2.4f) * d * 36;
-                float by2 = st + (sb - st) * (0.25f + 0.25f * k) + (float) Math.cos(tm * 2 + k) * d * 10;
-                float flap = (float) (0.35 + 0.65 * Math.abs(Math.sin(tm * 9 + k)));
+                float bx = w * (0.3f + 0.4f * k) + (float) Math.sin(tm * 0.5f + k * 2.4f) * d * 40;
+                float by2 = st + (sb - st) * (0.25f + 0.25f * k) + (float) Math.cos(tm * 0.9f + k) * d * 12;
+                float flap = (float) (0.35 + 0.65 * Math.abs(Math.sin(tm * 5 + k)));
                 p.setColor(k == 0 ? Color.parseColor("#FFB74D") : Color.parseColor("#F48FB1"));
                 c.drawOval(new RectF(bx - d * 7 * flap, by2 - d * 5, bx, by2 + d * 2), p);
                 c.drawOval(new RectF(bx, by2 - d * 5, bx + d * 7 * flap, by2 + d * 2), p);
@@ -11277,6 +11304,7 @@ public class MainActivity extends Activity {
         /** Kelinci penjaga kebun: melompat riang; lesu dan minta disiram bila ada tanaman haus. */
         private void pet(Canvas c, float sl, float sr, float sb) {
             float sz = d * 40;
+            long now = android.os.SystemClock.uptimeMillis();
             boolean sleepy = hausN > 0;
             float cx0 = (sl + sr) / 2f;
             float x;
@@ -11286,12 +11314,19 @@ public class MainActivity extends Activity {
                 x = sr - d * 52;
                 dir = -1;
             } else {
-                float ph = tm * 0.9f;
-                x = cx0 + (float) Math.sin(ph) * (sr - sl) * 0.3f;
-                dir = Math.cos(ph) >= 0 ? 1 : -1;
-                lift = Math.max(0f, (float) Math.sin(tm * 7)) * d * 7;
+                // lompat satu kali (0,5 dtk), lalu diam sebentar; tiap siklus 1,8 dtk
+                float t = now / 1000f;
+                float per = 1.8f;
+                int kk = (int) (t / per);
+                float f = t / per - kk;
+                float amp = (sr - sl) * 0.3f;
+                float x0 = cx0 + amp * (float) Math.sin(kk * 0.45);
+                float x1 = cx0 + amp * (float) Math.sin((kk + 1) * 0.45);
+                float u = Math.min(1f, f / 0.3f);
+                x = x0 + (x1 - x0) * (u * u * (3f - 2f * u));
+                dir = x1 >= x0 ? 1 : -1;
+                lift = (float) Math.sin(u * Math.PI) * d * 9;
             }
-            long now = android.os.SystemClock.uptimeMillis();
             float tp = Math.max(0f, 1f - (now - tapMs) / 650f);
             if (tp > 0f) {
                 lift += (float) Math.sin(tp * Math.PI) * d * 24;
@@ -11681,6 +11716,7 @@ public class MainActivity extends Activity {
         });
 
         root.addView(body, new LinearLayout.LayoutParams(MATCH, WRAP));
+        noWrapAnim = !animate;
         wrap(root);
     }
 

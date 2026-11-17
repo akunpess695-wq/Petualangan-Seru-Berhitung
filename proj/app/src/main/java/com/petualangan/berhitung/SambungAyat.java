@@ -113,8 +113,9 @@ final class SambungAyat {
         if (ayat != null) {
             return true;
         }
+        InputStream in = null;
         try {
-            InputStream in = ctx.getAssets().open("quran/juz" + juz + ".json");
+            in = ctx.getAssets().open("quran/juz" + juz + ".json");
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
             int n;
@@ -143,7 +144,16 @@ final class SambungAyat {
             terjemah = t;
             return true;
         } catch (Exception e) {
+            android.util.Log.w("SambungAyat", "load gagal juz " + juz, e);
             return false;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (Exception ignored) {
+                    // abaikan
+                }
+            }
         }
     }
 
