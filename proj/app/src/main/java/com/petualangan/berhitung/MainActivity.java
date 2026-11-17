@@ -10587,13 +10587,14 @@ public class MainActivity extends Activity {
         }
     }
 
-    // Murid menjawab benar: ayat itu naik satu hari latihan (hanya sekali per hari)
+    // Murid menjawab benar: ayat itu naik satu hari latihan (hanya sekali per hari) + bonus Embun
     private void sambungCatat(Q q) {
         try {
             int c = q.key == null ? -1 : q.key.indexOf(':');
             if (c > 0) {
                 SambungAyat.benar(prefs, Integer.parseInt(q.key.substring(0, c)),
                         Integer.parseInt(q.key.substring(c + 1)));
+                SambungAyat.tambahEmbun(prefs, 1);
             }
         } catch (Exception e) {
             // pencatatan tidak boleh mengganggu permainan
@@ -10608,6 +10609,20 @@ public class MainActivity extends Activity {
         return g;
     }
 
+    private int kebunSelectedSi = -1;
+
+    private GradientDrawable gardenPlotBg(boolean selected, boolean mutqin) {
+        GradientDrawable g = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                mutqin
+                        ? new int[]{Color.parseColor("#FEF9C3"), Color.parseColor("#DCFCE7"), Color.parseColor("#8D5524")}
+                        : new int[]{Color.parseColor("#E8F5E9"), Color.parseColor("#D7ECD9"), Color.parseColor("#8D5524")}
+        );
+        g.setCornerRadius(dp(18));
+        g.setStroke(dp(selected ? 3 : 2), selected ? Color.parseColor("#F59E0B") : Color.parseColor("#C8E6C9"));
+        return g;
+    }
+
     private void showSambung() {
         handler.removeCallbacksAndMessages(null);
         plainUi = true;
@@ -10619,114 +10634,375 @@ public class MainActivity extends Activity {
             return;
         }
         final int ns = SambungAyat.JUMLAH_SURAH;
-        int tot = 0;
-        int done = 0;
-        for (int si = 0; si < ns; si++) {
-            tot += SambungAyat.jumlahAyat(si);
-            done += SambungAyat.jumlahDikuasai(prefs, si);
+        if (kebunSelectedSi < 0 || kebunSelectedSi >= ns) {
+            kebunSelectedSi = ns - 1;
         }
-        LinearLayout c = column();
-        c.addView(text("🌳 Kebun Hafalan", 28, DARK, true), lp(WRAP, 0));
-        LinearLayout jr = new LinearLayout(this);
-        jr.setOrientation(LinearLayout.HORIZONTAL);
+
+        int totAyat = 0;
+        int doneAyat = 0;
+        int cntMutqin = 0;
+        int cntTumbuh = 0;
+        int cntBibit = 0;
+        int sumSegar = 0;
+        for (int si = 0; si < ns; si++) {
+            totAyat += SambungAyat.jumlahAyat(si);
+            doneAyat += SambungAyat.jumlahDikuasai(prefs, si);
+            int tahap = SambungAyat.tahapTanaman(prefs, si);
+            if (tahap == 3) cntMutqin++;
+            else if (tahap >= 1) cntTumbuh++;
+            else cntBibit++;
+            sumSegar += SambungAyat.kesegaran(prefs, si);
+        }
+        final int avgSegar = ns > 0 ? Math.round((float) sumSegar / ns) : 0;
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.parseColor("#FFFDF7"));
+        root.setPadding(0, 0, 0, dp(24));
+
+        // 1. HEADER ZAMRUD SALAMUDA QUEST
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable hdrBg = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.parseColor("#047857"), Color.parseColor("#059669"), Color.parseColor("#0D9488")}
+        );
+        hdrBg.setCornerRadii(new float[]{0, 0, 0, 0, dp(28), dp(28), dp(28), dp(28)});
+        header.setBackground(hdrBg);
+        header.setPadding(dp(18), dp(20), dp(18), dp(22));
+        header.setElevation(dp(6));
+
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView avaBadge = text(avatarStr(0), 24, INK, false);
+        avaBadge.setBackground(plainBox(Color.parseColor("#FEF3C7"), Color.parseColor("#FCD34D")));
+        avaBadge.setPadding(dp(8), dp(6), dp(8), dp(6));
+        topRow.addView(avaBadge, new LinearLayout.LayoutParams(WRAP, WRAP));
+
+        LinearLayout infoCol = new LinearLayout(this);
+        infoCol.setOrientation(LinearLayout.VERTICAL);
+        infoCol.setPadding(dp(10), 0, dp(8), 0);
+        TextView kelasBadge = text(KELAS_NAMES[kelas].toUpperCase(Locale.ROOT) + " • SALAMUDA QUEST", 10, Color.parseColor("#FDE68A"), true);
+        kelasBadge.setGravity(Gravity.START);
+        infoCol.addView(kelasBadge, lp(WRAP, 0));
+        TextView namaSiswa = text(names[0], 17, Color.WHITE, true);
+        namaSiswa.setGravity(Gravity.START);
+        infoCol.addView(namaSiswa, lp(WRAP, 2));
+        TextView sekolahTxt = text("SD Alam Muhammadiyah Kandangan", 11, Color.parseColor("#D1FAE5"), false);
+        sekolahTxt.setGravity(Gravity.START);
+        infoCol.addView(sekolahTxt, lp(WRAP, 1));
+        topRow.addView(infoCol, new LinearLayout.LayoutParams(0, WRAP, 1f));
+
+        LinearLayout statCol = new LinearLayout(this);
+        statCol.setOrientation(LinearLayout.VERTICAL);
+        statCol.setGravity(Gravity.END);
+        TextView starPill = text("⭐ " + totalStars(), 13, Color.parseColor("#064E3B"), true);
+        starPill.setBackground(pillBg(Color.parseColor("#FBBF24")));
+        starPill.setPadding(dp(12), dp(4), dp(12), dp(4));
+        statCol.addView(starPill, lp(WRAP, 0));
+
+        TextView embunPill = text("💧 " + SambungAyat.embun(prefs) + " Embun", 11, Color.WHITE, true);
+        embunPill.setBackground(pillBg(Color.parseColor("#065F46")));
+        embunPill.setPadding(dp(10), dp(4), dp(10), dp(4));
+        statCol.addView(embunPill, lp(WRAP, 5));
+        topRow.addView(statCol, new LinearLayout.LayoutParams(WRAP, WRAP));
+        header.addView(topRow, lp(WRAP, 0));
+
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout titleCol = new LinearLayout(this);
+        titleCol.setOrientation(LinearLayout.VERTICAL);
+        TextView judulKebun = text("🌿 Kebun Hafalan", 20, Color.WHITE, true);
+        judulKebun.setGravity(Gravity.START);
+        titleCol.addView(judulKebun, lp(WRAP, 0));
+        TextView subKebun = text("Rawat hafalanmu agar tumbuh berbuah emas!", 11, Color.parseColor("#D1FAE5"), false);
+        subKebun.setGravity(Gravity.START);
+        titleCol.addView(subKebun, lp(WRAP, 2));
+        titleRow.addView(titleCol, new LinearLayout.LayoutParams(0, WRAP, 1f));
+
+        LinearLayout juzTabs = new LinearLayout(this);
+        juzTabs.setOrientation(LinearLayout.HORIZONTAL);
         for (int jj = 30; jj >= 28; jj--) {
             final int fj = jj;
             boolean ok = SambungAyat.ada(this, jj);
             boolean pilih = jj == SambungAyat.juz;
-            Button jb = button("Juz " + jj + (ok ? "" : "\n(segera)"), GRAY, 14);
-            jb.setTextColor(ok ? Color.BLACK : Color.GRAY);
-            jb.setBackground(plainBox(pilih ? Color.parseColor("#E8F5E9") : Color.WHITE, pilih ? GREEN : Color.parseColor("#CFD8DC")));
+            Button jb = button("Juz " + jj, GRAY, 12);
+            jb.setTextColor(pilih ? Color.parseColor("#065F46") : (ok ? Color.WHITE : Color.parseColor("#6EE7B7")));
+            jb.setBackground(plainBox(pilih ? Color.WHITE : Color.parseColor("#065F46"),
+                    pilih ? Color.parseColor("#FBBF24") : Color.parseColor("#047857")));
             jb.setEnabled(ok);
-            LinearLayout.LayoutParams jlp = new LinearLayout.LayoutParams(0, dp(52), 1f);
-            jlp.setMargins(dp(3), 0, dp(3), 0);
-            jr.addView(jb, jlp);
+            flat(jb);
+            jb.setPadding(dp(10), dp(6), dp(10), dp(6));
+            LinearLayout.LayoutParams jlp = new LinearLayout.LayoutParams(WRAP, WRAP);
+            jlp.leftMargin = dp(4);
+            juzTabs.addView(jb, jlp);
             jb.setOnClickListener(v -> {
                 SambungAyat.pilihJuz(fj);
+                kebunSelectedSi = -1;
                 showSambung();
             });
         }
-        c.addView(jr, lp(WRAP, 10));
-        c.addView(text("Sambung Ayat Juz " + SambungAyat.juz + " • " + done + " dari " + tot + " ayat dikuasai", 15, DARK, true), lp(WRAP, 6));
-        c.addView(text("Ayat dikuasai setelah dijawab benar di " + SambungAyat.BUTUH_HARI
-                + " hari berbeda. Pohon tidak akan mati; kalau lama tidak dilatih, ia hanya haus.", 13, DARK, false), lp(WRAP, 6));
-        Button acak = button("🎲  Acak seluruh Juz " + SambungAyat.juz, GRAY, 18);
-        acak.setTextColor(Color.BLACK);
-        acak.setBackground(plainBox(Color.WHITE, Color.parseColor("#CFD8DC")));
-        c.addView(acak, lp(dp(60), 14));
-        acak.setOnClickListener(v -> startSambung(-1));
-        Button urutBtn = button("🧩  Urut Ayat (urutkan 3 ayat)", GRAY, 18);
-        urutBtn.setTextColor(Color.BLACK);
-        urutBtn.setBackground(plainBox(Color.WHITE, Color.parseColor("#CFD8DC")));
-        c.addView(urutBtn, lp(dp(60), 10));
-        urutBtn.setOnClickListener(v -> startUrut(-1));
-        c.addView(sectionTitleLeaf(SambungAyat.juz == 30 ? "Pilih surah (mulai dari yang pendek)" : "Pilih surah"), lp(WRAP, 18));
+        titleRow.addView(juzTabs, new LinearLayout.LayoutParams(WRAP, WRAP));
+        header.addView(titleRow, lp(WRAP, 14));
+        root.addView(header, lp(WRAP, 0));
 
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(16), dp(14), dp(16), dp(16));
+
+        // 2. KARTU RINGKASAN PROGRES KEBUN
+        LinearLayout sumCard = new LinearLayout(this);
+        sumCard.setOrientation(LinearLayout.VERTICAL);
+        sumCard.setBackground(plainBox(Color.WHITE, Color.parseColor("#D1FAE5")));
+        sumCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+        sumCard.setElevation(dp(3));
+
+        LinearLayout sumTop = new LinearLayout(this);
+        sumTop.setOrientation(LinearLayout.HORIZONTAL);
+        sumTop.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout sumLeft = new LinearLayout(this);
+        sumLeft.setOrientation(LinearLayout.VERTICAL);
+        TextView sumTitle = text("🌳 Kebun Juz " + SambungAyat.juz + " (" + ns + " Surah)", 14, INK, true);
+        sumTitle.setGravity(Gravity.START);
+        sumLeft.addView(sumTitle, lp(WRAP, 0));
+        TextView sumSub = text(cntMutqin + " Pohon Emas • " + cntTumbuh + " Tumbuh • " + cntBibit + " Bibit (" + doneAyat + "/" + totAyat + " ayat)", 11, INK_SOFT, false);
+        sumSub.setGravity(Gravity.START);
+        sumLeft.addView(sumSub, lp(WRAP, 2));
+        sumTop.addView(sumLeft, new LinearLayout.LayoutParams(0, WRAP, 1f));
+
+        TextView pctBadge = text(avgSegar + "%", 14, Color.parseColor("#047857"), true);
+        pctBadge.setBackground(plainBox(Color.parseColor("#ECFDF5"), Color.parseColor("#A7F3D0")));
+        pctBadge.setPadding(dp(10), dp(4), dp(10), dp(4));
+        sumTop.addView(pctBadge, new LinearLayout.LayoutParams(WRAP, WRAP));
+        sumCard.addView(sumTop, lp(WRAP, 0));
+
+        LinearLayout progTrack = new LinearLayout(this);
+        progTrack.setOrientation(LinearLayout.HORIZONTAL);
+        progTrack.setBackground(box(Color.parseColor("#D1FAE5"), 6));
+        if (avgSegar > 0) {
+            View pFill = new View(this);
+            pFill.setBackground(box(Color.parseColor("#10B981"), 6));
+            progTrack.addView(pFill, new LinearLayout.LayoutParams(0, MATCH, avgSegar));
+        }
+        if (100 - avgSegar > 0) {
+            View pRest = new View(this);
+            progTrack.addView(pRest, new LinearLayout.LayoutParams(0, MATCH, 100 - avgSegar));
+        }
+        sumCard.addView(progTrack, lp(dp(10), 10));
+
+        TextView legendTxt = text("🌰 Bibit   •   🌱 Tunas   •   🌳 Pohon   •   🌳🍎 Mutqin (Emas)", 11, INK_SOFT, false);
+        legendTxt.setGravity(Gravity.CENTER);
+        sumCard.addView(legendTxt, lp(WRAP, 8));
+        body.addView(sumCard, lp(WRAP, 0));
+
+        // 3. KARTU DETAIL SURAH TERPILIH
+        final int selSi = kebunSelectedSi;
+        int selN = SambungAyat.jumlahAyat(selSi);
+        int selM = SambungAyat.jumlahDikuasai(prefs, selSi);
+        int selTahap = SambungAyat.tahapTanaman(prefs, selSi);
+        int selSegar = SambungAyat.kesegaran(prefs, selSi);
         int hari = SambungAyat.hariIni();
+        boolean selHaus = selM < selN && SambungAyat.pernahLatih(prefs, selSi)
+                && hari - SambungAyat.hariTerakhir(prefs, selSi) >= SambungAyat.HARI_HAUS;
+
+        String[] tahapLabel = {"🌰 Bibit Baru", "🌱 Tunas Tumbuh", "🌳 Pohon Muda", "✨ Pohon Emas Mutqin"};
+        String[] tahapEmo = {"🌰", "🌱", "🌳", "🌳🍎"};
+
+        LinearLayout detailCard = new LinearLayout(this);
+        detailCard.setOrientation(LinearLayout.VERTICAL);
+        detailCard.setBackground(plainBox(Color.WHITE, Color.parseColor("#6EE7B7")));
+        detailCard.setPadding(dp(15), dp(14), dp(15), dp(14));
+        detailCard.setElevation(dp(5));
+
+        LinearLayout detHead = new LinearLayout(this);
+        detHead.setOrientation(LinearLayout.HORIZONTAL);
+        detHead.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout detLeft = new LinearLayout(this);
+        detLeft.setOrientation(LinearLayout.VERTICAL);
+        TextView detStage = text(tahapLabel[selTahap] + "  •  " + selN + " Ayat", 11,
+                selTahap == 3 ? Color.parseColor("#92400E") : Color.parseColor("#065F46"), true);
+        detStage.setGravity(Gravity.START);
+        detLeft.addView(detStage, lp(WRAP, 0));
+
+        TextView detName = text("Surah " + SambungAyat.NAMA[selSi], 19, INK, true);
+        detName.setGravity(Gravity.START);
+        detLeft.addView(detName, lp(WRAP, 2));
+
+        TextView detMeaning = text("\"" + SambungAyat.ARTI[selSi] + "\" • QS. ke-" + SambungAyat.nomorSurah(selSi), 12, INK_SOFT, false);
+        detMeaning.setGravity(Gravity.START);
+        detLeft.addView(detMeaning, lp(WRAP, 1));
+        detHead.addView(detLeft, new LinearLayout.LayoutParams(0, WRAP, 1f));
+
+        TextView detArab = text(SambungAyat.ARAB[selSi], 26, Color.parseColor("#065F46"), true);
+        detHead.addView(detArab, new LinearLayout.LayoutParams(WRAP, WRAP));
+        detailCard.addView(detHead, lp(WRAP, 0));
+
+        LinearLayout stageBox = new LinearLayout(this);
+        stageBox.setOrientation(LinearLayout.HORIZONTAL);
+        stageBox.setGravity(Gravity.CENTER_VERTICAL);
+        stageBox.setBackground(plainBox(Color.parseColor("#F0FDF4"), Color.parseColor("#BBF7D0")));
+        stageBox.setPadding(dp(12), dp(10), dp(12), dp(10));
+
+        TextView bigPlant = text(tahapEmo[selTahap], 36, INK, false);
+        stageBox.addView(bigPlant, new LinearLayout.LayoutParams(dp(64), WRAP));
+
+        LinearLayout freshCol = new LinearLayout(this);
+        freshCol.setOrientation(LinearLayout.VERTICAL);
+        TextView freshLbl = text("Kesegaran Hafalan: " + selSegar + "%  (" + selM + "/" + selN + " ayat mutqin)", 12, INK, true);
+        freshLbl.setGravity(Gravity.START);
+        freshCol.addView(freshLbl, lp(WRAP, 0));
+
+        LinearLayout fTrack = new LinearLayout(this);
+        fTrack.setOrientation(LinearLayout.HORIZONTAL);
+        fTrack.setBackground(box(Color.WHITE, 5));
+        if (selSegar > 0) {
+            View fFill = new View(this);
+            fFill.setBackground(box(selTahap == 3 ? Color.parseColor("#F59E0B") : Color.parseColor("#10B981"), 5));
+            fTrack.addView(fFill, new LinearLayout.LayoutParams(0, MATCH, selSegar));
+        }
+        if (100 - selSegar > 0) {
+            fTrack.addView(new View(this), new LinearLayout.LayoutParams(0, MATCH, 100 - selSegar));
+        }
+        freshCol.addView(fTrack, lp(dp(8), 6));
+
+        TextView coachTip = text(selHaus
+                ? "💧 Tanaman ini haus! Siram dengan Embun atau muraja'ah sekarang."
+                : (selTahap == 3 ? "MasyaAllah! Hafalan sudah kokoh berbuah emas mutqin."
+                : "Ketuk Sambung Ayat untuk melatih surah ini dan panen bintang!"), 11, INK_SOFT, false);
+        coachTip.setGravity(Gravity.START);
+        freshCol.addView(coachTip, lp(WRAP, 6));
+        stageBox.addView(freshCol, new LinearLayout.LayoutParams(0, WRAP, 1f));
+        detailCard.addView(stageBox, lp(WRAP, 10));
+
+        LinearLayout actRow = new LinearLayout(this);
+        actRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button btnSiram = button("💧 Siram Hafalan", Color.parseColor("#0EA5E9"), 14);
+        btnSiram.setOnClickListener(v -> {
+            if (SambungAyat.siramSurah(prefs, selSi)) {
+                sfx(SFX_CORRECT);
+                Toast.makeText(this, "Surah " + SambungAyat.NAMA[selSi] + " disiram! Kesegaran naik 🌱", Toast.LENGTH_SHORT).show();
+                showSambung();
+            } else {
+                Toast.makeText(this, "Embun habis! Mainkan Sambung Ayat untuk dapat Embun baru 💧", Toast.LENGTH_SHORT).show();
+            }
+        });
+        actRow.addView(btnSiram, weight(0, 5));
+
+        Button btnMain = button("🧩 Sambung Ayat", Color.parseColor("#F59E0B"), 14);
+        btnMain.setTextColor(Color.parseColor("#064E3B"));
+        btnMain.setOnClickListener(v -> startSambung(selSi));
+        actRow.addView(btnMain, weight(5, 0));
+        detailCard.addView(actRow, lp(dp(48), 10));
+
+        body.addView(detailCard, lp(WRAP, 14));
+
+        // 4. ARENA TANTANGAN CEPAT
+        LinearLayout quickRow = new LinearLayout(this);
+        quickRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button acak = button("🎲 Acak Juz " + SambungAyat.juz, GREEN, 14);
+        acak.setOnClickListener(v -> startSambung(-1));
+        quickRow.addView(acak, weight(0, 5));
+
+        Button urutBtn = button("🔢 Urut Ayat", TEAL, 14);
+        urutBtn.setOnClickListener(v -> startUrut(selSi));
+        quickRow.addView(urutBtn, weight(5, 0));
+        body.addView(quickRow, lp(dp(48), 12));
+
+        // 5. GRID PETAK KEBUN SURAH (3 KOLOM)
+        TextView gridHead = text("Petak Kebun Surahmu (Ketuk petak untuk memilih)", 14, INK, true);
+        gridHead.setGravity(Gravity.START);
+        body.addView(gridHead, lp(WRAP, 16));
+
+        final int cols = 3;
+        LinearLayout gridRow = null;
+        int colIdx = 0;
         for (int si = ns - 1; si >= 0; si--) {
+            if (colIdx % cols == 0) {
+                gridRow = new LinearLayout(this);
+                gridRow.setOrientation(LinearLayout.HORIZONTAL);
+                body.addView(gridRow, lp(WRAP, 8));
+            }
             final int fsi = si;
             int n = SambungAyat.jumlahAyat(si);
             int m = SambungAyat.jumlahDikuasai(prefs, si);
-            boolean pernah = SambungAyat.pernahLatih(prefs, si);
-            double f = (double) m / n;
-            String emo;
-            String tahap;
-            if (m >= n) {
-                emo = "🌳🍎";
-                tahap = "Berbuah";
-            } else if (f >= 0.67) {
-                emo = "🌳";
-                tahap = "Pohon tinggi";
-            } else if (f >= 0.34) {
-                emo = "🌿";
-                tahap = "Pohon kecil";
-            } else if (pernah) {
-                emo = "🌱";
-                tahap = "Tunas";
-            } else {
-                emo = "🌰";
-                tahap = "Biji";
-            }
-            boolean haus = m < n && pernah && hari - SambungAyat.hariTerakhir(prefs, si) >= SambungAyat.HARI_HAUS;
+            int tahap = SambungAyat.tahapTanaman(prefs, si);
+            int segar = SambungAyat.kesegaran(prefs, si);
+            boolean isSel = (si == selSi);
+            boolean isMutqin = (tahap == 3);
+            boolean haus = m < n && SambungAyat.pernahLatih(prefs, si)
+                    && hari - SambungAyat.hariTerakhir(prefs, si) >= SambungAyat.HARI_HAUS;
 
-            LinearLayout row = card();
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.addView(text(emo, 26 + Math.min(14, n / 3), INK, false), new LinearLayout.LayoutParams(dp(70), WRAP));
-            LinearLayout col = new LinearLayout(this);
-            col.setOrientation(LinearLayout.VERTICAL);
-            TextView nm = text(SambungAyat.NAMA[si] + " • " + n + " ayat", 17, DARK, true);
-            nm.setGravity(Gravity.START);
-            col.addView(nm, lp(WRAP, 0));
-            LinearLayout bar = new LinearLayout(this);
-            bar.setOrientation(LinearLayout.HORIZONTAL);
-            if (m > 0) {
-                View fill = new View(this);
-                fill.setBackground(box(haus ? Color.parseColor("#A5B87A") : GREEN, 4));
-                bar.addView(fill, new LinearLayout.LayoutParams(0, MATCH, m));
+            LinearLayout plot = new LinearLayout(this);
+            plot.setOrientation(LinearLayout.VERTICAL);
+            plot.setGravity(Gravity.CENTER_HORIZONTAL);
+            plot.setPadding(dp(8), dp(8), dp(8), dp(8));
+            plot.setBackground(gardenPlotBg(isSel, isMutqin));
+            plot.setElevation(dp(isSel ? 6 : 2));
+
+            LinearLayout pTop = new LinearLayout(this);
+            pTop.setOrientation(LinearLayout.HORIZONTAL);
+            TextView ayTag = text(n + " Ay", 10, INK, true);
+            ayTag.setBackground(box(Color.argb(210, 255, 255, 255), 6));
+            ayTag.setPadding(dp(5), dp(1), dp(5), dp(1));
+            pTop.addView(ayTag, new LinearLayout.LayoutParams(WRAP, WRAP));
+            pTop.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+            TextView stIco = text(isMutqin ? "⭐" : (haus ? "💧" : "✓"), 11, INK, true);
+            pTop.addView(stIco, new LinearLayout.LayoutParams(WRAP, WRAP));
+            plot.addView(pTop, lp(WRAP, 0));
+
+            TextView plantIco = text(tahapEmo[tahap], 26, INK, false);
+            plot.addView(plantIco, lp(WRAP, 4));
+
+            TextView sName = text(SambungAyat.NAMA[si], 12, Color.WHITE, true);
+            sName.setSingleLine(true);
+            sName.setEllipsize(TextUtils.TruncateAt.END);
+            plot.addView(sName, lp(WRAP, 4));
+
+            LinearLayout miniBar = new LinearLayout(this);
+            miniBar.setOrientation(LinearLayout.HORIZONTAL);
+            miniBar.setBackground(box(Color.argb(90, 0, 0, 0), 4));
+            if (segar > 0) {
+                View mf = new View(this);
+                mf.setBackground(box(isMutqin ? Color.parseColor("#FDE047") : Color.parseColor("#BEF264"), 4));
+                miniBar.addView(mf, new LinearLayout.LayoutParams(0, MATCH, segar));
             }
-            if (n - m > 0) {
-                View rest = new View(this);
-                rest.setBackground(box(Color.parseColor("#D7CCC8"), 4));
-                bar.addView(rest, new LinearLayout.LayoutParams(0, MATCH, n - m));
+            if (100 - segar > 0) {
+                miniBar.addView(new View(this), new LinearLayout.LayoutParams(0, MATCH, 100 - segar));
             }
-            col.addView(bar, lp(dp(8), 6));
-            TextView st = text(tahap + " • " + m + "/" + n + " ayat dikuasai"
-                    + (haus ? " • 💧 haus, ayo disiram" : ""), 13, DARK, false);
-            st.setGravity(Gravity.START);
-            col.addView(st, lp(WRAP, 6));
-            row.addView(col, new LinearLayout.LayoutParams(0, WRAP, 1f));
-            row.setClickable(true);
-            row.setFocusable(true);
-            pressable(row);
-            row.setOnClickListener(v -> startSambung(fsi));
-            c.addView(row, lp(WRAP, 10));
+            plot.addView(miniBar, lp(dp(5), 4));
+
+            plot.setClickable(true);
+            plot.setFocusable(true);
+            pressable(plot);
+            plot.setOnClickListener(v -> {
+                kebunSelectedSi = fsi;
+                showSambung();
+            });
+
+            LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(0, WRAP, 1f);
+            plp.setMargins(dp(3), 0, dp(3), 0);
+            gridRow.addView(plot, plp);
+            colIdx++;
+        }
+        while (colIdx % cols != 0 && gridRow != null) {
+            LinearLayout.LayoutParams emptyLp = new LinearLayout.LayoutParams(0, WRAP, 1f);
+            emptyLp.setMargins(dp(3), 0, dp(3), 0);
+            gridRow.addView(new View(this), emptyLp);
+            colIdx++;
         }
 
-        Button back = button("Kembali", GRAY, 14);
+        Button back = button("⬅ Kembali ke Menu Utama", GRAY, 15);
         back.setTextColor(DARK);
-        c.addView(back, lp(dp(46), 18));
+        body.addView(back, lp(dp(50), 20));
         back.setOnClickListener(v -> showMenu());
-        wrap(c);
+
+        root.addView(body, lp(WRAP, 0));
+        wrap(root);
     }
 
     // ---------- Tebak Gambar (versi 6.10.0): "Ini gambar apa?", memakai set pasangan bergambar ----------
