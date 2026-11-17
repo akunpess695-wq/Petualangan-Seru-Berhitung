@@ -2439,6 +2439,80 @@ public class MainActivity extends Activity {
     // ---------- Pembantu tampilan menu baru ----------
 
     /** Gambar dari res/drawable (mis. menu_island, menu_cube); null bila berkasnya belum ada. */
+    // ---- Aset gambar Kebun Hafalan (res/drawable-nodpi). Bila berkas tidak ada, tampilan lama dipakai. ----
+    private final HashMap<String, android.graphics.Bitmap> kBmpCache = new HashMap<>();
+    private final Paint kPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    private final RectF kRf = new RectF();
+    private final Rect kSrc = new Rect();
+
+    private android.graphics.Bitmap kBmp(String n) {
+        if (kBmpCache.containsKey(n)) {
+            return kBmpCache.get(n);
+        }
+        android.graphics.Bitmap b = null;
+        int id = getResources().getIdentifier(n, "drawable", getPackageName());
+        if (id != 0) {
+            try {
+                b = android.graphics.BitmapFactory.decodeResource(getResources(), id);
+            } catch (Throwable e) {
+                b = null;
+            }
+        }
+        kBmpCache.put(n, b);
+        return b;
+    }
+
+    private boolean kCover(Canvas c, String n, float w, float h, float anchorY) {
+        android.graphics.Bitmap b = kBmp(n);
+        if (b == null) {
+            return false;
+        }
+        float s = Math.max(w / b.getWidth(), h / b.getHeight());
+        float dw = b.getWidth() * s;
+        float dh = b.getHeight() * s;
+        float t = -(dh - h) * anchorY;
+        kRf.set((w - dw) / 2f, t, (w - dw) / 2f + dw, t + dh);
+        c.drawBitmap(b, null, kRf, kPaint);
+        return true;
+    }
+
+    private void kPiece(Canvas c, android.graphics.Bitmap b, int sy0, int sy1, float l, float t, float r, float bt) {
+        kSrc.set(0, sy0, b.getWidth(), sy1);
+        kRf.set(l, t, r, bt);
+        c.drawBitmap(b, kSrc, kRf, kPaint);
+    }
+
+    private View kIconView(String name, View fallback) {
+        Drawable d = artDrawable(name);
+        if (d == null) {
+            return fallback;
+        }
+        ImageView iv = new ImageView(this);
+        iv.setImageDrawable(d);
+        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        return iv;
+    }
+
+    /** Tunas untuk benih/tunas (tahap 0-1); pohon tetap digambar kode. */
+    private View seedIcon(int stage) {
+        View f = new SeedIcon(this, stage);
+        return stage <= 1 ? kIconView("ic_tunas", f) : f;
+    }
+
+    /** Ikon gambar di kiri teks; teks diganti (tanpa emoji) hanya bila gambarnya ada. */
+    private void iconLeft(TextView t, String name, int hDp, String plain) {
+        Drawable d = artDrawable(name);
+        if (d == null) {
+            return;
+        }
+        int iw = Math.max(1, d.getIntrinsicWidth());
+        int ih = Math.max(1, d.getIntrinsicHeight());
+        d.setBounds(0, 0, dp(hDp) * iw / ih, dp(hDp));
+        t.setCompoundDrawables(d, null, null, null);
+        t.setCompoundDrawablePadding(dp(6));
+        t.setText(plain);
+    }
+
     private Drawable artDrawable(String name) {
         int id = getResources().getIdentifier(name, "drawable", getPackageName());
         return id != 0 ? getResources().getDrawable(id, null) : null;
@@ -11058,6 +11132,7 @@ public class MainActivity extends Activity {
             p.setStyle(Paint.Style.FILL);
             p.setTypeface(ROUND_BOLD);
 
+            if (!kCover(c, "kebun_latar", w, h, 0.25f)) {
             // awan
             cloud(c, w * 0.22f + (float) Math.sin(tm) * d * 5, h * 0.08f, d * 17);
             cloud(c, w * 0.80f + (float) Math.sin(tm + 2f) * d * 5, h * 0.06f, d * 14);
@@ -11091,12 +11166,36 @@ public class MainActivity extends Activity {
             flower(c, w * 0.04f, h * 0.38f, d * 4);
             flower(c, w * 0.97f, h * 0.45f, d * 4.5f);
             flower(c, w * 0.52f, h * 0.345f, d * 3.2f);
+            }
 
             // papan Progress Kebun
             float bh = Math.max(d * 62, Math.min(d * 84, h * 0.26f));
             float bl = w * 0.03f;
             float bt = h * 0.035f;
             float br = w * 0.42f;
+            android.graphics.Bitmap pbB = kBmp("kebun_papan_progres");
+            if (pbB != null) {
+                float qk = (br - bl) / 760f;
+                kRf.set(bl, bt, br, bt + 521f * qk);
+                c.drawBitmap(pbB, null, kRf, kPaint);
+                float qf = tot > 0 ? Math.min(1f, done / (float) tot) : 0f;
+                p.setShader(null);
+                p.setStyle(Paint.Style.FILL);
+                if (qf > 0f) {
+                    float qx0 = bl + 188 * qk;
+                    float qx1 = bl + (188 + (576 - 188) * qf) * qk;
+                    rf.set(qx0, bt + 156 * qk, Math.max(qx1, qx0 + 40 * qk), bt + 197 * qk);
+                    p.setColor(Color.parseColor("#68B84B"));
+                    c.drawRoundRect(rf, 20 * qk, 20 * qk, p);
+                }
+                p.setTypeface(ROUND_BOLD);
+                p.setTextAlign(Paint.Align.CENTER);
+                p.setColor(Color.parseColor("#5A3416"));
+                p.setTextSize(52 * qk);
+                c.drawText(Math.round(qf * 100) + "%", bl + 660 * qk, bt + 196 * qk, p);
+                p.setTextSize(46 * qk);
+                c.drawText(done + " / " + tot + " Ayat", bl + 410 * qk, bt + 306 * qk, p);
+            } else {
             board(c, bl, bt, br, bt + bh, -3f);
             c.save();
             c.rotate(-3f, (bl + br) / 2f, bt + bh / 2f);
@@ -11125,12 +11224,20 @@ public class MainActivity extends Activity {
             p.setColor(Color.parseColor("#5A3416"));
             c.drawText(done + " / " + tot + " Ayat", tx + d * 18, bt + bh * 0.86f, p);
             c.restore();
+            }
 
             // papan Kebunmu
             float kw = w * 0.26f;
             float kl = w * 0.71f;
             float kt = h * 0.06f;
             float kh = Math.max(d * 58, Math.min(d * 74, h * 0.22f));
+            android.graphics.Bitmap knB = kBmp("kebun_papan_nama");
+            if (knB != null) {
+                float qw = kw * 1.2f;
+                float ql2 = kl - kw * 0.1f;
+                kRf.set(ql2, kt, ql2 + qw, kt + qw * 472f / 620f);
+                c.drawBitmap(knB, null, kRf, kPaint);
+            } else {
             p.setColor(Color.parseColor("#B9783E"));
             c.drawRect(kl + kw / 2f - d * 5, kt + kh - d * 2, kl + kw / 2f + d * 5, h * 0.4f, p);
             board(c, kl, kt, kl + kw, kt + kh, 2f);
@@ -11150,12 +11257,22 @@ public class MainActivity extends Activity {
             p.setTextSize(d * 12.5f);
             p.setColor(Color.parseColor("#5A3416"));
             c.drawText("Kebunmu", pcx, kt + kh * 0.88f, p);
+            }
 
             // tanah
             float sl = w * 0.045f;
             float sr = w * 0.955f;
             float st = h * 0.43f;
             float sb = h * 0.96f;
+            android.graphics.Bitmap ptB = kBmp("kebun_petak");
+            if (ptB != null) {
+                float qdw = (sr - sl) + d * 24;
+                float qs = qdw / 900f;
+                float ql = sl - d * 12;
+                kPiece(c, ptB, 0, 100, ql, st - 100 * qs, ql + qdw, st);
+                kPiece(c, ptB, 100, 268, ql, st, ql + qdw, sb - 51 * qs);
+                kPiece(c, ptB, 268, 319, ql, sb - 51 * qs, ql + qdw, sb);
+            } else {
             rf.set(sl - d * 7, st - d * 7, sr + d * 7, sb + d * 7);
             p.setStyle(Paint.Style.FILL);
             p.setColor(Color.parseColor("#E7B26A"));
@@ -11197,6 +11314,7 @@ public class MainActivity extends Activity {
             p.setColor(Color.parseColor("#9C968A"));
             c.drawOval(new RectF(sr - d * 26, sb - d * 24, sr - d * 12, sb - d * 14), p);
             c.drawOval(new RectF(sl + d * 14, sb - d * 18, sl + d * 28, sb - d * 10), p);
+            }
             // kupu-kupu terbang pelan
             for (int k = 0; k < 2; k++) {
                 float bx = w * (0.3f + 0.4f * k) + (float) Math.sin(tm * 0.5f + k * 2.4f) * d * 40;
@@ -12090,7 +12208,7 @@ public class MainActivity extends Activity {
 
     private void toggleSurahAudio(String path, final TextView btn) {
         final String[] lb = btn.getTag() instanceof String[] ? (String[]) btn.getTag()
-                : new String[]{"🔊 Dengar surah", "⏹ Berhenti"};
+                : new String[]{"Dengar surah", "⏹ Berhenti"};
         if (surahPlayer != null) {
             stopSurahAudio();
             btn.setText(lb[0]);
@@ -12208,7 +12326,7 @@ public class MainActivity extends Activity {
         titlePill.setBackground(rr(cCream, Color.parseColor("#EADFC0"), 1, 24));
         titlePill.setElevation(dp(3));
         titlePill.setPadding(dp(10), dp(4), dp(14), dp(4));
-        titlePill.addView(new SeedIcon(this, 1), new LinearLayout.LayoutParams(dp(30), dp(34)));
+        titlePill.addView(seedIcon(1), new LinearLayout.LayoutParams(dp(30), dp(34)));
         LinearLayout tcol = new LinearLayout(this);
         tcol.setOrientation(LinearLayout.VERTICAL);
         tcol.setPadding(dp(8), 0, 0, 0);
@@ -12270,6 +12388,7 @@ public class MainActivity extends Activity {
         cName.setGravity(Gravity.START);
         left.addView(cName, new LinearLayout.LayoutParams(WRAP, WRAP));
         TextView cInfo = text("📖 QS. " + SambungAyat.NAMA[selSi] + " • " + selN + " Ayat", 12, Color.parseColor("#7A6A4F"), false);
+        iconLeft(cInfo, "ic_buku", 14, "QS. " + SambungAyat.NAMA[selSi] + " \u2022 " + selN + " Ayat");
         cInfo.setGravity(Gravity.START);
         left.addView(cInfo, lp(WRAP, 2));
         String hint = selHaus ? "💧 Tanaman haus! Siram atau muraja'ah sekarang."
@@ -12284,6 +12403,7 @@ public class MainActivity extends Activity {
         final String audioPath = surahAudioPath(selSi);
         if (audioPath != null) {
             final TextView dengar = text("🔊 Dengar surah", 12, Color.parseColor("#0B5E86"), true);
+            iconLeft(dengar, "ic_speaker", 16, "Dengar surah");
             dengar.setBackground(rr(Color.parseColor("#DDF2FC"), Color.parseColor("#EADFC0"), 1, 16));
             dengar.setPadding(dp(10), dp(6), dp(10), dp(6));
             dengar.setOnClickListener(v -> toggleSurahAudio(audioPath, dengar));
@@ -12292,9 +12412,10 @@ public class MainActivity extends Activity {
         }
         card.addView(left, new LinearLayout.LayoutParams(0, WRAP, 1f));
 
-        card.addView(new SeedBagView(this), new LinearLayout.LayoutParams(dp(66), dp(76)));
+        card.addView(kIconView("ic_karung_benih", new SeedBagView(this)), new LinearLayout.LayoutParams(dp(76), dp(76)));
 
         TextView tanam = text(selTahap == 0 ? "🌱 Tanam\nBenih" : "🌱 Rawat\nTanaman", 14, Color.WHITE, true);
+        iconLeft(tanam, "ic_tunas", 24, selTahap == 0 ? "Tanam\nBenih" : "Rawat\nTanaman");
         android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(new Drawable[]{
                 rr(Color.parseColor("#3F8A3A"), 0, 0, 18),
                 rr(cGreen, 0, 0, 18)});
@@ -12303,7 +12424,7 @@ public class MainActivity extends Activity {
         tanam.setPadding(dp(10), dp(10), dp(10), dp(14));
         tanam.setOnClickListener(v -> startSambung(selSi));
         pressable(tanam);
-        card.addView(tanam, new LinearLayout.LayoutParams(dp(92), dp(60)));
+        card.addView(tanam, new LinearLayout.LayoutParams(dp(112), dp(60)));
         body.addView(card, new LinearLayout.LayoutParams(MATCH, WRAP));
 
         // AKSI CEPAT
@@ -12313,6 +12434,7 @@ public class MainActivity extends Activity {
         TextView acak = text("🎲 Acak", 12, cDark, true);
         TextView urutBtn = text("🔢 Urut Ayat", 12, cDark, true);
         TextView mushafBtn = text("📖 Mushaf", 12, cDark, true);
+        iconLeft(mushafBtn, "ic_buku", 16, "Mushaf");
         TextView[] cv = {siram, acak, urutBtn, mushafBtn};
         for (int i = 0; i < cv.length; i++) {
             cv[i].setBackground(rr(i == 0 ? Color.parseColor("#DDF2FC") : cCream, Color.parseColor("#EADFC0"), 1, 18));
@@ -12348,7 +12470,7 @@ public class MainActivity extends Activity {
         LinearLayout sh = new LinearLayout(this);
         sh.setOrientation(LinearLayout.HORIZONTAL);
         sh.setGravity(Gravity.CENTER_VERTICAL);
-        sh.addView(new SeedIcon(this, 1), new LinearLayout.LayoutParams(dp(28), dp(28)));
+        sh.addView(seedIcon(1), new LinearLayout.LayoutParams(dp(28), dp(28)));
         TextView shT = text("Pilihan Benih Lainnya", 14, cDark, true);
         shT.setPadding(dp(6), 0, dp(8), 0);
         sh.addView(shT, new LinearLayout.LayoutParams(WRAP, WRAP));
@@ -12373,7 +12495,7 @@ public class MainActivity extends Activity {
             in.setOrientation(LinearLayout.VERTICAL);
             in.setGravity(Gravity.CENTER_HORIZONTAL);
             in.setPadding(dp(6), dp(8), dp(6), dp(8));
-            in.addView(new SeedIcon(this, tahapAll[s2]), new LinearLayout.LayoutParams(dp(54), dp(54)));
+            in.addView(seedIcon(tahapAll[s2]), new LinearLayout.LayoutParams(dp(54), dp(54)));
             TextView nm = text(SambungAyat.NAMA[s2], 12, cDark, true);
             nm.setSingleLine(true);
             nm.setEllipsize(TextUtils.TruncateAt.END);
