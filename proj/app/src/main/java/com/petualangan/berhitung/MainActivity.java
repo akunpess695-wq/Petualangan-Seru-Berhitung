@@ -11421,7 +11421,19 @@ public class MainActivity extends Activity {
     // ---------- Mushaf Hafalan: baca, tutup kata, mikrofon ----------
     private int mushafSi = -1;
     private int mushafMode = 0;
-    private int mushafLevel = 50;
+    private int mushafAwal = 1;
+    private String mushafPeek;
+    private int mushafTouch = -1;
+    private boolean mushafLong;
+    private final java.util.ArrayList<int[]> mushafRanges = new java.util.ArrayList<>();
+    private final Runnable mushafLongRun = () -> {
+        if (mushafTouch >= 0 && mushafTouch < mushafRanges.size()) {
+            int[] rg = mushafRanges.get(mushafTouch);
+            mushafLong = true;
+            mushafPeek = rg[2] + ":" + rg[3];
+            mushafRender();
+        }
+    };
     private final java.util.HashSet<String> mushafOpen = new java.util.HashSet<>();
     private final java.util.HashSet<String> mushafGood = new java.util.HashSet<>();
     private android.speech.SpeechRecognizer mushafSr;
@@ -11471,11 +11483,9 @@ public class MainActivity extends Activity {
     }
 
     private boolean mushafHidden(int si, int ai, int wi) {
-        if (mushafMode != 1 || mushafOpen.contains(ai + ":" + wi)) return false;
-        int h = si * 7919 + ai * 104729 + wi * 15485863 + 12345;
-        h = (h ^ (h >>> 13)) * 1103515245;
-        h = (h ^ (h >>> 16)) & 0x7fffffff;
-        return h % 100 < mushafLevel;
+        if (mushafMode == 0 || mushafOpen.contains(ai + ":" + wi)) return false;
+        if (mushafMode == 1 && wi < mushafAwal) return false;
+        return true;
     }
 
     private int mushafSisa() {
@@ -11491,30 +11501,27 @@ public class MainActivity extends Activity {
 
     private void mushafRender() {
         if (mushafTv == null) return;
+        mushafRanges.clear();
         android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
         for (int ai = 0; ai < SambungAyat.jumlahAyat(mushafSi); ai++) {
             String[] w = SambungAyat.ayat(mushafSi, ai).trim().split("\\s+");
             for (int wi = 0; wi < w.length; wi++) {
-                final String key = ai + ":" + wi;
+                String key = ai + ":" + wi;
                 int st = sb.length();
                 if (mushafHidden(mushafSi, ai, wi)) {
-                    int n = Math.max(2, Math.min(7, normAr(w[wi]).length()));
-                    StringBuilder ph = new StringBuilder();
-                    for (int k = 0; k < n; k++) ph.append('_');
-                    sb.append(ph);
-                    sb.setSpan(new android.text.style.ClickableSpan() {
-                        @Override
-                        public void onClick(View v) {
-                            mushafOpen.add(key);
-                            mushafRender();
-                        }
-
-                        @Override
-                        public void updateDrawState(TextPaint ds) {
-                            ds.setUnderlineText(false);
-                            ds.setColor(Color.parseColor("#8FA08F"));
-                        }
-                    }, st, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    if (key.equals(mushafPeek)) {
+                        sb.append(w[wi]);
+                        sb.setSpan(new android.text.style.ForegroundColorSpan(Color.parseColor("#E08A00")),
+                                st, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    } else {
+                        int n = Math.max(2, Math.min(7, normAr(w[wi]).length()));
+                        StringBuilder ph = new StringBuilder();
+                        for (int k = 0; k < n; k++) ph.append('_');
+                        sb.append(ph);
+                        sb.setSpan(new android.text.style.ForegroundColorSpan(Color.parseColor("#8FA08F")),
+                                st, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    }
+                    mushafRanges.add(new int[]{st, sb.length(), ai, wi});
                 } else {
                     sb.append(w[wi]);
                     if (mushafGood.contains(key)) {
@@ -11527,7 +11534,10 @@ public class MainActivity extends Activity {
             StringBuilder num = new StringBuilder();
             String ns = String.valueOf(ai + 1);
             for (int k = 0; k < ns.length(); k++) num.append((char) ('\u0660' + (ns.charAt(k) - '0')));
+            int ms = sb.length();
             sb.append("\uFD3F").append(num).append("\uFD3E ");
+            sb.setSpan(new android.text.style.ForegroundColorSpan(Color.parseColor("#3F5FB5")),
+                    ms, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         mushafTv.setText(sb);
     }
@@ -11690,6 +11700,147 @@ public class MainActivity extends Activity {
         return t;
     }
 
+    private static final String[] MUSHAF_AR = {"النبأ", "النازعات", "عبس", "التكوير", "الانفطار", "المطففين",
+            "الانشقاق", "البروج", "الطارق", "الأعلى", "الغاشية", "الفجر", "البلد", "الشمس", "الليل", "الضحى",
+            "الشرح", "التين", "العلق", "القدر", "البينة", "الزلزلة", "العاديات", "القارعة", "التكاثر", "العصر",
+            "الهمزة", "الفيل", "قريش", "الماعون", "الكوثر", "الكافرون", "النصر", "المسد", "الإخلاص", "الفلق", "الناس"};
+
+    private TextView mushafCircle(String ic) {
+        TextView t = text(ic, 16, Color.parseColor("#285A35"), false);
+        t.setBackground(rr(Color.WHITE, Color.parseColor("#EADFC0"), 1, 22));
+        t.setElevation(dp(2));
+        pressable(t);
+        return t;
+    }
+
+    private void mushafGo(int si) {
+        if (si < 0 || si >= SambungAyat.JUMLAH_SURAH) return;
+        mushafSi = si;
+        mushafOpen.clear();
+        mushafGood.clear();
+        mushafPeek = null;
+        showMushaf();
+    }
+
+    private void mushafSheet() {
+        final int cDark = Color.parseColor("#285A35");
+        final android.app.Dialog dlg = new android.app.Dialog(this);
+        dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(18), dp(16), dp(18), dp(20));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.WHITE);
+        float r = dp(24);
+        bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
+        box.setBackground(bg);
+
+        TextView t1 = text("🎙 Murajaah", 18, cDark, true);
+        t1.setGravity(Gravity.START);
+        box.addView(t1, new LinearLayout.LayoutParams(MATCH, WRAP));
+        TextView t2 = text("Teman murajaah untuk latihan mandiri. Ikuti bacaan kata demi kata dan kenali kata yang terlewat. Fitur ini belum menilai tajwid dan tidak menggantikan peran guru ngaji.", 12, Color.parseColor("#6B6B6B"), false);
+        t2.setGravity(Gravity.START);
+        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(MATCH, WRAP);
+        p2.topMargin = dp(8);
+        box.addView(t2, p2);
+        TextView t3 = text("Sembunyikan kata", 14, Color.parseColor("#222222"), true);
+        t3.setGravity(Gravity.START);
+        LinearLayout.LayoutParams p3 = new LinearLayout.LayoutParams(MATCH, WRAP);
+        p3.topMargin = dp(14);
+        box.addView(t3, p3);
+
+        final String[] ol = {"👁  Tampilkan Semua", "➖  Sisakan Kata Awal", "🙈  Sembunyikan Penuh"};
+        final TextView[] opt = new TextView[3];
+        final TextView[] ab = new TextView[3];
+        final LinearLayout awalRow = new LinearLayout(this);
+        final Runnable[] upd = new Runnable[1];
+        for (int i = 0; i < 3; i++) {
+            final int fi = i;
+            opt[i] = text(ol[i], 14, Color.parseColor("#333333"), true);
+            opt[i].setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+            opt[i].setPadding(dp(14), dp(13), dp(14), dp(13));
+            opt[i].setOnClickListener(v -> {
+                mushafMode = fi;
+                upd[0].run();
+            });
+            LinearLayout.LayoutParams lp0 = new LinearLayout.LayoutParams(MATCH, WRAP);
+            lp0.topMargin = dp(6);
+            box.addView(opt[i], lp0);
+        }
+        awalRow.setOrientation(LinearLayout.HORIZONTAL);
+        awalRow.setGravity(Gravity.CENTER_VERTICAL);
+        awalRow.setPadding(dp(14), dp(8), dp(10), dp(8));
+        awalRow.setBackground(rr(Color.parseColor("#E8F0EA"), 0, 0, 16));
+        TextView al = text("Kata awal", 14, cDark, true);
+        al.setGravity(Gravity.START);
+        awalRow.addView(al, new LinearLayout.LayoutParams(0, WRAP, 1f));
+        for (int j = 0; j < 3; j++) {
+            final int fj = j;
+            ab[j] = text(String.valueOf(j + 1), 15, cDark, true);
+            ab[j].setPadding(dp(18), dp(8), dp(18), dp(8));
+            ab[j].setOnClickListener(v -> {
+                mushafAwal = fj + 1;
+                upd[0].run();
+            });
+            LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(WRAP, WRAP);
+            ap.leftMargin = dp(4);
+            awalRow.addView(ab[j], ap);
+        }
+        LinearLayout.LayoutParams arp = new LinearLayout.LayoutParams(MATCH, WRAP);
+        arp.topMargin = dp(8);
+        box.addView(awalRow, arp);
+        upd[0] = () -> {
+            for (int i = 0; i < 3; i++) {
+                boolean on = mushafMode == i;
+                opt[i].setText(ol[i] + (on ? "    ✓" : ""));
+                opt[i].setTextColor(on ? cDark : Color.parseColor("#333333"));
+                opt[i].setBackground(rr(on ? Color.parseColor("#E9F5D3") : Color.WHITE, Color.parseColor("#E0E0E0"), 1, 14));
+            }
+            awalRow.setVisibility(mushafMode == 1 ? View.VISIBLE : View.GONE);
+            for (int j = 0; j < 3; j++) {
+                boolean on = mushafAwal == j + 1;
+                ab[j].setTextColor(on ? Color.WHITE : cDark);
+                ab[j].setBackground(rr(on ? cDark : Color.WHITE, cDark, 1, 12));
+            }
+        };
+        upd[0].run();
+
+        TextView hint = text("👆 Saat latihan, tahan kata tersembunyi untuk mengintip.", 12, cDark, false);
+        hint.setGravity(Gravity.START);
+        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(MATCH, WRAP);
+        hp.topMargin = dp(12);
+        box.addView(hint, hp);
+
+        final boolean[] go = {false};
+        TextView start = text("Mulai Murajaah", 16, Color.WHITE, true);
+        start.setBackground(rr(cDark, 0, 0, 26));
+        start.setPadding(dp(10), dp(14), dp(10), dp(14));
+        pressable(start);
+        start.setOnClickListener(v -> {
+            go[0] = true;
+            dlg.dismiss();
+        });
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(MATCH, WRAP);
+        sp.topMargin = dp(14);
+        box.addView(start, sp);
+
+        dlg.setOnDismissListener(d -> {
+            mushafOpen.clear();
+            mushafGood.clear();
+            mushafPeek = null;
+            showMushaf();
+            if (go[0] && mushafMode != 0) mushafMic();
+        });
+        dlg.setContentView(box);
+        android.view.Window w = dlg.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+            w.setLayout(MATCH, WRAP);
+            w.setGravity(Gravity.BOTTOM);
+        }
+        dlg.show();
+    }
+
     private void showMushaf() {
         handler.removeCallbacksAndMessages(null);
         plainUi = true;
@@ -11703,143 +11854,199 @@ public class MainActivity extends Activity {
         final int ns = SambungAyat.JUMLAH_SURAH;
         if (mushafSi < 0 || mushafSi >= ns) mushafSi = ns - 1;
         final int cDark = Color.parseColor("#285A35");
+        final int cGold = Color.parseColor("#D9B766");
         final int cCream = Color.parseColor("#FFF8E6");
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(14), dp(14), dp(18));
+        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.parseColor("#FFFBEF"), Color.parseColor("#F7F3D6")}));
+        root.setMinimumHeight(getResources().getDisplayMetrics().heightPixels);
 
+        // HEADER
         LinearLayout head = new LinearLayout(this);
-        head.setOrientation(LinearLayout.HORIZONTAL);
-        head.setGravity(Gravity.CENTER_VERTICAL);
-        TextView back = text("←", 22, cDark, true);
-        back.setPadding(dp(4), 0, dp(14), 0);
+        head.setOrientation(LinearLayout.VERTICAL);
+        head.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.parseColor("#9ED8F5"), Color.parseColor("#D6EFD0"), Color.parseColor("#FFFBEF")}));
+        head.setPadding(dp(12), dp(12), dp(12), dp(8));
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView back = mushafCircle("←");
         back.setOnClickListener(v -> showMenu());
-        head.addView(back, new LinearLayout.LayoutParams(WRAP, WRAP));
-        TextView tt = text("📖 Mushaf Hafalan", 18, cDark, true);
+        row.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        LinearLayout tb = new LinearLayout(this);
+        tb.setOrientation(LinearLayout.VERTICAL);
+        tb.setPadding(dp(10), 0, dp(6), 0);
+        TextView tt = text("📖 Mushaf Hafalan", 17, cDark, true);
         tt.setGravity(Gravity.START);
-        head.addView(tt, new LinearLayout.LayoutParams(0, WRAP, 1f));
-        root.addView(head, new LinearLayout.LayoutParams(MATCH, WRAP));
+        tb.addView(tt, new LinearLayout.LayoutParams(WRAP, WRAP));
+        TextView ts = text("Baca • Hafal • Amalkan", 11, Color.parseColor("#4F6B52"), false);
+        ts.setGravity(Gravity.START);
+        tb.addView(ts, new LinearLayout.LayoutParams(WRAP, WRAP));
+        row.addView(tb, new LinearLayout.LayoutParams(0, WRAP, 1f));
+        final String audioPath = surahAudioPath(mushafSi);
+        final TextView dg = mushafCircle("🔊");
+        dg.setTag(new String[]{"🔊", "⏹"});
+        dg.setOnClickListener(v -> {
+            if (audioPath != null) {
+                toggleSurahAudio(audioPath, dg);
+            } else {
+                Toast.makeText(this, "Audio surah ini belum ada", Toast.LENGTH_SHORT).show();
+            }
+        });
+        dg.setAlpha(audioPath != null ? 1f : 0.45f);
+        LinearLayout.LayoutParams dgp = new LinearLayout.LayoutParams(dp(44), dp(44));
+        dgp.rightMargin = dp(8);
+        row.addView(dg, dgp);
+        TextView mc = mushafCircle("🎙");
+        mc.setOnClickListener(v -> mushafSheet());
+        row.addView(mc, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        head.addView(row, new LinearLayout.LayoutParams(MATCH, WRAP));
 
         // pilih surah
-        final HorizontalScrollView hs = new HorizontalScrollView(this);
-        hs.setHorizontalScrollBarEnabled(false);
-        LinearLayout sr = new LinearLayout(this);
-        sr.setOrientation(LinearLayout.HORIZONTAL);
-        sr.setPadding(0, dp(10), 0, dp(6));
-        View selChip = null;
-        for (int i = 0; i < ns; i++) {
-            final int fi = i;
-            TextView c = mushafChip(SambungAyat.NAMA[i], i == mushafSi);
-            c.setOnClickListener(v -> {
-                mushafSi = fi;
-                mushafOpen.clear();
-                mushafGood.clear();
-                showMushaf();
-            });
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(WRAP, WRAP);
-            clp.rightMargin = dp(6);
-            sr.addView(c, clp);
-            if (i == mushafSi) selChip = c;
-        }
-        hs.addView(sr);
-        root.addView(hs, new LinearLayout.LayoutParams(MATCH, WRAP));
-        final View fsel = selChip;
-        hs.post(() -> {
-            if (fsel != null) hs.scrollTo(Math.max(0, fsel.getLeft() - dp(40)), 0);
+        int nAyat = SambungAyat.jumlahAyat(mushafSi);
+        android.text.SpannableStringBuilder pl = new android.text.SpannableStringBuilder(SambungAyat.NAMA[mushafSi] + " ▾\n");
+        int ps = pl.length();
+        pl.append("Juz " + SambungAyat.juz + " • " + nAyat + " ayat");
+        pl.setSpan(new android.text.style.RelativeSizeSpan(0.62f), ps, pl.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        TextView pill = text("", 18, cDark, true);
+        pill.setText(pl);
+        pill.setBackground(rr(cCream, cGold, 2, 24));
+        pill.setPadding(dp(26), dp(8), dp(26), dp(8));
+        pressable(pill);
+        pill.setOnClickListener(v -> {
+            String[] names = new String[ns];
+            for (int i = 0; i < ns; i++) names[i] = (i + 1) + ". " + SambungAyat.NAMA[i];
+            new android.app.AlertDialog.Builder(this).setTitle("Pilih surah")
+                    .setItems(names, (d, i) -> mushafGo(i)).show();
         });
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(WRAP, WRAP);
+        pp.gravity = Gravity.CENTER_HORIZONTAL;
+        pp.topMargin = dp(10);
+        head.addView(pill, pp);
+        root.addView(head, new LinearLayout.LayoutParams(MATCH, WRAP));
 
-        // mode
-        LinearLayout md = new LinearLayout(this);
-        md.setOrientation(LinearLayout.HORIZONTAL);
-        md.setPadding(0, dp(4), 0, dp(4));
-        String[] ml = {"👁 Baca", "🙈 Hafalan"};
-        for (int i = 0; i < 2; i++) {
-            final int fm = i;
-            TextView c = mushafChip(ml[i], mushafMode == i);
-            c.setOnClickListener(v -> {
-                mushafMode = fm;
-                mushafOpen.clear();
-                mushafGood.clear();
-                showMushaf();
-            });
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(WRAP, WRAP);
-            clp.rightMargin = dp(6);
-            md.addView(c, clp);
-        }
-        if (mushafMode == 1) {
-            int[] lv = {25, 50, 100};
-            for (int i = 0; i < 3; i++) {
-                final int fl = lv[i];
-                TextView c = mushafChip("Tutup " + fl + "%", mushafLevel == fl);
-                c.setOnClickListener(v -> {
-                    mushafLevel = fl;
-                    mushafOpen.clear();
-                    mushafGood.clear();
-                    showMushaf();
-                });
-                LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(WRAP, WRAP);
-                clp.rightMargin = dp(6);
-                md.addView(c, clp);
-            }
-        }
-        HorizontalScrollView mhs = new HorizontalScrollView(this);
-        mhs.setHorizontalScrollBarEnabled(false);
-        mhs.addView(md);
-        root.addView(mhs, new LinearLayout.LayoutParams(MATCH, WRAP));
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(14), dp(6), dp(14), dp(18));
 
-        // aksi: dengar, mikrofon, ulangi
-        LinearLayout ac = new LinearLayout(this);
-        ac.setOrientation(LinearLayout.HORIZONTAL);
-        ac.setPadding(0, dp(6), 0, dp(4));
-        final String audioPath = surahAudioPath(mushafSi);
-        if (audioPath != null) {
-            final TextView dg = mushafChip("🔊 Dengar", false);
-            dg.setBackground(rr(Color.parseColor("#DDF2FC"), Color.parseColor("#EADFC0"), 1, 16));
-            dg.setOnClickListener(v -> toggleSurahAudio(audioPath, dg));
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(WRAP, WRAP);
-            p.rightMargin = dp(6);
-            ac.addView(dg, p);
-        }
+        // spanduk surah
+        String arName = (SambungAyat.juz == 30 && ns == MUSHAF_AR.length) ? "سُورَةُ " + MUSHAF_AR[mushafSi]
+                : "Surah " + SambungAyat.NAMA[mushafSi];
+        TextView ban = text(arName, 28, Color.parseColor("#1F3D2A"), true);
+        ban.setBackground(rr(Color.parseColor("#DCEBC8"), cGold, 2, 26));
+        ban.setPadding(dp(10), dp(8), dp(10), dp(10));
+        body.addView(ban, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+        // status & tombol sesi
         mushafMicBtn = null;
-        if (mushafMode == 1) {
+        mushafStatus = text("", 12, Color.parseColor("#7A6A4F"), false);
+        mushafStatus.setGravity(Gravity.START);
+        if (mushafMode != 0) {
+            LinearLayout ac = new LinearLayout(this);
+            ac.setOrientation(LinearLayout.HORIZONTAL);
+            ac.setGravity(Gravity.CENTER_VERTICAL);
             mushafMicBtn = mushafChip("🎙 Baca", false);
             mushafMicBtn.setBackground(rr(Color.parseColor("#FFE3E3"), Color.parseColor("#EADFC0"), 1, 16));
             mushafMicBtn.setOnClickListener(v -> mushafMic());
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(WRAP, WRAP);
-            p.rightMargin = dp(6);
-            ac.addView(mushafMicBtn, p);
+            LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(WRAP, WRAP);
+            mp.rightMargin = dp(6);
+            ac.addView(mushafMicBtn, mp);
             TextView ul = mushafChip("🔄 Ulangi", false);
             ul.setOnClickListener(v -> {
                 mushafOpen.clear();
                 mushafGood.clear();
                 mushafRender();
-                mushafSetStatus("Ketuk garis untuk membuka kata, atau tekan 🎙 lalu baca ayatnya.");
+                mushafSetStatus("Ketuk garis untuk membuka kata, tahan untuk mengintip.");
             });
             ac.addView(ul, new LinearLayout.LayoutParams(WRAP, WRAP));
+            TextView md = text(mushafMode == 1 ? "Sisakan " + mushafAwal + " kata awal" : "Sembunyikan penuh", 11, Color.parseColor("#7A6A4F"), false);
+            md.setGravity(Gravity.END);
+            ac.addView(md, new LinearLayout.LayoutParams(0, WRAP, 1f));
+            LinearLayout.LayoutParams acp = new LinearLayout.LayoutParams(MATCH, WRAP);
+            acp.topMargin = dp(8);
+            body.addView(ac, acp);
+            mushafStatus.setText("Ketuk garis untuk membuka kata, tahan untuk mengintip, atau tekan 🎙 lalu baca.");
         }
-        root.addView(ac, new LinearLayout.LayoutParams(MATCH, WRAP));
-
-        mushafStatus = text(mushafMode == 1 ? "Ketuk garis untuk membuka kata, atau tekan 🎙 lalu baca ayatnya." : "", 12, Color.parseColor("#7A6A4F"), false);
-        mushafStatus.setGravity(Gravity.START);
-        root.addView(mushafStatus, new LinearLayout.LayoutParams(MATCH, WRAP));
+        LinearLayout.LayoutParams stp = new LinearLayout.LayoutParams(MATCH, WRAP);
+        stp.topMargin = dp(6);
+        body.addView(mushafStatus, stp);
 
         // teks ayat
-        TextView tv = new TextView(this);
+        final TextView tv = new TextView(this);
         tv.setTextSize(26 * ui);
         tv.setTextColor(Color.parseColor("#1B1B1B"));
         tv.setTextDirection(View.TEXT_DIRECTION_RTL);
         tv.setGravity(Gravity.RIGHT);
         tv.setLineSpacing(0, 1.7f);
         tv.setPadding(dp(14), dp(14), dp(14), dp(14));
-        tv.setBackground(rr(cCream, Color.parseColor("#EADFC0"), 1, 20));
-        tv.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
-        tv.setHighlightColor(Color.TRANSPARENT);
+        tv.setBackground(rr(cCream, cGold, 2, 22));
+        tv.setOnTouchListener((v, ev) -> {
+            int a = ev.getActionMasked();
+            if (a == MotionEvent.ACTION_DOWN) {
+                int off = tv.getOffsetForPosition(ev.getX(), ev.getY());
+                mushafTouch = -1;
+                for (int i = 0; i < mushafRanges.size(); i++) {
+                    int[] rg = mushafRanges.get(i);
+                    if (off >= rg[0] && off <= rg[1]) {
+                        mushafTouch = i;
+                        break;
+                    }
+                }
+                if (mushafTouch < 0) return false;
+                mushafLong = false;
+                handler.postDelayed(mushafLongRun, android.view.ViewConfiguration.getLongPressTimeout());
+                return true;
+            }
+            if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
+                handler.removeCallbacks(mushafLongRun);
+                if (mushafTouch >= 0 && mushafTouch < mushafRanges.size()) {
+                    int[] rg = mushafRanges.get(mushafTouch);
+                    if (a == MotionEvent.ACTION_UP && !mushafLong) {
+                        mushafOpen.add(rg[2] + ":" + rg[3]);
+                    }
+                    mushafPeek = null;
+                    mushafRender();
+                }
+                mushafTouch = -1;
+                mushafLong = false;
+                return true;
+            }
+            return mushafTouch >= 0;
+        });
         mushafTv = tv;
         LinearLayout.LayoutParams tvp = new LinearLayout.LayoutParams(MATCH, WRAP);
         tvp.topMargin = dp(8);
-        root.addView(tv, tvp);
+        body.addView(tv, tvp);
         mushafRender();
+
+        // navigasi surah
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setGravity(Gravity.CENTER);
+        TextView pv = mushafCircle("◀");
+        pv.setOnClickListener(v -> mushafGo(mushafSi - 1));
+        nav.addView(pv, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        TextView cnt = text("📖  " + (mushafSi + 1) + " / " + ns, 16, cDark, true);
+        cnt.setBackground(rr(cCream, cGold, 2, 26));
+        cnt.setPadding(dp(22), dp(12), dp(22), dp(12));
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(WRAP, WRAP);
+        cp.leftMargin = dp(14);
+        cp.rightMargin = dp(14);
+        nav.addView(cnt, cp);
+        TextView nx = mushafCircle("▶");
+        nx.setOnClickListener(v -> mushafGo(mushafSi + 1));
+        nav.addView(nx, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        pv.setAlpha(mushafSi > 0 ? 1f : 0.4f);
+        nx.setAlpha(mushafSi < ns - 1 ? 1f : 0.4f);
+        LinearLayout.LayoutParams navp = new LinearLayout.LayoutParams(MATCH, WRAP);
+        navp.topMargin = dp(16);
+        body.addView(nav, navp);
+        TextView leaf = text("🌿 🌼 🌿", 18, cDark, false);
+        body.addView(leaf, lp(WRAP, 6));
+
+        root.addView(body, new LinearLayout.LayoutParams(MATCH, WRAP));
         wrap(root);
     }
 
@@ -11878,9 +12085,11 @@ public class MainActivity extends Activity {
     }
 
     private void toggleSurahAudio(String path, final TextView btn) {
+        final String[] lb = btn.getTag() instanceof String[] ? (String[]) btn.getTag()
+                : new String[]{"🔊 Dengar surah", "⏹ Berhenti"};
         if (surahPlayer != null) {
             stopSurahAudio();
-            btn.setText("🔊 Dengar surah");
+            btn.setText(lb[0]);
             return;
         }
         try {
@@ -11890,12 +12099,12 @@ public class MainActivity extends Activity {
             afd.close();
             mp.setOnCompletionListener(m -> {
                 stopSurahAudio();
-                btn.setText("🔊 Dengar surah");
+                btn.setText(lb[0]);
             });
             mp.prepare();
             mp.start();
             surahPlayer = mp;
-            btn.setText("⏹ Berhenti");
+            btn.setText(lb[1]);
         } catch (Exception e) {
             stopSurahAudio();
             Toast.makeText(this, "Audio tidak bisa diputar", Toast.LENGTH_SHORT).show();
