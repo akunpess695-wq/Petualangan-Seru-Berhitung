@@ -905,6 +905,9 @@ public class MainActivity extends Activity {
             }
         } else if ((screen == 2 || screen == 9) && advLevel >= 0) {
             showPeta();
+        } else if (screen == 8 && mushafOn) {
+            kebunNoGrow = true;
+            showSambung();
         } else if (screen == 11) {
             showGuru();
         } else {
@@ -2005,10 +2008,6 @@ public class MainActivity extends Activity {
             sa.setOnClickListener(v -> showSambung());
             c.addView(sa, lp(dp(58), 18));
         }
-
-        LinearLayout mh = miniCard("\uD83D\uDCD6", "Mushaf Hafalan", Color.parseColor("#3F6FB5"));
-        mh.setOnClickListener(v -> showMushaf());
-        c.addView(mh, lp(dp(58), 14));
 
         // Rekor & Lencana (Soal Guru pindah ke Pengaturan, bukan untuk anak)
         LinearLayout rk = miniCard("\uD83C\uDFC5", "Rekor & Lencana", Color.parseColor("#F9A825"));
@@ -11422,6 +11421,7 @@ public class MainActivity extends Activity {
     private int mushafSi = -1;
     private int mushafMode = 0;
     private int mushafAwal = 1;
+    private boolean mushafOn;
     private String mushafPeek;
     private int mushafTouch = -1;
     private boolean mushafLong;
@@ -11845,6 +11845,7 @@ public class MainActivity extends Activity {
         handler.removeCallbacksAndMessages(null);
         plainUi = true;
         setScreen(8);
+        mushafOn = true;
         nameFields = null;
         if (!SambungAyat.load(this)) {
             Toast.makeText(this, "Data ayat tidak bisa dibuka", Toast.LENGTH_LONG).show();
@@ -11873,7 +11874,10 @@ public class MainActivity extends Activity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         TextView back = mushafCircle("←");
-        back.setOnClickListener(v -> showMenu());
+        back.setOnClickListener(v -> {
+            kebunNoGrow = true;
+            showSambung();
+        });
         row.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
         LinearLayout tb = new LinearLayout(this);
         tb.setOrientation(LinearLayout.VERTICAL);
@@ -12121,6 +12125,7 @@ public class MainActivity extends Activity {
         handler.removeCallbacksAndMessages(null);
         plainUi = true;
         setScreen(8);
+        mushafOn = false;
         nameFields = null;
         if (!SambungAyat.load(this)) {
             Toast.makeText(this, "Data ayat tidak bisa dibuka", Toast.LENGTH_LONG).show();
@@ -12305,17 +12310,18 @@ public class MainActivity extends Activity {
         LinearLayout chips = new LinearLayout(this);
         chips.setOrientation(LinearLayout.HORIZONTAL);
         TextView siram = text("💧 Siram • " + SambungAyat.embun(prefs), 12, Color.parseColor("#0B5E86"), true);
-        TextView acak = text("🎲 Acak Juz " + SambungAyat.juz, 12, cDark, true);
+        TextView acak = text("🎲 Acak", 12, cDark, true);
         TextView urutBtn = text("🔢 Urut Ayat", 12, cDark, true);
-        TextView[] cv = {siram, acak, urutBtn};
+        TextView mushafBtn = text("📖 Mushaf", 12, cDark, true);
+        TextView[] cv = {siram, acak, urutBtn, mushafBtn};
         for (int i = 0; i < cv.length; i++) {
             cv[i].setBackground(rr(i == 0 ? Color.parseColor("#DDF2FC") : cCream, Color.parseColor("#EADFC0"), 1, 18));
-            cv[i].setPadding(dp(6), dp(10), dp(6), dp(10));
+            cv[i].setPadding(dp(4), dp(10), dp(4), dp(10));
             cv[i].setSingleLine(true);
             pressable(cv[i]);
             LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, WRAP, 1f);
-            clp.leftMargin = i == 0 ? 0 : dp(4);
-            clp.rightMargin = i == 2 ? 0 : dp(4);
+            clp.leftMargin = i == 0 ? 0 : dp(3);
+            clp.rightMargin = i == cv.length - 1 ? 0 : dp(3);
             chips.addView(cv[i], clp);
         }
         siram.setOnClickListener(v -> {
@@ -12329,6 +12335,13 @@ public class MainActivity extends Activity {
         });
         acak.setOnClickListener(v -> startSambung(-1));
         urutBtn.setOnClickListener(v -> startUrut(selSi));
+        mushafBtn.setOnClickListener(v -> {
+            mushafSi = selSi;
+            mushafOpen.clear();
+            mushafGood.clear();
+            mushafPeek = null;
+            showMushaf();
+        });
         body.addView(chips, lp(WRAP, 10));
 
         // PILIHAN BENIH LAINNYA
