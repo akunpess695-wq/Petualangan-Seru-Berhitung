@@ -10923,6 +10923,10 @@ public class MainActivity extends Activity {
         private final float[] hx;
         private final float[] hy;
         private float hr = 0f;
+        private float rx = -1f;
+        private float ry = -1f;
+        private int hausN = 0;
+        private long tapMs = 0L;
         private float grow = 0f;
         private float tm = 0f;
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -10946,6 +10950,11 @@ public class MainActivity extends Activity {
             this.hx = new float[si.length];
             this.hy = new float[si.length];
             this.grow = animate ? 0f : 1f;
+            for (boolean hb : haus) {
+                if (hb) {
+                    hausN++;
+                }
+            }
         }
 
         @Override
@@ -11196,7 +11205,7 @@ public class MainActivity extends Activity {
             float ix = sl + d * 8;
             float iy = st + d * 8;
             float iw = (sr - sl) - d * 16;
-            float ih = (sb - st) - d * 16;
+            float ih = (sb - st) - d * 44;
             if (n == 0) {
                 c.saveLayerAlpha(w / 2f - d * 50, st + ih * 0.05f, w / 2f + d * 50, st + ih * 0.56f, 130);
                 drawPlant(c, p, w / 2f, st + ih * 0.52f, d * 62, 1, 0f, 0f, false);
@@ -11208,6 +11217,7 @@ public class MainActivity extends Activity {
                 c.drawText("Pilih benih ayat", w / 2f, st + ih * 0.68f, p);
                 c.drawText("untuk ditanam", w / 2f, st + ih * 0.68f + d * 18, p);
                 hr = 0f;
+                pet(c, sl, sr, sb);
                 return;
             }
             int cols = (int) Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n * iw / ih))));
@@ -11261,13 +11271,113 @@ public class MainActivity extends Activity {
                 }
             }
             p.setStyle(Paint.Style.FILL);
+            pet(c, sl, sr, sb);
+        }
+
+        /** Kelinci penjaga kebun: melompat riang; lesu dan minta disiram bila ada tanaman haus. */
+        private void pet(Canvas c, float sl, float sr, float sb) {
+            float sz = d * 40;
+            boolean sleepy = hausN > 0;
+            float cx0 = (sl + sr) / 2f;
+            float x;
+            float lift = 0f;
+            int dir;
+            if (sleepy) {
+                x = sr - d * 52;
+                dir = -1;
+            } else {
+                float ph = tm * 0.9f;
+                x = cx0 + (float) Math.sin(ph) * (sr - sl) * 0.3f;
+                dir = Math.cos(ph) >= 0 ? 1 : -1;
+                lift = Math.max(0f, (float) Math.sin(tm * 7)) * d * 7;
+            }
+            long now = android.os.SystemClock.uptimeMillis();
+            float tp = Math.max(0f, 1f - (now - tapMs) / 650f);
+            if (tp > 0f) {
+                lift += (float) Math.sin(tp * Math.PI) * d * 24;
+            }
+            float by = sb - d * 12;
+            rx = x;
+            ry = by - sz * 0.5f - lift;
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.argb(55, 40, 20, 0));
+            c.drawOval(new RectF(x - sz * 0.5f, by - sz * 0.06f, x + sz * 0.5f, by + sz * 0.07f), p);
+            float breathe = sleepy ? (float) Math.sin(tm * 2) * sz * 0.015f : 0f;
+            c.save();
+            c.translate(0f, -lift + breathe);
+            c.scale(dir, 1f, x, by);
+            int fur = Color.parseColor("#FFF6EC");
+            p.setColor(fur);
+            c.drawCircle(x - sz * 0.46f, by - sz * 0.3f, sz * 0.14f, p);
+            c.drawOval(new RectF(x - sz * 0.5f, by - sz * 0.62f, x + sz * 0.42f, by - sz * 0.04f), p);
+            p.setColor(Color.parseColor("#F0E0CC"));
+            c.drawOval(new RectF(x - sz * 0.4f, by - sz * 0.22f, x + sz * 0.34f, by - sz * 0.04f), p);
+            p.setColor(fur);
+            c.drawOval(new RectF(x + sz * 0.14f, by - sz * 0.12f, x + sz * 0.38f, by - sz * 0.02f), p);
+            float hx0 = x + sz * 0.32f;
+            float hy0 = by - sz * 0.64f;
+            for (int e2 = 0; e2 < 2; e2++) {
+                float ang = sleepy ? 58f : (e2 == 0 ? -10f : 8f);
+                c.save();
+                c.translate(hx0 - sz * 0.08f + e2 * sz * 0.18f, hy0 - sz * 0.2f);
+                c.rotate(ang);
+                p.setColor(fur);
+                c.drawOval(new RectF(-sz * 0.085f, -sz * 0.36f, sz * 0.085f, sz * 0.02f), p);
+                p.setColor(Color.parseColor("#F8B6C8"));
+                c.drawOval(new RectF(-sz * 0.045f, -sz * 0.31f, sz * 0.045f, -sz * 0.03f), p);
+                c.restore();
+            }
+            p.setColor(fur);
+            c.drawCircle(hx0, hy0, sz * 0.3f, p);
+            p.setColor(Color.argb(110, 248, 150, 170));
+            c.drawCircle(hx0 + sz * 0.04f, hy0 + sz * 0.1f, sz * 0.07f, p);
+            p.setColor(Color.parseColor("#3B2A20"));
+            if (sleepy) {
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeCap(Paint.Cap.ROUND);
+                p.setStrokeWidth(sz * 0.035f);
+                c.drawLine(hx0 + sz * 0.06f, hy0 - sz * 0.02f, hx0 + sz * 0.17f, hy0 - sz * 0.02f, p);
+                p.setStyle(Paint.Style.FILL);
+            } else {
+                c.drawCircle(hx0 + sz * 0.12f, hy0 - sz * 0.03f, sz * 0.045f, p);
+                p.setColor(Color.WHITE);
+                c.drawCircle(hx0 + sz * 0.13f, hy0 - sz * 0.045f, sz * 0.014f, p);
+            }
+            p.setColor(Color.parseColor("#F48FB1"));
+            c.drawCircle(hx0 + sz * 0.28f, hy0 + sz * 0.05f, sz * 0.04f, p);
+            c.restore();
+            if (sleepy) {
+                float al = (float) (0.5 + 0.5 * Math.sin(tm * 3));
+                p.setTextAlign(Paint.Align.CENTER);
+                p.setTypeface(ROUND_BOLD);
+                p.setColor(Color.argb((int) (120 + 135 * al), 255, 255, 255));
+                p.setTextSize(d * 13);
+                c.drawText("z", x - dir * sz * 0.2f, by - sz * 1.2f, p);
+                p.setTextSize(d * 10);
+                c.drawText("z", x - dir * sz * 0.02f, by - sz * 1.0f, p);
+                p.setColor(Color.parseColor("#4FC3F7"));
+                float dx = x - dir * sz * 0.56f;
+                float dy = by - sz * 0.95f;
+                c.drawCircle(dx, dy + d * 3, d * 4.5f, p);
+                path.reset();
+                path.moveTo(dx, dy - d * 6);
+                path.lineTo(dx - d * 4, dy + d * 1.5f);
+                path.lineTo(dx + d * 4, dy + d * 1.5f);
+                path.close();
+                c.drawPath(path, p);
+            }
         }
 
         @Override
         public boolean onTouchEvent(MotionEvent e) {
             int a = e.getActionMasked();
+            boolean nearPet = rx >= 0f && Math.abs(e.getX() - rx) < d * 30 && Math.abs(e.getY() - ry) < d * 34;
             if (a == MotionEvent.ACTION_DOWN) {
-                return hr > 0f;
+                return hr > 0f || nearPet;
+            }
+            if (a == MotionEvent.ACTION_UP && nearPet) {
+                tapMs = android.os.SystemClock.uptimeMillis();
+                return true;
             }
             if (a == MotionEvent.ACTION_UP && hr > 0f) {
                 int best = -1;
