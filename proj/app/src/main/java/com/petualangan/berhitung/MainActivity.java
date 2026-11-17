@@ -10721,6 +10721,547 @@ public class MainActivity extends Activity {
         return g;
     }
 
+    // ---------- Kebun Hafalan (desain ulang: kebun 2D, benih, tanaman tumbuh) ----------
+    private interface IntPick {
+        void pick(int si);
+    }
+
+    private int kebunScrollX = 0;
+    private boolean kebunNoGrow = false;
+
+    private GradientDrawable rr(int color, int strokeColor, int strokeDp, int radiusDp) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(dp(radiusDp));
+        if (strokeDp > 0) {
+            g.setStroke(dp(strokeDp), strokeColor);
+        }
+        return g;
+    }
+
+    /** Gambar satu tanaman. stage: 0 benih, 1 tunas, 2 pohon, 3 pohon emas. by = garis tanah. */
+    private void drawPlant(Canvas c, Paint p, float cx, float by, float s, int stage, float ang, float tw, boolean shadow) {
+        p.setShader(null);
+        p.setStyle(Paint.Style.FILL);
+        if (shadow && stage > 0) {
+            p.setColor(Color.argb(45, 40, 20, 0));
+            c.drawOval(new RectF(cx - s * 0.26f, by - s * 0.045f, cx + s * 0.26f, by + s * 0.045f), p);
+        }
+        if (stage == 0) {
+            p.setColor(Color.parseColor("#8A5428"));
+            c.drawOval(new RectF(cx - s * 0.2f, by - s * 0.06f, cx + s * 0.2f, by + s * 0.05f), p);
+            c.save();
+            c.rotate(-25f, cx, by - s * 0.12f);
+            p.setColor(Color.parseColor("#7B4A24"));
+            c.drawOval(new RectF(cx - s * 0.1f, by - s * 0.24f, cx + s * 0.1f, by - s * 0.03f), p);
+            p.setColor(Color.argb(110, 255, 220, 170));
+            c.drawOval(new RectF(cx - s * 0.05f, by - s * 0.21f, cx - s * 0.01f, by - s * 0.12f), p);
+            c.restore();
+            return;
+        }
+        c.save();
+        c.rotate(ang, cx, by);
+        if (stage == 1) {
+            float top = by - s * 0.46f;
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeWidth(s * 0.07f);
+            p.setColor(Color.parseColor("#4E9A3A"));
+            c.drawLine(cx, by, cx, top, p);
+            p.setStyle(Paint.Style.FILL);
+            c.save();
+            c.translate(cx, top);
+            c.rotate(-32f);
+            p.setColor(Color.parseColor("#68B84B"));
+            c.drawOval(new RectF(-s * 0.3f, -s * 0.1f, 0f, s * 0.1f), p);
+            p.setColor(Color.argb(120, 185, 231, 124));
+            c.drawOval(new RectF(-s * 0.26f, -s * 0.07f, -s * 0.06f, 0f), p);
+            c.restore();
+            c.save();
+            c.translate(cx, top);
+            c.rotate(32f);
+            p.setColor(Color.parseColor("#7FCB5A"));
+            c.drawOval(new RectF(0f, -s * 0.1f, s * 0.3f, s * 0.1f), p);
+            p.setColor(Color.argb(120, 185, 231, 124));
+            c.drawOval(new RectF(s * 0.06f, -s * 0.07f, s * 0.26f, 0f), p);
+            c.restore();
+        } else {
+            float k = stage == 2 ? 0.86f : 1f;
+            float z = s * k;
+            float cy = by - z * 0.6f;
+            if (stage == 3) {
+                p.setShader(new android.graphics.RadialGradient(cx, cy, z * 0.62f,
+                        Color.argb(95, 246, 200, 75), Color.argb(0, 246, 200, 75), Shader.TileMode.CLAMP));
+                c.drawCircle(cx, cy, z * 0.62f, p);
+                p.setShader(null);
+            }
+            p.setColor(Color.parseColor("#A96C3D"));
+            c.drawRoundRect(new RectF(cx - z * 0.065f, cy, cx + z * 0.065f, by), z * 0.03f, z * 0.03f, p);
+            p.setColor(Color.parseColor("#4E9A3A"));
+            c.drawCircle(cx, cy, z * 0.3f, p);
+            p.setColor(Color.parseColor("#5DAA45"));
+            c.drawCircle(cx - z * 0.2f, cy + z * 0.08f, z * 0.22f, p);
+            c.drawCircle(cx + z * 0.2f, cy + z * 0.08f, z * 0.22f, p);
+            p.setColor(Color.parseColor("#68B84B"));
+            c.drawCircle(cx, cy - z * 0.08f, z * 0.24f, p);
+            p.setColor(Color.argb(150, 185, 231, 124));
+            c.drawCircle(cx - z * 0.09f, cy - z * 0.17f, z * 0.09f, p);
+            if (stage == 3) {
+                float[][] ap = {{-0.15f, -0.05f}, {0.18f, 0.02f}, {0f, 0.12f}, {-0.2f, 0.14f}, {0.1f, -0.17f}};
+                for (float[] a : ap) {
+                    float ax = cx + a[0] * z;
+                    float ay = cy + a[1] * z;
+                    p.setColor(Color.parseColor("#E0A21A"));
+                    c.drawCircle(ax, ay, z * 0.062f, p);
+                    p.setColor(Color.parseColor("#F6C84B"));
+                    c.drawCircle(ax - z * 0.004f, ay - z * 0.006f, z * 0.052f, p);
+                    p.setColor(Color.argb(200, 255, 255, 255));
+                    c.drawCircle(ax - z * 0.02f, ay - z * 0.022f, z * 0.014f, p);
+                }
+            }
+        }
+        c.restore();
+        if (stage == 3) {
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeWidth(s * 0.025f);
+            float[][] sp = {{-0.34f, -0.78f}, {0.36f, -0.62f}, {0.02f, -1.0f}};
+            for (int i = 0; i < sp.length; i++) {
+                float al = (float) (0.5 + 0.5 * Math.sin(tw * 1.0 + i * 2.1));
+                p.setColor(Color.argb((int) (230 * al), 255, 243, 176));
+                float sx = cx + sp[i][0] * s;
+                float sy = by + sp[i][1] * s;
+                float r = s * (0.05f + 0.05f * al);
+                c.drawLine(sx - r, sy, sx + r, sy, p);
+                c.drawLine(sx, sy - r, sx, sy + r, p);
+            }
+            p.setStyle(Paint.Style.FILL);
+        }
+    }
+
+    /** Ikon tanaman kecil (kartu benih dan header). */
+    private class SeedIcon extends View {
+        private final int stage;
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        SeedIcon(Context ctx, int stage) {
+            super(ctx);
+            this.stage = stage;
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
+            float w = getWidth();
+            float h = getHeight();
+            drawPlant(c, p, w / 2f, h * 0.9f, Math.min(w, h) * 1.05f, stage, 0f, 0f, false);
+        }
+    }
+
+    /** Kantong benih. */
+    private class SeedBagView extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+
+        SeedBagView(Context ctx) {
+            super(ctx);
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
+            float w = getWidth();
+            float h = getHeight();
+            float cx = w / 2f;
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new android.graphics.RadialGradient(cx, h * 0.52f, w * 0.5f,
+                    Color.argb(190, 255, 236, 160), Color.argb(0, 255, 236, 160), Shader.TileMode.CLAMP));
+            c.drawCircle(cx, h * 0.52f, w * 0.5f, p);
+            p.setShader(null);
+            float bw = w * 0.5f;
+            float top = h * 0.24f;
+            float bot = h * 0.86f;
+            path.reset();
+            path.moveTo(cx - bw / 2f, top);
+            path.lineTo(cx + bw / 2f, top);
+            path.lineTo(cx + bw / 2f + w * 0.03f, bot);
+            path.lineTo(cx - bw / 2f - w * 0.03f, bot);
+            path.close();
+            p.setColor(Color.parseColor("#E6BC7E"));
+            c.drawPath(path, p);
+            p.setColor(Color.parseColor("#F3D7A2"));
+            c.drawRect(cx - bw / 2f, top - h * 0.1f, cx + bw / 2f, top + h * 0.03f, p);
+            p.setColor(Color.argb(60, 120, 70, 20));
+            c.drawRect(cx + bw * 0.2f, top, cx + bw / 2f + w * 0.03f, bot, p);
+            p.setColor(Color.parseColor("#FFF8E6"));
+            c.drawRoundRect(new RectF(cx - bw * 0.34f, top + h * 0.17f, cx + bw * 0.34f, bot - h * 0.08f), w * 0.06f, w * 0.06f, p);
+            drawPlant(c, p, cx, bot - h * 0.1f, w * 0.42f, 1, 0f, 0f, false);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeWidth(w * 0.025f);
+            p.setColor(Color.parseColor("#F6C84B"));
+            float sx = cx + bw * 0.55f;
+            float sy = top - h * 0.02f;
+            float r = w * 0.08f;
+            c.drawLine(sx - r, sy, sx + r, sy, p);
+            c.drawLine(sx, sy - r, sx, sy + r, p);
+            p.setStyle(Paint.Style.FILL);
+        }
+    }
+
+    /** Area kebun utama: langit, pagar, papan, tanah, dan tanaman yang tumbuh. */
+    private class GardenView extends View {
+        private final int[] si;
+        private final int[] stg;
+        private final boolean[] haus;
+        private final int sel;
+        private final int done;
+        private final int tot;
+        private final IntPick cb;
+        private final boolean animate;
+        private final float[] hx;
+        private final float[] hy;
+        private float hr = 0f;
+        private float grow = 0f;
+        private float tm = 0f;
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+        private final RectF rf = new RectF();
+        private ValueAnimator gA;
+        private ValueAnimator tA;
+        private final float d = getResources().getDisplayMetrics().density;
+
+        GardenView(Context ctx, int[] si, int[] stg, boolean[] haus, int sel, int done, int tot,
+                   boolean animate, IntPick cb) {
+            super(ctx);
+            this.si = si;
+            this.stg = stg;
+            this.haus = haus;
+            this.sel = sel;
+            this.done = done;
+            this.tot = tot;
+            this.cb = cb;
+            this.animate = animate;
+            this.hx = new float[si.length];
+            this.hy = new float[si.length];
+            this.grow = animate ? 0f : 1f;
+        }
+
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            if (animate) {
+                gA = ValueAnimator.ofFloat(0f, 1f);
+                gA.setDuration(1300);
+                gA.addUpdateListener(a -> {
+                    grow = (float) a.getAnimatedValue();
+                    invalidate();
+                });
+                gA.start();
+            }
+            tA = ValueAnimator.ofFloat(0f, (float) (Math.PI * 2));
+            tA.setDuration(5200);
+            tA.setRepeatCount(ValueAnimator.INFINITE);
+            tA.setInterpolator(new android.view.animation.LinearInterpolator());
+            tA.addUpdateListener(a -> {
+                tm = (float) a.getAnimatedValue();
+                invalidate();
+            });
+            tA.start();
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            if (gA != null) {
+                gA.cancel();
+            }
+            if (tA != null) {
+                tA.cancel();
+            }
+        }
+
+        private void cloud(Canvas c, float cx, float cy, float r) {
+            p.setColor(Color.argb(235, 255, 255, 255));
+            c.drawCircle(cx, cy, r, p);
+            c.drawCircle(cx + r * 0.95f, cy + r * 0.2f, r * 0.75f, p);
+            c.drawCircle(cx - r * 0.95f, cy + r * 0.25f, r * 0.65f, p);
+            rf.set(cx - r * 1.5f, cy + r * 0.25f, cx + r * 1.7f, cy + r * 0.95f);
+            c.drawRoundRect(rf, r * 0.4f, r * 0.4f, p);
+        }
+
+        private void bush(Canvas c, float cx, float cy, float r) {
+            p.setColor(Color.parseColor("#4E9A3A"));
+            c.drawCircle(cx, cy, r, p);
+            p.setColor(Color.parseColor("#68B84B"));
+            c.drawCircle(cx - r * 0.3f, cy - r * 0.15f, r * 0.8f, p);
+            c.drawCircle(cx + r * 0.55f, cy + r * 0.1f, r * 0.6f, p);
+            p.setColor(Color.argb(120, 185, 231, 124));
+            c.drawCircle(cx - r * 0.5f, cy - r * 0.45f, r * 0.28f, p);
+        }
+
+        private void flower(Canvas c, float x, float y, float r) {
+            p.setColor(Color.WHITE);
+            for (int i = 0; i < 5; i++) {
+                double a = i * Math.PI * 2 / 5;
+                c.drawCircle(x + (float) Math.cos(a) * r, y + (float) Math.sin(a) * r, r * 0.8f, p);
+            }
+            p.setColor(Color.parseColor("#F6C84B"));
+            c.drawCircle(x, y, r * 0.65f, p);
+        }
+
+        private void board(Canvas c, float l, float t, float r, float b, float rot) {
+            c.save();
+            c.rotate(rot, (l + r) / 2f, (t + b) / 2f);
+            rf.set(l, t, r, b);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.parseColor("#EFC27F"));
+            c.drawRoundRect(rf, d * 8, d * 8, p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(d * 2.5f);
+            p.setColor(Color.parseColor("#A96C3D"));
+            c.drawRoundRect(rf, d * 8, d * 8, p);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.parseColor("#8A5428"));
+            c.drawCircle(l + d * 7, t + d * 7, d * 1.8f, p);
+            c.drawCircle(r - d * 7, t + d * 7, d * 1.8f, p);
+            c.restore();
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
+            float w = getWidth();
+            float h = getHeight();
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+            p.setShader(null);
+            p.setStyle(Paint.Style.FILL);
+            p.setTypeface(ROUND_BOLD);
+
+            // awan
+            cloud(c, w * 0.22f + (float) Math.sin(tm) * d * 5, h * 0.08f, d * 17);
+            cloud(c, w * 0.80f + (float) Math.sin(tm + 2f) * d * 5, h * 0.06f, d * 14);
+            // bukit jauh
+            p.setColor(Color.parseColor("#9ADB74"));
+            c.drawOval(new RectF(-w * 0.2f, h * 0.2f, w * 0.62f, h * 0.5f), p);
+            p.setColor(Color.parseColor("#8CD36A"));
+            c.drawOval(new RectF(w * 0.4f, h * 0.22f, w * 1.2f, h * 0.5f), p);
+            // rumput
+            p.setShader(new LinearGradient(0, h * 0.33f, 0, h, Color.parseColor("#B9E77C"), Color.parseColor("#CFEA9A"), Shader.TileMode.CLAMP));
+            c.drawRect(0, h * 0.33f, w, h, p);
+            p.setShader(null);
+
+            // pagar
+            float fy = h * 0.3f;
+            float rail = d * 8;
+            p.setColor(Color.parseColor("#E7B26A"));
+            c.drawRoundRect(new RectF(0, fy, w, fy + rail), d * 3, d * 3, p);
+            c.drawRoundRect(new RectF(0, fy + rail * 1.9f, w, fy + rail * 2.9f), d * 3, d * 3, p);
+            float[] postX = {0.46f, 0.6f, 0.74f};
+            for (float px : postX) {
+                rf.set(w * px - d * 8, fy - d * 12, w * px + d * 8, fy + rail * 4.2f);
+                p.setColor(Color.parseColor("#E0A45E"));
+                c.drawRoundRect(rf, d * 5, d * 5, p);
+                p.setColor(Color.argb(60, 120, 70, 20));
+                c.drawRect(w * px + d * 2, fy - d * 8, w * px + d * 8, fy + rail * 4f, p);
+            }
+            // semak dan bunga di pinggir
+            bush(c, -d * 4, h * 0.36f, d * 34);
+            bush(c, w + d * 4, h * 0.38f, d * 36);
+            flower(c, w * 0.04f, h * 0.38f, d * 4);
+            flower(c, w * 0.97f, h * 0.45f, d * 4.5f);
+            flower(c, w * 0.52f, h * 0.345f, d * 3.2f);
+
+            // papan Progress Kebun
+            float bh = Math.max(d * 62, Math.min(d * 84, h * 0.26f));
+            float bl = w * 0.03f;
+            float bt = h * 0.035f;
+            float br = w * 0.42f;
+            board(c, bl, bt, br, bt + bh, -3f);
+            c.save();
+            c.rotate(-3f, (bl + br) / 2f, bt + bh / 2f);
+            float tx = bl + d * 10;
+            p.setTextAlign(Paint.Align.LEFT);
+            p.setColor(Color.parseColor("#5A3416"));
+            p.setTextSize(d * 12.5f);
+            c.drawText("Progress Kebun", tx, bt + bh * 0.3f, p);
+            float barL = tx;
+            float barR = br - d * 40;
+            float barY = bt + bh * 0.5f;
+            rf.set(barL, barY - d * 4, barR, barY + d * 4);
+            p.setColor(Color.argb(150, 255, 248, 230));
+            c.drawRoundRect(rf, d * 4, d * 4, p);
+            float frac = tot > 0 ? Math.min(1f, done / (float) tot) : 0f;
+            if (frac > 0f) {
+                rf.set(barL, barY - d * 4, barL + Math.max(d * 8, (barR - barL) * frac), barY + d * 4);
+                p.setColor(Color.parseColor("#68B84B"));
+                c.drawRoundRect(rf, d * 4, d * 4, p);
+            }
+            p.setTextSize(d * 11);
+            p.setColor(Color.parseColor("#5A3416"));
+            c.drawText(Math.round(frac * 100) + "%", barR + d * 6, barY + d * 4, p);
+            drawPlant(c, p, tx + d * 6, bt + bh * 0.9f, d * 20, 1, 0f, 0f, false);
+            p.setTextSize(d * 11.5f);
+            p.setColor(Color.parseColor("#5A3416"));
+            c.drawText(done + " / " + tot + " Ayat", tx + d * 18, bt + bh * 0.86f, p);
+            c.restore();
+
+            // papan Kebunmu
+            float kw = w * 0.26f;
+            float kl = w * 0.71f;
+            float kt = h * 0.06f;
+            float kh = Math.max(d * 58, Math.min(d * 74, h * 0.22f));
+            p.setColor(Color.parseColor("#B9783E"));
+            c.drawRect(kl + kw / 2f - d * 5, kt + kh - d * 2, kl + kw / 2f + d * 5, h * 0.4f, p);
+            board(c, kl, kt, kl + kw, kt + kh, 2f);
+            p.setColor(Color.parseColor("#C8794A"));
+            path.reset();
+            float pcx = kl + kw / 2f;
+            float pby = kt + kh * 0.62f;
+            path.moveTo(pcx - d * 8, pby - d * 7);
+            path.lineTo(pcx + d * 8, pby - d * 7);
+            path.lineTo(pcx + d * 6, pby + d * 1);
+            path.lineTo(pcx - d * 6, pby + d * 1);
+            path.close();
+            drawPlant(c, p, pcx, pby - d * 6, d * 22, 1, 0f, 0f, false);
+            p.setColor(Color.parseColor("#C8794A"));
+            c.drawPath(path, p);
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTextSize(d * 12.5f);
+            p.setColor(Color.parseColor("#5A3416"));
+            c.drawText("Kebunmu", pcx, kt + kh * 0.88f, p);
+
+            // tanah
+            float sl = w * 0.045f;
+            float sr = w * 0.955f;
+            float st = h * 0.43f;
+            float sb = h * 0.96f;
+            rf.set(sl - d * 7, st - d * 7, sr + d * 7, sb + d * 7);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.parseColor("#E7B26A"));
+            c.drawRoundRect(rf, d * 22, d * 22, p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(d * 2);
+            p.setColor(Color.parseColor("#B9783E"));
+            c.drawRoundRect(rf, d * 22, d * 22, p);
+            p.setStyle(Paint.Style.FILL);
+            rf.set(sl, st, sr, sb);
+            p.setShader(new LinearGradient(0, st, 0, sb, Color.parseColor("#B47A4A"), Color.parseColor("#96592F"), Shader.TileMode.CLAMP));
+            c.drawRoundRect(rf, d * 16, d * 16, p);
+            p.setShader(null);
+            p.setColor(Color.argb(40, 70, 30, 0));
+            for (int i = 0; i < 22; i++) {
+                float ox = sl + (sr - sl) * (((i * 37) % 100) / 100f);
+                float oy = st + (sb - st) * (((i * 53 + 11) % 100) / 100f);
+                c.drawOval(new RectF(ox - d * 7, oy - d * 3.5f, ox + d * 7, oy + d * 3.5f), p);
+            }
+            p.setColor(Color.argb(45, 0, 0, 0));
+            rf.set(sl, st, sr, st + d * 8);
+            c.drawRoundRect(rf, d * 8, d * 8, p);
+
+            // tanaman
+            int n = si.length;
+            float ix = sl + d * 8;
+            float iy = st + d * 8;
+            float iw = (sr - sl) - d * 16;
+            float ih = (sb - st) - d * 16;
+            if (n == 0) {
+                c.saveLayerAlpha(w / 2f - d * 50, st + ih * 0.05f, w / 2f + d * 50, st + ih * 0.56f, 130);
+                drawPlant(c, p, w / 2f, st + ih * 0.52f, d * 62, 1, 0f, 0f, false);
+                c.restore();
+                p.setStyle(Paint.Style.FILL);
+                p.setTextAlign(Paint.Align.CENTER);
+                p.setTextSize(d * 14);
+                p.setColor(Color.parseColor("#F6DDB0"));
+                c.drawText("Pilih benih ayat", w / 2f, st + ih * 0.68f, p);
+                c.drawText("untuk ditanam", w / 2f, st + ih * 0.68f + d * 18, p);
+                hr = 0f;
+                return;
+            }
+            int cols = (int) Math.max(1, Math.min(n, Math.ceil(Math.sqrt(n * iw / ih))));
+            int rows = (int) Math.ceil(n / (double) cols);
+            float cell = Math.min(Math.min(iw / cols, ih / rows), d * 84);
+            float gx0 = ix + (iw - cell * cols) / 2f;
+            float gy0 = iy + (ih - cell * rows) / 2f;
+            hr = cell / 2f;
+            android.view.animation.Interpolator ov = new OvershootInterpolator(2.2f);
+            for (int i = 0; i < n; i++) {
+                int col = i % cols;
+                int row = i / cols;
+                float cx = gx0 + cell * (col + 0.5f);
+                float by = gy0 + cell * (row + 0.8f);
+                float s = cell * 0.95f;
+                hx[i] = cx;
+                hy[i] = gy0 + cell * (row + 0.5f);
+                float pr = Math.max(0f, Math.min(1f, grow * 1.5f - i * 0.04f));
+                float g = ov.getInterpolation(pr);
+                boolean isSel = si[i] == sel;
+                if (isSel) {
+                    p.setStyle(Paint.Style.FILL);
+                    p.setColor(Color.argb((int) (70 + 40 * Math.sin(tm * 2)), 255, 248, 214));
+                    c.drawOval(new RectF(cx - s * 0.42f, by - s * 0.09f, cx + s * 0.42f, by + s * 0.09f), p);
+                }
+                c.save();
+                c.scale(g, g, cx, by);
+                drawPlant(c, p, cx, by, s, stg[i], (float) Math.sin(tm + i * 0.9) * 2.4f, tm * 1.5f, true);
+                c.restore();
+                if (haus[i]) {
+                    p.setStyle(Paint.Style.FILL);
+                    p.setColor(Color.parseColor("#4FC3F7"));
+                    float dx = cx + s * 0.3f;
+                    float dy = by - s * 0.78f;
+                    c.drawCircle(dx, dy + d * 3, d * 4.5f, p);
+                    path.reset();
+                    path.moveTo(dx, dy - d * 6);
+                    path.lineTo(dx - d * 4, dy + d * 1.5f);
+                    path.lineTo(dx + d * 4, dy + d * 1.5f);
+                    path.close();
+                    c.drawPath(path, p);
+                }
+                if (cell >= d * 44) {
+                    p.setStyle(Paint.Style.FILL);
+                    p.setTextAlign(Paint.Align.CENTER);
+                    p.setTextSize(Math.min(d * 10.5f, cell * 0.17f));
+                    p.setColor(isSel ? Color.parseColor("#FFF3D6") : Color.argb(220, 255, 243, 214));
+                    String nm = SambungAyat.NAMA[si[i]];
+                    c.drawText(nm, cx, gy0 + cell * (row + 0.97f), p);
+                }
+            }
+            p.setStyle(Paint.Style.FILL);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent e) {
+            int a = e.getActionMasked();
+            if (a == MotionEvent.ACTION_DOWN) {
+                return hr > 0f;
+            }
+            if (a == MotionEvent.ACTION_UP && hr > 0f) {
+                int best = -1;
+                float bd = hr * hr;
+                for (int i = 0; i < si.length; i++) {
+                    float dx = e.getX() - hx[i];
+                    float dy = e.getY() - hy[i];
+                    float dd = dx * dx + dy * dy;
+                    if (dd <= bd) {
+                        bd = dd;
+                        best = i;
+                    }
+                }
+                if (best >= 0 && cb != null) {
+                    cb.pick(si[best]);
+                }
+                return true;
+            }
+            return true;
+        }
+    }
+
+    private void kebunPilih(int si) {
+        kebunSelectedSi = si;
+        kebunNoGrow = true;
+        showSambung();
+    }
+
     private void showSambung() {
         handler.removeCallbacksAndMessages(null);
         plainUi = true;
@@ -10735,252 +11276,185 @@ public class MainActivity extends Activity {
         if (kebunSelectedSi < 0 || kebunSelectedSi >= ns) {
             kebunSelectedSi = ns - 1;
         }
+        final boolean animate = !kebunNoGrow;
+        kebunNoGrow = false;
+        final int hari = SambungAyat.hariIni();
 
         int totAyat = 0;
         int doneAyat = 0;
-        int cntMutqin = 0;
-        int cntTumbuh = 0;
-        int cntBibit = 0;
-        int sumSegar = 0;
-        for (int si = 0; si < ns; si++) {
-            totAyat += SambungAyat.jumlahAyat(si);
-            doneAyat += SambungAyat.jumlahDikuasai(prefs, si);
-            int tahap = SambungAyat.tahapTanaman(prefs, si);
-            if (tahap == 3) cntMutqin++;
-            else if (tahap >= 1) cntTumbuh++;
-            else cntBibit++;
-            sumSegar += SambungAyat.kesegaran(prefs, si);
+        int[] tahapAll = new int[ns];
+        boolean[] hausAll = new boolean[ns];
+        int plantedN = 0;
+        for (int s0 = 0; s0 < ns; s0++) {
+            int n0 = SambungAyat.jumlahAyat(s0);
+            int m0 = SambungAyat.jumlahDikuasai(prefs, s0);
+            totAyat += n0;
+            doneAyat += m0;
+            tahapAll[s0] = SambungAyat.tahapTanaman(prefs, s0);
+            hausAll[s0] = m0 < n0 && SambungAyat.pernahLatih(prefs, s0)
+                    && hari - SambungAyat.hariTerakhir(prefs, s0) >= SambungAyat.HARI_HAUS;
+            if (tahapAll[s0] >= 1) {
+                plantedN++;
+            }
         }
-        final int avgSegar = ns > 0 ? Math.round((float) sumSegar / ns) : 0;
+        int[] pSi = new int[plantedN];
+        int[] pSt = new int[plantedN];
+        boolean[] pHaus = new boolean[plantedN];
+        int pi = 0;
+        for (int s1 = ns - 1; s1 >= 0; s1--) {
+            if (tahapAll[s1] >= 1) {
+                pSi[pi] = s1;
+                pSt[pi] = tahapAll[s1];
+                pHaus[pi] = hausAll[s1];
+                pi++;
+            }
+        }
+
+        final int selSi = kebunSelectedSi;
+        final int selN = SambungAyat.jumlahAyat(selSi);
+        final int selM = SambungAyat.jumlahDikuasai(prefs, selSi);
+        final int selTahap = tahapAll[selSi];
+        final int selSegar = SambungAyat.kesegaran(prefs, selSi);
+        final boolean selHaus = hausAll[selSi];
+
+        final int cGreen = Color.parseColor("#68B84B");
+        final int cDark = Color.parseColor("#285A35");
+        final int cCream = Color.parseColor("#FFF8E6");
+        final int cBrown = Color.parseColor("#5A3416");
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#FFFDF7"));
-        root.setPadding(0, 0, 0, dp(24));
+        GradientDrawable skyBg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.parseColor("#78CCF5"), Color.parseColor("#A9DCF3"),
+                        Color.parseColor("#CFEA9A"), Color.parseColor("#F4F2C0")});
+        root.setBackground(skyBg);
 
-        // 1. HEADER ZAMRUD SALAMUDA QUEST
+        // HEADER
         LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable hdrBg = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.parseColor("#047857"), Color.parseColor("#059669"), Color.parseColor("#0D9488")}
-        );
-        hdrBg.setCornerRadii(new float[]{0, 0, 0, 0, dp(28), dp(28), dp(28), dp(28)});
-        header.setBackground(hdrBg);
-        header.setPadding(dp(18), dp(20), dp(18), dp(22));
-        header.setElevation(dp(6));
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(12), dp(12), dp(12), dp(4));
 
-        LinearLayout topRow = new LinearLayout(this);
-        topRow.setOrientation(LinearLayout.HORIZONTAL);
-        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView back = text("←", 20, cDark, true);
+        back.setBackground(rr(cCream, Color.parseColor("#EADFC0"), 1, 22));
+        back.setElevation(dp(3));
+        back.setOnClickListener(v -> showMenu());
+        pressable(back);
+        header.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
-        TextView avaBadge = text(av(0), 24, INK, false);
-        avaBadge.setBackground(plainBox(Color.parseColor("#FEF3C7"), Color.parseColor("#FCD34D")));
-        avaBadge.setPadding(dp(8), dp(6), dp(8), dp(6));
-        topRow.addView(avaBadge, new LinearLayout.LayoutParams(WRAP, WRAP));
+        LinearLayout titlePill = new LinearLayout(this);
+        titlePill.setOrientation(LinearLayout.HORIZONTAL);
+        titlePill.setGravity(Gravity.CENTER_VERTICAL);
+        titlePill.setBackground(rr(cCream, Color.parseColor("#EADFC0"), 1, 24));
+        titlePill.setElevation(dp(3));
+        titlePill.setPadding(dp(10), dp(4), dp(14), dp(4));
+        titlePill.addView(new SeedIcon(this, 1), new LinearLayout.LayoutParams(dp(30), dp(34)));
+        LinearLayout tcol = new LinearLayout(this);
+        tcol.setOrientation(LinearLayout.VERTICAL);
+        tcol.setPadding(dp(8), 0, 0, 0);
+        TextView tJudul = text("Kebun Hafalan", 17, cDark, true);
+        tJudul.setGravity(Gravity.START);
+        tcol.addView(tJudul, new LinearLayout.LayoutParams(WRAP, WRAP));
+        TextView tSub = text("Tanam ayat, panen pahala", 10, Color.parseColor("#7A6A4F"), false);
+        tSub.setGravity(Gravity.START);
+        tcol.addView(tSub, new LinearLayout.LayoutParams(WRAP, WRAP));
+        titlePill.addView(tcol, new LinearLayout.LayoutParams(0, WRAP, 1f));
+        LinearLayout.LayoutParams tpl = new LinearLayout.LayoutParams(0, WRAP, 1f);
+        tpl.leftMargin = dp(8);
+        tpl.rightMargin = dp(8);
+        header.addView(titlePill, tpl);
 
-        LinearLayout infoCol = new LinearLayout(this);
-        infoCol.setOrientation(LinearLayout.VERTICAL);
-        infoCol.setPadding(dp(10), 0, dp(8), 0);
-        TextView kelasBadge = text(KELAS_NAMES[kelas].toUpperCase(Locale.ROOT) + " • SALAMUDA QUEST", 10, Color.parseColor("#FDE68A"), true);
-        kelasBadge.setGravity(Gravity.START);
-        infoCol.addView(kelasBadge, lp(WRAP, 0));
-        TextView namaSiswa = text(names[0], 17, Color.WHITE, true);
-        namaSiswa.setGravity(Gravity.START);
-        infoCol.addView(namaSiswa, lp(WRAP, 2));
-        TextView sekolahTxt = text("SD Alam Muhammadiyah Kandangan", 11, Color.parseColor("#D1FAE5"), false);
-        sekolahTxt.setGravity(Gravity.START);
-        infoCol.addView(sekolahTxt, lp(WRAP, 1));
-        topRow.addView(infoCol, new LinearLayout.LayoutParams(0, WRAP, 1f));
-
-        LinearLayout statCol = new LinearLayout(this);
-        statCol.setOrientation(LinearLayout.VERTICAL);
-        statCol.setGravity(Gravity.END);
-        TextView starPill = text("⭐ " + totalStars(), 13, Color.parseColor("#064E3B"), true);
-        starPill.setBackground(pillBg(Color.parseColor("#FBBF24")));
-        starPill.setPadding(dp(12), dp(4), dp(12), dp(4));
-        statCol.addView(starPill, lp(WRAP, 0));
-
-        TextView embunPill = text("💧 " + SambungAyat.embun(prefs) + " Embun", 11, Color.WHITE, true);
-        embunPill.setBackground(pillBg(Color.parseColor("#065F46")));
-        embunPill.setPadding(dp(10), dp(4), dp(10), dp(4));
-        statCol.addView(embunPill, lp(WRAP, 5));
-        topRow.addView(statCol, new LinearLayout.LayoutParams(WRAP, WRAP));
-        header.addView(topRow, lp(WRAP, 0));
-
-        LinearLayout titleRow = new LinearLayout(this);
-        titleRow.setOrientation(LinearLayout.HORIZONTAL);
-        titleRow.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout titleCol = new LinearLayout(this);
-        titleCol.setOrientation(LinearLayout.VERTICAL);
-        TextView judulKebun = text("🌿 Kebun Hafalan", 20, Color.WHITE, true);
-        judulKebun.setGravity(Gravity.START);
-        titleCol.addView(judulKebun, lp(WRAP, 0));
-        TextView subKebun = text("Rawat hafalanmu agar tumbuh berbuah emas!", 11, Color.parseColor("#D1FAE5"), false);
-        subKebun.setGravity(Gravity.START);
-        titleCol.addView(subKebun, lp(WRAP, 2));
-        titleRow.addView(titleCol, new LinearLayout.LayoutParams(0, WRAP, 1f));
-
-        LinearLayout juzTabs = new LinearLayout(this);
-        juzTabs.setOrientation(LinearLayout.HORIZONTAL);
-        for (int jj = 30; jj >= 28; jj--) {
-            final int fj = jj;
-            boolean ok = SambungAyat.ada(this, jj);
-            boolean pilih = jj == SambungAyat.juz;
-            Button jb = button("Juz " + jj, GRAY, 12);
-            jb.setTextColor(pilih ? Color.parseColor("#065F46") : (ok ? Color.WHITE : Color.parseColor("#6EE7B7")));
-            jb.setBackground(plainBox(pilih ? Color.WHITE : Color.parseColor("#065F46"),
-                    pilih ? Color.parseColor("#FBBF24") : Color.parseColor("#047857")));
-            jb.setEnabled(ok);
-            flat(jb);
-            jb.setPadding(dp(10), dp(6), dp(10), dp(6));
-            LinearLayout.LayoutParams jlp = new LinearLayout.LayoutParams(WRAP, WRAP);
-            jlp.leftMargin = dp(4);
-            juzTabs.addView(jb, jlp);
-            jb.setOnClickListener(v -> {
-                SambungAyat.pilihJuz(fj);
+        TextView juzBtn = text("🌱 Juz " + SambungAyat.juz + " ▾", 13, cDark, true);
+        juzBtn.setBackground(rr(cCream, Color.parseColor("#EADFC0"), 1, 22));
+        juzBtn.setElevation(dp(3));
+        juzBtn.setPadding(dp(12), dp(10), dp(12), dp(10));
+        pressable(juzBtn);
+        juzBtn.setOnClickListener(v -> {
+            android.widget.PopupMenu pm = new android.widget.PopupMenu(this, v);
+            for (int jj = 30; jj >= 28; jj--) {
+                android.view.MenuItem mi = pm.getMenu().add(0, jj, 0, "Juz " + jj);
+                mi.setEnabled(SambungAyat.ada(this, jj));
+            }
+            pm.setOnMenuItemClickListener(it -> {
+                SambungAyat.pilihJuz(it.getItemId());
                 kebunSelectedSi = -1;
+                kebunScrollX = 0;
                 showSambung();
+                return true;
             });
-        }
-        titleRow.addView(juzTabs, new LinearLayout.LayoutParams(WRAP, WRAP));
-        header.addView(titleRow, lp(WRAP, 14));
-        root.addView(header, lp(WRAP, 0));
+            pm.show();
+        });
+        header.addView(juzBtn, new LinearLayout.LayoutParams(WRAP, dp(44)));
+        root.addView(header, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+        // KEBUN
+        GardenView garden = new GardenView(this, pSi, pSt, pHaus, selSi, doneAyat, totAyat, animate, this::kebunPilih);
+        root.addView(garden, new LinearLayout.LayoutParams(MATCH, 0, 1f));
+        garden.setMinimumHeight(dp(250));
 
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(16), dp(14), dp(16), dp(16));
+        body.setPadding(dp(14), dp(4), dp(14), dp(14));
 
-        // 2. KARTU RINGKASAN PROGRES KEBUN
-        LinearLayout sumCard = new LinearLayout(this);
-        sumCard.setOrientation(LinearLayout.VERTICAL);
-        sumCard.setBackground(plainBox(Color.WHITE, Color.parseColor("#D1FAE5")));
-        sumCard.setPadding(dp(14), dp(12), dp(14), dp(12));
-        sumCard.setElevation(dp(3));
+        // KARTU BENIH TERPILIH
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setBackground(rr(cCream, Color.parseColor("#EADFC0"), 1, 22));
+        card.setElevation(dp(4));
+        card.setPadding(dp(14), dp(12), dp(10), dp(12));
 
-        LinearLayout sumTop = new LinearLayout(this);
-        sumTop.setOrientation(LinearLayout.HORIZONTAL);
-        sumTop.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout sumLeft = new LinearLayout(this);
-        sumLeft.setOrientation(LinearLayout.VERTICAL);
-        TextView sumTitle = text("🌳 Kebun Juz " + SambungAyat.juz + " (" + ns + " Surah)", 14, INK, true);
-        sumTitle.setGravity(Gravity.START);
-        sumLeft.addView(sumTitle, lp(WRAP, 0));
-        TextView sumSub = text(cntMutqin + " Pohon Emas • " + cntTumbuh + " Tumbuh • " + cntBibit + " Bibit (" + doneAyat + "/" + totAyat + " ayat)", 11, INK_SOFT, false);
-        sumSub.setGravity(Gravity.START);
-        sumLeft.addView(sumSub, lp(WRAP, 2));
-        sumTop.addView(sumLeft, new LinearLayout.LayoutParams(0, WRAP, 1f));
+        LinearLayout left = new LinearLayout(this);
+        left.setOrientation(LinearLayout.VERTICAL);
+        TextView cName = text("Benih Surah " + SambungAyat.NAMA[selSi], 16, cDark, true);
+        cName.setGravity(Gravity.START);
+        left.addView(cName, new LinearLayout.LayoutParams(WRAP, WRAP));
+        TextView cInfo = text("📖 QS. " + SambungAyat.NAMA[selSi] + " • " + selN + " Ayat", 12, Color.parseColor("#7A6A4F"), false);
+        cInfo.setGravity(Gravity.START);
+        left.addView(cInfo, lp(WRAP, 2));
+        String hint = selHaus ? "💧 Tanaman haus! Siram atau muraja'ah sekarang."
+                : (selTahap == 3 ? "MasyaAllah! Pohon emas Mutqin."
+                : (selTahap == 0 ? "Menanam ayat ini akan menambah kesegaran hafalanmu."
+                : "Kesegaran " + selSegar + "% • " + selM + "/" + selN + " ayat mutqin"));
+        TextView cHint = text(hint, 11, cDark, false);
+        cHint.setGravity(Gravity.START);
+        cHint.setBackground(rr(Color.parseColor("#E9F5D3"), 0, 0, 12));
+        cHint.setPadding(dp(8), dp(5), dp(8), dp(5));
+        left.addView(cHint, lp(WRAP, 8));
+        card.addView(left, new LinearLayout.LayoutParams(0, WRAP, 1f));
 
-        TextView pctBadge = text(avgSegar + "%", 14, Color.parseColor("#047857"), true);
-        pctBadge.setBackground(plainBox(Color.parseColor("#ECFDF5"), Color.parseColor("#A7F3D0")));
-        pctBadge.setPadding(dp(10), dp(4), dp(10), dp(4));
-        sumTop.addView(pctBadge, new LinearLayout.LayoutParams(WRAP, WRAP));
-        sumCard.addView(sumTop, lp(WRAP, 0));
+        card.addView(new SeedBagView(this), new LinearLayout.LayoutParams(dp(66), dp(76)));
 
-        LinearLayout progTrack = new LinearLayout(this);
-        progTrack.setOrientation(LinearLayout.HORIZONTAL);
-        progTrack.setBackground(box(Color.parseColor("#D1FAE5"), 6));
-        if (avgSegar > 0) {
-            View pFill = new View(this);
-            pFill.setBackground(box(Color.parseColor("#10B981"), 6));
-            progTrack.addView(pFill, new LinearLayout.LayoutParams(0, MATCH, avgSegar));
+        TextView tanam = text(selTahap == 0 ? "🌱 Tanam\nBenih" : "🌱 Rawat\nTanaman", 14, Color.WHITE, true);
+        android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(new Drawable[]{
+                rr(Color.parseColor("#3F8A3A"), 0, 0, 18),
+                rr(cGreen, 0, 0, 18)});
+        ld.setLayerInset(1, 0, 0, 0, dp(4));
+        tanam.setBackground(ld);
+        tanam.setPadding(dp(10), dp(10), dp(10), dp(14));
+        tanam.setOnClickListener(v -> startSambung(selSi));
+        pressable(tanam);
+        card.addView(tanam, new LinearLayout.LayoutParams(dp(92), dp(60)));
+        body.addView(card, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+        // AKSI CEPAT
+        LinearLayout chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        TextView siram = text("💧 Siram • " + SambungAyat.embun(prefs), 12, Color.parseColor("#0B5E86"), true);
+        TextView acak = text("🎲 Acak Juz " + SambungAyat.juz, 12, cDark, true);
+        TextView urutBtn = text("🔢 Urut Ayat", 12, cDark, true);
+        TextView[] cv = {siram, acak, urutBtn};
+        for (int i = 0; i < cv.length; i++) {
+            cv[i].setBackground(rr(i == 0 ? Color.parseColor("#DDF2FC") : cCream, Color.parseColor("#EADFC0"), 1, 18));
+            cv[i].setPadding(dp(6), dp(10), dp(6), dp(10));
+            cv[i].setSingleLine(true);
+            pressable(cv[i]);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, WRAP, 1f);
+            clp.leftMargin = i == 0 ? 0 : dp(4);
+            clp.rightMargin = i == 2 ? 0 : dp(4);
+            chips.addView(cv[i], clp);
         }
-        if (100 - avgSegar > 0) {
-            View pRest = new View(this);
-            progTrack.addView(pRest, new LinearLayout.LayoutParams(0, MATCH, 100 - avgSegar));
-        }
-        sumCard.addView(progTrack, lp(dp(10), 10));
-
-        TextView legendTxt = text("🌰 Bibit   •   🌱 Tunas   •   🌳 Pohon   •   🌳🍎 Mutqin (Emas)", 11, INK_SOFT, false);
-        legendTxt.setGravity(Gravity.CENTER);
-        sumCard.addView(legendTxt, lp(WRAP, 8));
-        body.addView(sumCard, lp(WRAP, 0));
-
-        // 3. KARTU DETAIL SURAH TERPILIH
-        final int selSi = kebunSelectedSi;
-        int selN = SambungAyat.jumlahAyat(selSi);
-        int selM = SambungAyat.jumlahDikuasai(prefs, selSi);
-        int selTahap = SambungAyat.tahapTanaman(prefs, selSi);
-        int selSegar = SambungAyat.kesegaran(prefs, selSi);
-        int hari = SambungAyat.hariIni();
-        boolean selHaus = selM < selN && SambungAyat.pernahLatih(prefs, selSi)
-                && hari - SambungAyat.hariTerakhir(prefs, selSi) >= SambungAyat.HARI_HAUS;
-
-        String[] tahapLabel = {"🌰 Bibit Baru", "🌱 Tunas Tumbuh", "🌳 Pohon Muda", "✨ Pohon Emas Mutqin"};
-        String[] tahapEmo = {"🌰", "🌱", "🌳", "🌳🍎"};
-
-        LinearLayout detailCard = new LinearLayout(this);
-        detailCard.setOrientation(LinearLayout.VERTICAL);
-        detailCard.setBackground(plainBox(Color.WHITE, Color.parseColor("#6EE7B7")));
-        detailCard.setPadding(dp(15), dp(14), dp(15), dp(14));
-        detailCard.setElevation(dp(5));
-
-        LinearLayout detHead = new LinearLayout(this);
-        detHead.setOrientation(LinearLayout.HORIZONTAL);
-        detHead.setGravity(Gravity.CENTER_VERTICAL);
-
-        LinearLayout detLeft = new LinearLayout(this);
-        detLeft.setOrientation(LinearLayout.VERTICAL);
-        TextView detStage = text(tahapLabel[selTahap] + "  •  " + selN + " Ayat", 11,
-                selTahap == 3 ? Color.parseColor("#92400E") : Color.parseColor("#065F46"), true);
-        detStage.setGravity(Gravity.START);
-        detLeft.addView(detStage, lp(WRAP, 0));
-
-        TextView detName = text("Surah " + SambungAyat.NAMA[selSi], 19, INK, true);
-        detName.setGravity(Gravity.START);
-        detLeft.addView(detName, lp(WRAP, 2));
-
-        TextView detMeaning = text("\"" + SambungAyat.ARTI[selSi] + "\" • QS. ke-" + SambungAyat.nomorSurah(selSi), 12, INK_SOFT, false);
-        detMeaning.setGravity(Gravity.START);
-        detLeft.addView(detMeaning, lp(WRAP, 1));
-        detHead.addView(detLeft, new LinearLayout.LayoutParams(0, WRAP, 1f));
-
-        TextView detArab = text(SambungAyat.ARAB[selSi], 26, Color.parseColor("#065F46"), true);
-        detHead.addView(detArab, new LinearLayout.LayoutParams(WRAP, WRAP));
-        detailCard.addView(detHead, lp(WRAP, 0));
-
-        LinearLayout stageBox = new LinearLayout(this);
-        stageBox.setOrientation(LinearLayout.HORIZONTAL);
-        stageBox.setGravity(Gravity.CENTER_VERTICAL);
-        stageBox.setBackground(plainBox(Color.parseColor("#F0FDF4"), Color.parseColor("#BBF7D0")));
-        stageBox.setPadding(dp(12), dp(10), dp(12), dp(10));
-
-        TextView bigPlant = text(tahapEmo[selTahap], 36, INK, false);
-        stageBox.addView(bigPlant, new LinearLayout.LayoutParams(dp(64), WRAP));
-
-        LinearLayout freshCol = new LinearLayout(this);
-        freshCol.setOrientation(LinearLayout.VERTICAL);
-        TextView freshLbl = text("Kesegaran Hafalan: " + selSegar + "%  (" + selM + "/" + selN + " ayat mutqin)", 12, INK, true);
-        freshLbl.setGravity(Gravity.START);
-        freshCol.addView(freshLbl, lp(WRAP, 0));
-
-        LinearLayout fTrack = new LinearLayout(this);
-        fTrack.setOrientation(LinearLayout.HORIZONTAL);
-        fTrack.setBackground(box(Color.WHITE, 5));
-        if (selSegar > 0) {
-            View fFill = new View(this);
-            fFill.setBackground(box(selTahap == 3 ? Color.parseColor("#F59E0B") : Color.parseColor("#10B981"), 5));
-            fTrack.addView(fFill, new LinearLayout.LayoutParams(0, MATCH, selSegar));
-        }
-        if (100 - selSegar > 0) {
-            fTrack.addView(new View(this), new LinearLayout.LayoutParams(0, MATCH, 100 - selSegar));
-        }
-        freshCol.addView(fTrack, lp(dp(8), 6));
-
-        TextView coachTip = text(selHaus
-                ? "💧 Tanaman ini haus! Siram dengan Embun atau muraja'ah sekarang."
-                : (selTahap == 3 ? "MasyaAllah! Hafalan sudah kokoh berbuah emas mutqin."
-                : "Ketuk Sambung Ayat untuk melatih surah ini dan panen bintang!"), 11, INK_SOFT, false);
-        coachTip.setGravity(Gravity.START);
-        freshCol.addView(coachTip, lp(WRAP, 6));
-        stageBox.addView(freshCol, new LinearLayout.LayoutParams(0, WRAP, 1f));
-        detailCard.addView(stageBox, lp(WRAP, 10));
-
-        LinearLayout actRow = new LinearLayout(this);
-        actRow.setOrientation(LinearLayout.HORIZONTAL);
-
-        Button btnSiram = button("💧 Siram Hafalan", Color.parseColor("#0EA5E9"), 14);
-        btnSiram.setOnClickListener(v -> {
+        siram.setOnClickListener(v -> {
             if (SambungAyat.siramSurah(prefs, selSi)) {
                 sfx(SFX_CORRECT);
                 Toast.makeText(this, "Surah " + SambungAyat.NAMA[selSi] + " disiram! Kesegaran naik 🌱", Toast.LENGTH_SHORT).show();
@@ -10989,117 +11463,80 @@ public class MainActivity extends Activity {
                 Toast.makeText(this, "Embun habis! Mainkan Sambung Ayat untuk dapat Embun baru 💧", Toast.LENGTH_SHORT).show();
             }
         });
-        actRow.addView(btnSiram, weight(0, 5));
-
-        Button btnMain = button("🧩 Sambung Ayat", Color.parseColor("#F59E0B"), 14);
-        btnMain.setTextColor(Color.parseColor("#064E3B"));
-        btnMain.setOnClickListener(v -> startSambung(selSi));
-        actRow.addView(btnMain, weight(5, 0));
-        detailCard.addView(actRow, lp(dp(48), 10));
-
-        body.addView(detailCard, lp(WRAP, 14));
-
-        // 4. ARENA TANTANGAN CEPAT
-        LinearLayout quickRow = new LinearLayout(this);
-        quickRow.setOrientation(LinearLayout.HORIZONTAL);
-        Button acak = button("🎲 Acak Juz " + SambungAyat.juz, GREEN, 14);
         acak.setOnClickListener(v -> startSambung(-1));
-        quickRow.addView(acak, weight(0, 5));
-
-        Button urutBtn = button("🔢 Urut Ayat", TEAL, 14);
         urutBtn.setOnClickListener(v -> startUrut(selSi));
-        quickRow.addView(urutBtn, weight(5, 0));
-        body.addView(quickRow, lp(dp(48), 12));
+        body.addView(chips, lp(WRAP, 10));
 
-        // 5. GRID PETAK KEBUN SURAH (3 KOLOM)
-        TextView gridHead = text("Petak Kebun Surahmu (Ketuk petak untuk memilih)", 14, INK, true);
-        gridHead.setGravity(Gravity.START);
-        body.addView(gridHead, lp(WRAP, 16));
+        // PILIHAN BENIH LAINNYA
+        LinearLayout sh = new LinearLayout(this);
+        sh.setOrientation(LinearLayout.HORIZONTAL);
+        sh.setGravity(Gravity.CENTER_VERTICAL);
+        sh.addView(new SeedIcon(this, 0), new LinearLayout.LayoutParams(dp(24), dp(24)));
+        TextView shT = text("Pilihan Benih Lainnya", 14, cDark, true);
+        shT.setPadding(dp(6), 0, dp(8), 0);
+        sh.addView(shT, new LinearLayout.LayoutParams(WRAP, WRAP));
+        View shL = new View(this);
+        shL.setBackgroundColor(Color.argb(90, 104, 184, 75));
+        sh.addView(shL, new LinearLayout.LayoutParams(0, dp(2), 1f));
+        body.addView(sh, lp(WRAP, 12));
 
-        final int cols = 3;
-        LinearLayout gridRow = null;
-        int colIdx = 0;
-        for (int si = ns - 1; si >= 0; si--) {
-            if (colIdx % cols == 0) {
-                gridRow = new LinearLayout(this);
-                gridRow.setOrientation(LinearLayout.HORIZONTAL);
-                body.addView(gridRow, lp(WRAP, 8));
+        final HorizontalScrollView hsv = new HorizontalScrollView(this);
+        hsv.setHorizontalScrollBarEnabled(false);
+        LinearLayout seedRow = new LinearLayout(this);
+        seedRow.setOrientation(LinearLayout.HORIZONTAL);
+        seedRow.setPadding(dp(2), dp(6), dp(2), dp(8));
+        View selCard = null;
+        for (int s2 = ns - 1; s2 >= 0; s2--) {
+            final int fs = s2;
+            boolean isSel = s2 == selSi;
+            FrameLayout fc = new FrameLayout(this);
+            fc.setBackground(rr(cCream, isSel ? cGreen : Color.parseColor("#EADFC0"), isSel ? 3 : 1, 16));
+            fc.setElevation(dp(isSel ? 4 : 2));
+            LinearLayout in = new LinearLayout(this);
+            in.setOrientation(LinearLayout.VERTICAL);
+            in.setGravity(Gravity.CENTER_HORIZONTAL);
+            in.setPadding(dp(6), dp(10), dp(6), dp(8));
+            in.addView(new SeedIcon(this, tahapAll[s2] == 0 ? 0 : tahapAll[s2]), new LinearLayout.LayoutParams(dp(44), dp(44)));
+            TextView nm = text(SambungAyat.NAMA[s2], 12, cDark, true);
+            nm.setSingleLine(true);
+            nm.setEllipsize(TextUtils.TruncateAt.END);
+            in.addView(nm, lp(WRAP, 4));
+            TextView ay = text(SambungAyat.jumlahAyat(s2) + " Ayat", 11, Color.parseColor("#8A7F68"), false);
+            in.addView(ay, new LinearLayout.LayoutParams(WRAP, WRAP));
+            fc.addView(in, new FrameLayout.LayoutParams(MATCH, MATCH));
+            if (isSel) {
+                TextView ck = text("✓", 12, Color.WHITE, true);
+                ck.setBackground(rr(cGreen, 0, 0, 12));
+                FrameLayout.LayoutParams ckp = new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.TOP | Gravity.END);
+                ckp.topMargin = dp(-6);
+                ckp.rightMargin = dp(-4);
+                fc.addView(ck, ckp);
+                selCard = fc;
             }
-            final int fsi = si;
-            int n = SambungAyat.jumlahAyat(si);
-            int m = SambungAyat.jumlahDikuasai(prefs, si);
-            int tahap = SambungAyat.tahapTanaman(prefs, si);
-            int segar = SambungAyat.kesegaran(prefs, si);
-            boolean isSel = (si == selSi);
-            boolean isMutqin = (tahap == 3);
-            boolean haus = m < n && SambungAyat.pernahLatih(prefs, si)
-                    && hari - SambungAyat.hariTerakhir(prefs, si) >= SambungAyat.HARI_HAUS;
-
-            LinearLayout plot = new LinearLayout(this);
-            plot.setOrientation(LinearLayout.VERTICAL);
-            plot.setGravity(Gravity.CENTER_HORIZONTAL);
-            plot.setPadding(dp(8), dp(8), dp(8), dp(8));
-            plot.setBackground(gardenPlotBg(isSel, isMutqin));
-            plot.setElevation(dp(isSel ? 6 : 2));
-
-            LinearLayout pTop = new LinearLayout(this);
-            pTop.setOrientation(LinearLayout.HORIZONTAL);
-            TextView ayTag = text(n + " Ay", 10, INK, true);
-            ayTag.setBackground(box(Color.argb(210, 255, 255, 255), 6));
-            ayTag.setPadding(dp(5), dp(1), dp(5), dp(1));
-            pTop.addView(ayTag, new LinearLayout.LayoutParams(WRAP, WRAP));
-            pTop.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
-            TextView stIco = text(isMutqin ? "⭐" : (haus ? "💧" : "✓"), 11, INK, true);
-            pTop.addView(stIco, new LinearLayout.LayoutParams(WRAP, WRAP));
-            plot.addView(pTop, lp(WRAP, 0));
-
-            TextView plantIco = text(tahapEmo[tahap], 26, INK, false);
-            plot.addView(plantIco, lp(WRAP, 4));
-
-            TextView sName = text(SambungAyat.NAMA[si], 12, Color.WHITE, true);
-            sName.setSingleLine(true);
-            sName.setEllipsize(TextUtils.TruncateAt.END);
-            plot.addView(sName, lp(WRAP, 4));
-
-            LinearLayout miniBar = new LinearLayout(this);
-            miniBar.setOrientation(LinearLayout.HORIZONTAL);
-            miniBar.setBackground(box(Color.argb(90, 0, 0, 0), 4));
-            if (segar > 0) {
-                View mf = new View(this);
-                mf.setBackground(box(isMutqin ? Color.parseColor("#FDE047") : Color.parseColor("#BEF264"), 4));
-                miniBar.addView(mf, new LinearLayout.LayoutParams(0, MATCH, segar));
-            }
-            if (100 - segar > 0) {
-                miniBar.addView(new View(this), new LinearLayout.LayoutParams(0, MATCH, 100 - segar));
-            }
-            plot.addView(miniBar, lp(dp(5), 4));
-
-            plot.setClickable(true);
-            plot.setFocusable(true);
-            pressable(plot);
-            plot.setOnClickListener(v -> {
-                kebunSelectedSi = fsi;
-                showSambung();
+            fc.setClickable(true);
+            pressable(fc);
+            fc.setOnClickListener(v -> {
+                kebunScrollX = hsv.getScrollX();
+                kebunPilih(fs);
             });
-
-            LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(0, WRAP, 1f);
-            plp.setMargins(dp(3), 0, dp(3), 0);
-            gridRow.addView(plot, plp);
-            colIdx++;
+            LinearLayout.LayoutParams fcp = new LinearLayout.LayoutParams(dp(84), dp(106));
+            fcp.rightMargin = dp(8);
+            seedRow.addView(fc, fcp);
         }
-        while (colIdx % cols != 0 && gridRow != null) {
-            LinearLayout.LayoutParams emptyLp = new LinearLayout.LayoutParams(0, WRAP, 1f);
-            emptyLp.setMargins(dp(3), 0, dp(3), 0);
-            gridRow.addView(new View(this), emptyLp);
-            colIdx++;
-        }
+        hsv.addView(seedRow);
+        hsv.setClipToPadding(false);
+        body.addView(hsv, new LinearLayout.LayoutParams(MATCH, WRAP));
+        final View fSel = selCard;
+        hsv.post(() -> {
+            int sx = kebunScrollX;
+            if (fSel != null && (fSel.getLeft() < sx || fSel.getRight() > sx + hsv.getWidth())) {
+                sx = Math.max(0, fSel.getLeft() - (hsv.getWidth() - fSel.getWidth()) / 2);
+            }
+            kebunScrollX = sx;
+            hsv.scrollTo(sx, 0);
+        });
 
-        Button back = button("⬅ Kembali ke Menu Utama", GRAY, 15);
-        back.setTextColor(DARK);
-        body.addView(back, lp(dp(50), 20));
-        back.setOnClickListener(v -> showMenu());
-
-        root.addView(body, lp(WRAP, 0));
+        root.addView(body, new LinearLayout.LayoutParams(MATCH, WRAP));
         wrap(root);
     }
 
