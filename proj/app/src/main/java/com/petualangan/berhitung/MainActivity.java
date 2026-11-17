@@ -687,6 +687,7 @@ public class MainActivity extends Activity {
 
     private void setScreen(int s) {
         stopSurahAudio();
+        stopMic();
         screen = s;
         if (s == 0) {
             int p = tampilProfile;
@@ -843,6 +844,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         stopSurahAudio();
+        stopMic();
         saveStats();
         if (screen == 2) {
             handler.removeCallbacksAndMessages(null);
@@ -864,6 +866,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         stopSurahAudio();
+        stopMic();
         handler.removeCallbacksAndMessages(null);
         for (int i = 0; i < sfxTracks.length; i++) {
             if (sfxTracks[i] != null) {
@@ -2002,6 +2005,10 @@ public class MainActivity extends Activity {
             sa.setOnClickListener(v -> showSambung());
             c.addView(sa, lp(dp(58), 18));
         }
+
+        LinearLayout mh = miniCard("\uD83D\uDCD6", "Mushaf Hafalan", Color.parseColor("#3F6FB5"));
+        mh.setOnClickListener(v -> showMushaf());
+        c.addView(mh, lp(dp(58), 14));
 
         // Rekor & Lencana (Soal Guru pindah ke Pengaturan, bukan untuk anak)
         LinearLayout rk = miniCard("\uD83C\uDFC5", "Rekor & Lencana", Color.parseColor("#F9A825"));
@@ -11409,6 +11416,431 @@ public class MainActivity extends Activity {
             }
             return true;
         }
+    }
+
+    // ---------- Mushaf Hafalan: baca, tutup kata, mikrofon ----------
+    private int mushafSi = -1;
+    private int mushafMode = 0;
+    private int mushafLevel = 50;
+    private final java.util.HashSet<String> mushafOpen = new java.util.HashSet<>();
+    private final java.util.HashSet<String> mushafGood = new java.util.HashSet<>();
+    private android.speech.SpeechRecognizer mushafSr;
+    private boolean mushafListening;
+    private TextView mushafTv;
+    private TextView mushafStatus;
+    private TextView mushafMicBtn;
+    private static final int REQ_MIC = 71;
+
+    private static String normAr(String s) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if ((ch >= '\u064B' && ch <= '\u065F') || ch == '\u0670' || ch == '\u0640'
+                    || (ch >= '\u06D6' && ch <= '\u06ED')) {
+                continue;
+            }
+            if (ch == '\u0623' || ch == '\u0625' || ch == '\u0622' || ch == '\u0671') {
+                ch = '\u0627';
+            } else if (ch == '\u0649' || ch == '\u06CC') {
+                ch = '\u064A';
+            } else if (ch == '\u0629') {
+                ch = '\u0647';
+            } else if (ch == '\u06A9') {
+                ch = '\u0643';
+            }
+            b.append(ch);
+        }
+        return b.toString();
+    }
+
+    private static boolean sameAr(String a, String b) {
+        if (a.equals(b)) return true;
+        if (a.length() < 4 || b.length() < 4 || Math.abs(a.length() - b.length()) > 1) return false;
+        int[] prev = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) prev[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            int[] cur = new int[b.length() + 1];
+            cur[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int c = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + c);
+            }
+            prev = cur;
+        }
+        return prev[b.length()] <= 1;
+    }
+
+    private boolean mushafHidden(int si, int ai, int wi) {
+        if (mushafMode != 1 || mushafOpen.contains(ai + ":" + wi)) return false;
+        int h = si * 7919 + ai * 104729 + wi * 15485863 + 12345;
+        h = (h ^ (h >>> 13)) * 1103515245;
+        h = (h ^ (h >>> 16)) & 0x7fffffff;
+        return h % 100 < mushafLevel;
+    }
+
+    private int mushafSisa() {
+        int sisa = 0;
+        for (int ai = 0; ai < SambungAyat.jumlahAyat(mushafSi); ai++) {
+            String[] w = SambungAyat.ayat(mushafSi, ai).trim().split("\\s+");
+            for (int wi = 0; wi < w.length; wi++) {
+                if (mushafHidden(mushafSi, ai, wi)) sisa++;
+            }
+        }
+        return sisa;
+    }
+
+    private void mushafRender() {
+        if (mushafTv == null) return;
+        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+        for (int ai = 0; ai < SambungAyat.jumlahAyat(mushafSi); ai++) {
+            String[] w = SambungAyat.ayat(mushafSi, ai).trim().split("\\s+");
+            for (int wi = 0; wi < w.length; wi++) {
+                final String key = ai + ":" + wi;
+                int st = sb.length();
+                if (mushafHidden(mushafSi, ai, wi)) {
+                    int n = Math.max(2, Math.min(7, normAr(w[wi]).length()));
+                    StringBuilder ph = new StringBuilder();
+                    for (int k = 0; k < n; k++) ph.append('_');
+                    sb.append(ph);
+                    sb.setSpan(new android.text.style.ClickableSpan() {
+                        @Override
+                        public void onClick(View v) {
+                            mushafOpen.add(key);
+                            mushafRender();
+                        }
+
+                        @Override
+                        public void updateDrawState(TextPaint ds) {
+                            ds.setUnderlineText(false);
+                            ds.setColor(Color.parseColor("#8FA08F"));
+                        }
+                    }, st, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                } else {
+                    sb.append(w[wi]);
+                    if (mushafGood.contains(key)) {
+                        sb.setSpan(new android.text.style.ForegroundColorSpan(Color.parseColor("#2E8B3D")),
+                                st, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    }
+                }
+                sb.append(' ');
+            }
+            StringBuilder num = new StringBuilder();
+            String ns = String.valueOf(ai + 1);
+            for (int k = 0; k < ns.length(); k++) num.append((char) ('\u0660' + (ns.charAt(k) - '0')));
+            sb.append("\uFD3F").append(num).append("\uFD3E ");
+        }
+        mushafTv.setText(sb);
+    }
+
+    private void mushafSetStatus(String s) {
+        if (mushafStatus != null) mushafStatus.setText(s);
+    }
+
+    private void stopMic() {
+        mushafListening = false;
+        if (mushafSr != null) {
+            try {
+                mushafSr.cancel();
+            } catch (Exception e) {
+                // abaikan
+            }
+            try {
+                mushafSr.destroy();
+            } catch (Exception e) {
+                // abaikan
+            }
+            mushafSr = null;
+        }
+        if (mushafMicBtn != null) mushafMicBtn.setText("🎙 Baca");
+    }
+
+    private void mushafMic() {
+        if (mushafListening) {
+            stopMic();
+            mushafSetStatus("Mikrofon dihentikan");
+            return;
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+            return;
+        }
+        startMic();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int rc, String[] perms, int[] res) {
+        super.onRequestPermissionsResult(rc, perms, res);
+        if (rc == REQ_MIC) {
+            if (res.length > 0 && res[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                startMic();
+            } else {
+                mushafSetStatus("Izin mikrofon ditolak");
+            }
+        }
+    }
+
+    private void startMic() {
+        stopSurahAudio();
+        try {
+            mushafSr = android.speech.SpeechRecognizer.createSpeechRecognizer(this);
+            mushafSr.setRecognitionListener(new android.speech.RecognitionListener() {
+                @Override public void onReadyForSpeech(Bundle p) { mushafSetStatus("🎙 Silakan baca ayatnya..."); }
+                @Override public void onBeginningOfSpeech() { }
+                @Override public void onRmsChanged(float v) { }
+                @Override public void onBufferReceived(byte[] b) { }
+                @Override public void onEndOfSpeech() { mushafSetStatus("Memeriksa bacaan..."); }
+                @Override public void onPartialResults(Bundle p) { }
+                @Override public void onEvent(int t, Bundle p) { }
+
+                @Override
+                public void onResults(Bundle b) {
+                    java.util.ArrayList<String> l = b.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION);
+                    handler.post(() -> stopMic());
+                    if (l != null && !l.isEmpty()) {
+                        mushafCocok(l.get(0));
+                    } else {
+                        mushafSetStatus("Belum terdengar, coba lagi");
+                    }
+                }
+
+                @Override
+                public void onError(int e) {
+                    handler.post(() -> stopMic());
+                    mushafSetStatus(e == android.speech.SpeechRecognizer.ERROR_NO_MATCH
+                            || e == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                            ? "Suara belum terdengar, coba lagi"
+                            : "Pengenalan suara gagal (kode " + e + "). Pastikan layanan suara Google aktif.");
+                }
+            });
+            Intent in = new Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            in.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            in.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ar-SA");
+            in.putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+            mushafSr.startListening(in);
+            mushafListening = true;
+            if (mushafMicBtn != null) mushafMicBtn.setText("⏹ Berhenti");
+        } catch (Exception e) {
+            stopMic();
+            mushafSetStatus("Mikrofon tidak bisa dipakai di HP ini");
+        }
+    }
+
+    private void mushafCocok(String said) {
+        java.util.ArrayList<int[]> pos = new java.util.ArrayList<>();
+        java.util.ArrayList<String> nrm = new java.util.ArrayList<>();
+        for (int ai = 0; ai < SambungAyat.jumlahAyat(mushafSi); ai++) {
+            String[] w = SambungAyat.ayat(mushafSi, ai).trim().split("\\s+");
+            for (int wi = 0; wi < w.length; wi++) {
+                pos.add(new int[]{ai, wi});
+                nrm.add(normAr(w[wi]));
+            }
+        }
+        String[] sp = normAr(said).trim().split("\\s+");
+        int p = -1;
+        int hit = 0;
+        int n = nrm.size();
+        for (String w : sp) {
+            if (w.isEmpty()) continue;
+            int found = -1;
+            if (p < 0) {
+                for (int k = 0; k < n && found < 0; k++) {
+                    if (sameAr(nrm.get(k), w) && mushafHidden(mushafSi, pos.get(k)[0], pos.get(k)[1])) found = k;
+                }
+                for (int k = 0; k < n && found < 0; k++) {
+                    if (sameAr(nrm.get(k), w)) found = k;
+                }
+            } else {
+                for (int k = p; k < Math.min(n, p + 4); k++) {
+                    if (sameAr(nrm.get(k), w)) {
+                        found = k;
+                        break;
+                    }
+                }
+            }
+            if (found >= 0) {
+                int ai = pos.get(found)[0];
+                int wi = pos.get(found)[1];
+                if (mushafHidden(mushafSi, ai, wi)) {
+                    mushafOpen.add(ai + ":" + wi);
+                    mushafGood.add(ai + ":" + wi);
+                    hit++;
+                }
+                p = found + 1;
+            }
+        }
+        mushafRender();
+        if (hit > 0 && mushafSisa() == 0) {
+            sfx(SFX_CORRECT);
+            mushafSetStatus("🎉 MasyaAllah! Semua kata sudah terbuka.");
+        } else if (hit > 0) {
+            sfx(SFX_CORRECT);
+            mushafSetStatus("✅ " + hit + " kata benar! Sisa " + mushafSisa() + " kata.");
+        } else {
+            mushafSetStatus("Belum cocok, coba baca lebih pelan dan jelas.");
+        }
+    }
+
+    private TextView mushafChip(String label, boolean on) {
+        TextView t = text(label, 12, on ? Color.WHITE : Color.parseColor("#285A35"), true);
+        t.setBackground(rr(on ? Color.parseColor("#68B84B") : Color.parseColor("#FFF8E6"), Color.parseColor("#EADFC0"), 1, 16));
+        t.setPadding(dp(12), dp(8), dp(12), dp(8));
+        t.setSingleLine(true);
+        pressable(t);
+        return t;
+    }
+
+    private void showMushaf() {
+        handler.removeCallbacksAndMessages(null);
+        plainUi = true;
+        setScreen(8);
+        nameFields = null;
+        if (!SambungAyat.load(this)) {
+            Toast.makeText(this, "Data ayat tidak bisa dibuka", Toast.LENGTH_LONG).show();
+            showMenu();
+            return;
+        }
+        final int ns = SambungAyat.JUMLAH_SURAH;
+        if (mushafSi < 0 || mushafSi >= ns) mushafSi = ns - 1;
+        final int cDark = Color.parseColor("#285A35");
+        final int cCream = Color.parseColor("#FFF8E6");
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(14), dp(14), dp(14), dp(18));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        TextView back = text("←", 22, cDark, true);
+        back.setPadding(dp(4), 0, dp(14), 0);
+        back.setOnClickListener(v -> showMenu());
+        head.addView(back, new LinearLayout.LayoutParams(WRAP, WRAP));
+        TextView tt = text("📖 Mushaf Hafalan", 18, cDark, true);
+        tt.setGravity(Gravity.START);
+        head.addView(tt, new LinearLayout.LayoutParams(0, WRAP, 1f));
+        root.addView(head, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+        // pilih surah
+        final HorizontalScrollView hs = new HorizontalScrollView(this);
+        hs.setHorizontalScrollBarEnabled(false);
+        LinearLayout sr = new LinearLayout(this);
+        sr.setOrientation(LinearLayout.HORIZONTAL);
+        sr.setPadding(0, dp(10), 0, dp(6));
+        View selChip = null;
+        for (int i = 0; i < ns; i++) {
+            final int fi = i;
+            TextView c = mushafChip(SambungAyat.NAMA[i], i == mushafSi);
+            c.setOnClickListener(v -> {
+                mushafSi = fi;
+                mushafOpen.clear();
+                mushafGood.clear();
+                showMushaf();
+            });
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(WRAP, WRAP);
+            clp.rightMargin = dp(6);
+            sr.addView(c, clp);
+            if (i == mushafSi) selChip = c;
+        }
+        hs.addView(sr);
+        root.addView(hs, new LinearLayout.LayoutParams(MATCH, WRAP));
+        final View fsel = selChip;
+        hs.post(() -> {
+            if (fsel != null) hs.scrollTo(Math.max(0, fsel.getLeft() - dp(40)), 0);
+        });
+
+        // mode
+        LinearLayout md = new LinearLayout(this);
+        md.setOrientation(LinearLayout.HORIZONTAL);
+        md.setPadding(0, dp(4), 0, dp(4));
+        String[] ml = {"👁 Baca", "🙈 Hafalan"};
+        for (int i = 0; i < 2; i++) {
+            final int fm = i;
+            TextView c = mushafChip(ml[i], mushafMode == i);
+            c.setOnClickListener(v -> {
+                mushafMode = fm;
+                mushafOpen.clear();
+                mushafGood.clear();
+                showMushaf();
+            });
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(WRAP, WRAP);
+            clp.rightMargin = dp(6);
+            md.addView(c, clp);
+        }
+        if (mushafMode == 1) {
+            int[] lv = {25, 50, 100};
+            for (int i = 0; i < 3; i++) {
+                final int fl = lv[i];
+                TextView c = mushafChip("Tutup " + fl + "%", mushafLevel == fl);
+                c.setOnClickListener(v -> {
+                    mushafLevel = fl;
+                    mushafOpen.clear();
+                    mushafGood.clear();
+                    showMushaf();
+                });
+                LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(WRAP, WRAP);
+                clp.rightMargin = dp(6);
+                md.addView(c, clp);
+            }
+        }
+        HorizontalScrollView mhs = new HorizontalScrollView(this);
+        mhs.setHorizontalScrollBarEnabled(false);
+        mhs.addView(md);
+        root.addView(mhs, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+        // aksi: dengar, mikrofon, ulangi
+        LinearLayout ac = new LinearLayout(this);
+        ac.setOrientation(LinearLayout.HORIZONTAL);
+        ac.setPadding(0, dp(6), 0, dp(4));
+        final String audioPath = surahAudioPath(mushafSi);
+        if (audioPath != null) {
+            final TextView dg = mushafChip("🔊 Dengar", false);
+            dg.setBackground(rr(Color.parseColor("#DDF2FC"), Color.parseColor("#EADFC0"), 1, 16));
+            dg.setOnClickListener(v -> toggleSurahAudio(audioPath, dg));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(WRAP, WRAP);
+            p.rightMargin = dp(6);
+            ac.addView(dg, p);
+        }
+        mushafMicBtn = null;
+        if (mushafMode == 1) {
+            mushafMicBtn = mushafChip("🎙 Baca", false);
+            mushafMicBtn.setBackground(rr(Color.parseColor("#FFE3E3"), Color.parseColor("#EADFC0"), 1, 16));
+            mushafMicBtn.setOnClickListener(v -> mushafMic());
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(WRAP, WRAP);
+            p.rightMargin = dp(6);
+            ac.addView(mushafMicBtn, p);
+            TextView ul = mushafChip("🔄 Ulangi", false);
+            ul.setOnClickListener(v -> {
+                mushafOpen.clear();
+                mushafGood.clear();
+                mushafRender();
+                mushafSetStatus("Ketuk garis untuk membuka kata, atau tekan 🎙 lalu baca ayatnya.");
+            });
+            ac.addView(ul, new LinearLayout.LayoutParams(WRAP, WRAP));
+        }
+        root.addView(ac, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+        mushafStatus = text(mushafMode == 1 ? "Ketuk garis untuk membuka kata, atau tekan 🎙 lalu baca ayatnya." : "", 12, Color.parseColor("#7A6A4F"), false);
+        mushafStatus.setGravity(Gravity.START);
+        root.addView(mushafStatus, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+        // teks ayat
+        TextView tv = new TextView(this);
+        tv.setTextSize(26 * ui);
+        tv.setTextColor(Color.parseColor("#1B1B1B"));
+        tv.setTextDirection(View.TEXT_DIRECTION_RTL);
+        tv.setGravity(Gravity.RIGHT);
+        tv.setLineSpacing(0, 1.7f);
+        tv.setPadding(dp(14), dp(14), dp(14), dp(14));
+        tv.setBackground(rr(cCream, Color.parseColor("#EADFC0"), 1, 20));
+        tv.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+        tv.setHighlightColor(Color.TRANSPARENT);
+        mushafTv = tv;
+        LinearLayout.LayoutParams tvp = new LinearLayout.LayoutParams(MATCH, WRAP);
+        tvp.topMargin = dp(8);
+        root.addView(tv, tvp);
+        mushafRender();
+        wrap(root);
     }
 
     private android.media.MediaPlayer surahPlayer;
