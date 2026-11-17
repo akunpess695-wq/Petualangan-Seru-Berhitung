@@ -1182,7 +1182,65 @@ public class MainActivity extends Activity {
     private boolean menuBgOn = false;
 
     private Drawable background() {
+        android.graphics.Bitmap bg = assetBmp("img/bg_game.jpg");
+        if (bg != null) {
+            return new ImgBgDrawable(bg);
+        }
         return menuBgOn ? new MenuBgDrawable() : new BgDrawable();
+    }
+
+    private final java.util.HashMap<String, android.graphics.Bitmap> bmpCache = new java.util.HashMap<>();
+
+    private android.graphics.Bitmap assetBmp(String name) {
+        android.graphics.Bitmap b = bmpCache.get(name);
+        if (b == null && !bmpCache.containsKey(name)) {
+            try (java.io.InputStream in = getAssets().open(name)) {
+                b = android.graphics.BitmapFactory.decodeStream(in);
+            } catch (Exception e) {
+                b = null;
+            }
+            bmpCache.put(name, b);
+        }
+        return b;
+    }
+
+    // Latar gambar (isi penuh, dipotong tengah)
+    private static class ImgBgDrawable extends Drawable {
+        private final android.graphics.Bitmap bm;
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+
+        ImgBgDrawable(android.graphics.Bitmap b) {
+            bm = b;
+        }
+
+        @Override
+        public void draw(Canvas cv) {
+            Rect r = getBounds();
+            if (r.width() <= 0 || r.height() <= 0) {
+                return;
+            }
+            float sc = Math.max(r.width() / (float) bm.getWidth(), r.height() / (float) bm.getHeight());
+            float sw = r.width() / sc;
+            float sh = r.height() / sc;
+            Rect src = new Rect((int) ((bm.getWidth() - sw) / 2), (int) ((bm.getHeight() - sh) / 2),
+                    (int) ((bm.getWidth() + sw) / 2), (int) ((bm.getHeight() + sh) / 2));
+            cv.drawBitmap(bm, src, r, p);
+        }
+
+        @Override
+        public void setAlpha(int a) {
+            p.setAlpha(a);
+        }
+
+        @Override
+        public void setColorFilter(android.graphics.ColorFilter cf) {
+            p.setColorFilter(cf);
+        }
+
+        @Override
+        public int getOpacity() {
+            return android.graphics.PixelFormat.OPAQUE;
+        }
     }
 
     // Latar belakang: gradasi hangat, lingkaran lembut, dan simbol belajar yang samar
@@ -1898,9 +1956,22 @@ public class MainActivity extends Activity {
         c.addView(tk, lp(dp(84), 18));
 
         // Sambung Ayat + Kebun Hafalan (Juz 30)
-        LinearLayout sa = miniCard("\uD83C\uDF33", "Sambung Ayat \u2022 Kebun Hafalan", GREEN);
-        sa.setOnClickListener(v -> showSambung());
-        c.addView(sa, lp(dp(58), 18));
+        android.graphics.Bitmap saBmp = assetBmp("img/btn_sambung_ayat.png");
+        if (saBmp != null) {
+            ImageView saImg = new ImageView(this);
+            saImg.setImageBitmap(saBmp);
+            saImg.setAdjustViewBounds(true);
+            saImg.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            saImg.setContentDescription("Sambung Ayat");
+            saImg.setOnClickListener(v -> showSambung());
+            LinearLayout.LayoutParams saLp = new LinearLayout.LayoutParams(MATCH, WRAP);
+            saLp.topMargin = dp(12);
+            c.addView(saImg, saLp);
+        } else {
+            LinearLayout sa = miniCard("\uD83C\uDF33", "Sambung Ayat \u2022 Kebun Hafalan", GREEN);
+            sa.setOnClickListener(v -> showSambung());
+            c.addView(sa, lp(dp(58), 18));
+        }
 
         // Rekor & Lencana (Soal Guru pindah ke Pengaturan, bukan untuk anak)
         LinearLayout rk = miniCard("\uD83C\uDFC5", "Rekor & Lencana", Color.parseColor("#F9A825"));
