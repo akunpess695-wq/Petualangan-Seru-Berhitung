@@ -12488,15 +12488,24 @@ public class MainActivity extends Activity {
 
         card.addView(kIconView("ic_karung_benih", new SeedBagView(this)), new LinearLayout.LayoutParams(dp(84), dp(84)));
 
-        TextView tanam = text(selTahap == 0 ? "🌱 Tanam\nBenih" : "🌱 Rawat\nTanaman", 14, Color.WHITE, true);
-        iconLeft(tanam, "ic_tunas", 24, selTahap == 0 ? "Tanam\nBenih" : "Rawat\nTanaman");
+        LinearLayout tanam = new LinearLayout(this);
+        tanam.setOrientation(LinearLayout.VERTICAL);
         tanam.setGravity(Gravity.CENTER);
         android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(new Drawable[]{
                 rr(Color.parseColor("#3F8A3A"), 0, 0, 20),
                 rr(cGreen, 0, 0, 20)});
         ld.setLayerInset(1, 0, 0, 0, dp(4));
         tanam.setBackground(ld);
-        tanam.setPadding(dp(8), dp(8), dp(8), dp(12));
+        tanam.setPadding(dp(6), dp(8), dp(6), dp(12));
+        View tanamIcon = kIconView("ic_tunas", seedIcon(1));
+        tanam.addView(tanamIcon, new LinearLayout.LayoutParams(dp(26), dp(26)));
+        TextView tanamTxt = text(selTahap == 0 ? "Tanam Benih" : "Rawat Tanaman", 15, Color.WHITE, true);
+        tanamTxt.setGravity(Gravity.CENTER);
+        tanamTxt.setSingleLine(true);
+        tanamTxt.setAutoSizeTextTypeUniformWithConfiguration(9, 15, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        LinearLayout.LayoutParams tanamTxtLp = new LinearLayout.LayoutParams(MATCH, WRAP);
+        tanamTxtLp.topMargin = dp(4);
+        tanam.addView(tanamTxt, tanamTxtLp);
         tanam.setOnClickListener(v -> startSambung(selSi));
         pressable(tanam);
         LinearLayout.LayoutParams tanamLp = new LinearLayout.LayoutParams(dp(104), dp(64));
