@@ -11182,7 +11182,7 @@ public class MainActivity extends Activity {
             // kupu-kupu terbang pelan
             for (int k = 0; k < 2; k++) {
                 float bx = w * (0.3f + 0.4f * k) + (float) Math.sin(tm + k * 2.4f) * d * 36;
-                float by2 = st + ih * (0.25f + 0.25f * k) + (float) Math.cos(tm * 2 + k) * d * 10;
+                float by2 = st + (sb - st) * (0.25f + 0.25f * k) + (float) Math.cos(tm * 2 + k) * d * 10;
                 float flap = (float) (0.35 + 0.65 * Math.abs(Math.sin(tm * 9 + k)));
                 p.setColor(k == 0 ? Color.parseColor("#FFB74D") : Color.parseColor("#F48FB1"));
                 c.drawOval(new RectF(bx - d * 7 * flap, by2 - d * 5, bx, by2 + d * 2), p);
