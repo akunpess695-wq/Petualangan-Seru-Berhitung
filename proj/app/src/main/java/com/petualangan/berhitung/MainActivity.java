@@ -686,6 +686,7 @@ public class MainActivity extends Activity {
     }
 
     private void setScreen(int s) {
+        stopSurahAudio();
         screen = s;
         if (s == 0) {
             int p = tampilProfile;
@@ -841,6 +842,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        stopSurahAudio();
         saveStats();
         if (screen == 2) {
             handler.removeCallbacksAndMessages(null);
@@ -861,6 +863,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        stopSurahAudio();
         handler.removeCallbacksAndMessages(null);
         for (int i = 0; i < sfxTracks.length; i++) {
             if (sfxTracks[i] != null) {
@@ -1652,8 +1655,6 @@ public class MainActivity extends Activity {
         wrapBg(c, plainUi ? new android.graphics.drawable.ColorDrawable(Color.WHITE) : background());
     }
 
-    private boolean noWrapAnim = false;
-
     private void wrapBg(LinearLayout c, Drawable bg) {
         syncNaga(!nagaHide);
         nagaHide = false;
@@ -1669,10 +1670,6 @@ public class MainActivity extends Activity {
             sv.addView(c);
         }
         setContentView(sv);
-        if (noWrapAnim) {
-            noWrapAnim = false;
-            return;
-        }
         sv.setAlpha(0f);
         sv.setTranslationY(dp(12));
         sv.animate().alpha(1f).translationY(0f).setDuration(200)
@@ -10933,7 +10930,6 @@ public class MainActivity extends Activity {
         private float ry = -1f;
         private int hausN = 0;
         private long tapMs = 0L;
-        private long lastInv = 0L;
         private float grow = 0f;
         private float tm = 0f;
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -10982,29 +10978,9 @@ public class MainActivity extends Activity {
             tA.setInterpolator(new android.view.animation.LinearInterpolator());
             tA.addUpdateListener(a -> {
                 tm = (float) a.getAnimatedValue();
-                long nw = android.os.SystemClock.uptimeMillis();
-                if (nw - lastInv >= 33L) {
-                    lastInv = nw;
-                    invalidate();
-                }
+                invalidate();
             });
             tA.start();
-        }
-
-        @Override
-        protected void onWindowVisibilityChanged(int visibility) {
-            super.onWindowVisibilityChanged(visibility);
-            try {
-                if (tA != null) {
-                    if (visibility == View.VISIBLE) {
-                        tA.resume();
-                    } else {
-                        tA.pause();
-                    }
-                }
-            } catch (Exception e) {
-                android.util.Log.w("Kebun", "jeda animasi gagal", e);
-            }
         }
 
         @Override
@@ -11435,6 +11411,65 @@ public class MainActivity extends Activity {
         }
     }
 
+    private android.media.MediaPlayer surahPlayer;
+
+    private int surahNoOf(int si) {
+        return SambungAyat.juz == 30 ? 78 + si : -1;
+    }
+
+    private String surahAudioPath(int si) {
+        int no = surahNoOf(si);
+        if (no < 0) return null;
+        String path = "quran/au_" + (no < 10 ? "00" : (no < 100 ? "0" : "")) + no + ".m4a";
+        try {
+            getAssets().openFd(path).close();
+            return path;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void stopSurahAudio() {
+        if (surahPlayer != null) {
+            try {
+                surahPlayer.stop();
+            } catch (Exception e) {
+                // abaikan
+            }
+            try {
+                surahPlayer.release();
+            } catch (Exception e) {
+                // abaikan
+            }
+            surahPlayer = null;
+        }
+    }
+
+    private void toggleSurahAudio(String path, final TextView btn) {
+        if (surahPlayer != null) {
+            stopSurahAudio();
+            btn.setText("🔊 Dengar surah");
+            return;
+        }
+        try {
+            android.content.res.AssetFileDescriptor afd = getAssets().openFd(path);
+            android.media.MediaPlayer mp = new android.media.MediaPlayer();
+            mp.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+            afd.close();
+            mp.setOnCompletionListener(m -> {
+                stopSurahAudio();
+                btn.setText("🔊 Dengar surah");
+            });
+            mp.prepare();
+            mp.start();
+            surahPlayer = mp;
+            btn.setText("⏹ Berhenti");
+        } catch (Exception e) {
+            stopSurahAudio();
+            Toast.makeText(this, "Audio tidak bisa diputar", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void kebunPilih(int si) {
         kebunSelectedSi = si;
         kebunNoGrow = true;
@@ -11600,6 +11635,15 @@ public class MainActivity extends Activity {
         cHint.setBackground(rr(Color.parseColor("#E9F5D3"), 0, 0, 12));
         cHint.setPadding(dp(8), dp(5), dp(8), dp(5));
         left.addView(cHint, lp(WRAP, 8));
+        final String audioPath = surahAudioPath(selSi);
+        if (audioPath != null) {
+            final TextView dengar = text("🔊 Dengar surah", 12, Color.parseColor("#0B5E86"), true);
+            dengar.setBackground(rr(Color.parseColor("#DDF2FC"), Color.parseColor("#EADFC0"), 1, 16));
+            dengar.setPadding(dp(10), dp(6), dp(10), dp(6));
+            dengar.setOnClickListener(v -> toggleSurahAudio(audioPath, dengar));
+            pressable(dengar);
+            left.addView(dengar, lp(WRAP, 8));
+        }
         card.addView(left, new LinearLayout.LayoutParams(0, WRAP, 1f));
 
         card.addView(new SeedBagView(this), new LinearLayout.LayoutParams(dp(66), dp(76)));
@@ -11716,7 +11760,6 @@ public class MainActivity extends Activity {
         });
 
         root.addView(body, new LinearLayout.LayoutParams(MATCH, WRAP));
-        noWrapAnim = !animate;
         wrap(root);
     }
 
