@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 41;
     private static final int REQ_BACKUP_SAVE = 42;
     private static final int REQ_BACKUP_OPEN = 43;
-    private static final String APP_VERSION = "6.29.0";
+    private static final String APP_VERSION = "6.30.0";
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
@@ -1734,7 +1734,7 @@ public class MainActivity extends Activity {
     }
 
     private String bestKey() {
-        return "best_k" + kelas + (mode == 7 ? "_b" + subj + (alamOn() ? "a" : "") + (tebakOn() ? "g" : "") + (sambungOn() ? (urut ? "ur" : "s") + (SambungAyat.juz != 30 ? "j" + SambungAyat.juz : "") : "") : "") + (timed ? "_t" : "");
+        return "best_k" + kelas + (mode == 7 ? "_b" + subj + (alamOn() ? "a" : "") + (tebakOn() ? "g" : "") + (sambungOn() ? (urut ? "ur" : kata ? "kt" : "s") + (SambungAyat.juz != 30 ? "j" + SambungAyat.juz : "") : "") : "") + (timed ? "_t" : "");
     }
 
     private String timeLabel() {
@@ -1745,7 +1745,7 @@ public class MainActivity extends Activity {
         if (advLevel >= 0) {
             return "Petualangan \u2022 " + timeLabel();
         }
-        String base = mode == 7 ? (alamOn() ? "Kuis Alam \u2022 " : tebakOn() ? "Tebak Gambar \u2022 " : sambungOn() ? (urut ? "Urut Ayat \u2022 " : "Sambung Ayat \u2022 ") : "") + SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
+        String base = mode == 7 ? (alamOn() ? "Kuis Alam \u2022 " : tebakOn() ? "Tebak Gambar \u2022 " : sambungOn() ? (urut ? "Urut Ayat \u2022 " : kata ? "Lanjutkan Kata \u2022 " : "Sambung Ayat \u2022 ") : "") + SUBJ_NAMES[subj] + " \u2022 " + timeLabel() : timeLabel();
         return (relaxed && mode != 7) ? base + " \u2022 Santai" : base;
     }
 
@@ -4045,7 +4045,7 @@ public class MainActivity extends Activity {
             return "Tabel " + tableN;
         }
         if (mode == 7) {
-            return alamOn() ? "Kuis Alam" : tebakOn() ? "Tebak Gambar" : sambungOn() ? (urut ? "Urut Ayat" : "Sambung Ayat") : "Kuis soal";
+            return alamOn() ? "Kuis Alam" : tebakOn() ? "Tebak Gambar" : sambungOn() ? (urut ? "Urut Ayat" : kata ? "Lanjutkan Kata" : "Sambung Ayat") : "Kuis soal";
         }
         if (mode == 5) {
             return "3 Bilangan";
@@ -9217,7 +9217,7 @@ public class MainActivity extends Activity {
         cardQ.setElevation(dp(8));
         cardQ.setPadding(dp(18), dp(plainUi ? 22 : 30), dp(18), dp(30));
         if (plainUi) {
-            TextView tag = text(urut ? "\u2726  URUTKAN AYAT  \u2726" : "\u2726  SAMBUNG AYAT  \u2726", 11, GOLD_DEEP, true);
+            TextView tag = text(urut ? "\u2726  URUTKAN AYAT  \u2726" : kata ? "\u2726  LANJUTKAN KATA  \u2726" : "\u2726  SAMBUNG AYAT  \u2726", 11, GOLD_DEEP, true);
             tag.setLetterSpacing(0.12f);
             LinearLayout.LayoutParams tagp = new LinearLayout.LayoutParams(WRAP, WRAP);
             tagp.bottomMargin = dp(14);
@@ -10640,6 +10640,8 @@ public class MainActivity extends Activity {
     // ---------- Sambung Ayat + Kebun Hafalan (versi 6.29.0), Juz 30 ----------
     private boolean sambung;
     private boolean urut;
+    private boolean kata;
+    private boolean kataNext;
     private int sambungSurah = -1;
 
     private boolean sambungOn() {
@@ -10654,7 +10656,14 @@ public class MainActivity extends Activity {
         startSambung(si, false);
     }
 
+    private void startKata(int si) {
+        kataNext = true;
+        startSambung(si, false);
+    }
+
     private void startSambung(int si, boolean sus) {
+        kata = kataNext;
+        kataNext = false;
         urut = sus;
         if (!SambungAyat.load(this)) {
             Toast.makeText(this, "Data ayat tidak bisa dibuka", Toast.LENGTH_LONG).show();
@@ -10678,6 +10687,10 @@ public class MainActivity extends Activity {
         }
         if (urut) {
             buildUrut();
+            return;
+        }
+        if (kata) {
+            buildKata();
             return;
         }
         final int ns = SambungAyat.JUMLAH_SURAH;
@@ -10753,6 +10766,98 @@ public class MainActivity extends Activity {
     }
 
     // Urut Ayat: 3 ayat berurutan ditampilkan acak (A, B, C); pilih urutan yang benar. Tidak mengubah Kebun.
+    // Lanjutkan Kata: satu kata ayat disembunyikan, pilih kata yang tepat dari 4 pilihan
+    private void buildKata() {
+        ArrayList<int[]> items = new ArrayList<>();
+        ArrayList<String> pool = new ArrayList<>();
+        for (int si = 0; si < SambungAyat.JUMLAH_SURAH; si++) {
+            for (int ai = 0; ai < SambungAyat.jumlahAyat(si); ai++) {
+                String[] w = SambungAyat.ayat(si, ai).trim().split("\\s+");
+                int n = 0;
+                for (String t : w) {
+                    if (hasLetter(normAr(t))) {
+                        n++;
+                        if (!pool.contains(t) && pool.size() < 600) {
+                            pool.add(t);
+                        }
+                    }
+                }
+                if ((sambungSurah < 0 || si == sambungSurah) && n >= 3 && SambungAyat.ayat(si, ai).length() <= 220) {
+                    items.add(new int[]{si, ai});
+                }
+            }
+        }
+        if (items.isEmpty()) {
+            sambung = false;
+            kata = false;
+            buildBuiltin();
+            return;
+        }
+        Collections.shuffle(items, rnd);
+        total = Math.min(qCount(), items.size());
+        for (int i = 0; i < total; i++) {
+            int si = items.get(i)[0];
+            int ai = items.get(i)[1];
+            String[] w = SambungAyat.ayat(si, ai).trim().split("\\s+");
+            ArrayList<Integer> ok = new ArrayList<>();
+            for (int k = 1; k < w.length; k++) { // bukan kata pertama: ada konteks
+                if (hasLetter(normAr(w[k]))) {
+                    ok.add(k);
+                }
+            }
+            if (ok.isEmpty()) {
+                ok.add(0);
+            }
+            int hid = ok.get(rnd.nextInt(ok.size()));
+            String right = w[hid];
+            StringBuilder sb = new StringBuilder();
+            for (int k = 0; k < w.length; k++) {
+                sb.append(k == hid ? "\u2581\u2581\u2581\u2581\u2581" : w[k]);
+                if (k < w.length - 1) {
+                    sb.append(' ');
+                }
+            }
+            ArrayList<String> opts = new ArrayList<>();
+            opts.add(right);
+            ArrayList<String> sh = new ArrayList<>(pool);
+            Collections.shuffle(sh, rnd);
+            for (String c : sh) {
+                if (opts.size() == 4) {
+                    break;
+                }
+                boolean dup = false;
+                for (String o : opts) {
+                    if (sameAr(o, c)) {
+                        dup = true;
+                        break;
+                    }
+                }
+                if (!dup) {
+                    opts.add(c);
+                }
+            }
+            while (opts.size() < 4) {
+                opts.add(right + " " + opts.size());
+            }
+            Collections.shuffle(opts, rnd);
+            Q q = new Q();
+            q.text = "QS. " + SambungAyat.NAMA[si] + " ayat " + (ai + 1) + "\n\n" + sb
+                    + "\n\nPilih kata yang tepat untuk melanjutkan ayat.";
+            q.full = q.text;
+            q.sopts = new String[4];
+            for (int j = 0; j < 4; j++) {
+                q.sopts[j] = opts.get(j);
+                if (q.sopts[j].equals(right)) {
+                    q.correctIdx = j;
+                }
+            }
+            q.expl = "QS. " + SambungAyat.NAMA[si] + " ayat " + (ai + 1) + ": " + SambungAyat.ayat(si, ai)
+                    + "\n" + SambungAyat.terjemah(si, ai);
+            q.key = si + ":" + ai;
+            qs[i] = q;
+        }
+    }
+
     private void buildUrut() {
         ArrayList<int[]> items = new ArrayList<>();
         for (int si = 0; si < SambungAyat.JUMLAH_SURAH; si++) {
@@ -12869,10 +12974,11 @@ public class MainActivity extends Activity {
         TextView siram = text("💧 Siram • " + SambungAyat.embun(prefs), 12, Color.parseColor("#0B5E86"), true);
         TextView acak = text("🎲 Acak", 12, cDark, true);
         TextView urutBtn = text("🔢 Urut Ayat", 12, cDark, true);
+        TextView kataBtn = text("✍ Kata", 12, cDark, true);
         TextView mushafBtn = text("📖 Mushaf", 12, cDark, true);
         iconLeft(mushafBtn, "ic_buku", 18, "Mushaf");
         mushafBtn.setPadding(0, 0, 0, 0);
-        TextView[] cv = {siram, acak, urutBtn, mushafBtn};
+        TextView[] cv = {siram, acak, urutBtn, kataBtn, mushafBtn};
         for (int i = 0; i < cv.length; i++) {
             cv[i].setBackground(rr(i == 0 ? Color.parseColor("#DDF2FC") : cCream, Color.parseColor("#EADFC0"), 1, 18));
             cv[i].setPadding(dp(2), 0, dp(2), 0);
@@ -12896,6 +13002,7 @@ public class MainActivity extends Activity {
         });
         acak.setOnClickListener(v -> startSambung(-1));
         urutBtn.setOnClickListener(v -> startUrut(selSi));
+        kataBtn.setOnClickListener(v -> startKata(selSi));
         mushafBtn.setOnClickListener(v -> {
             mushafSi = selSi;
             mushafOpen.clear();
