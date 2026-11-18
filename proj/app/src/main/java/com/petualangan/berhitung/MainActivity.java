@@ -11876,8 +11876,27 @@ public class MainActivity extends Activity {
         return prev[b.length()] <= 1;
     }
 
+    private final java.util.HashSet<String> mushafMarks = new java.util.HashSet<>();
+    private int mushafMarksSi = -1;
+
+    /** Token yang hanya berisi tanda baca/waqaf (tanpa huruf) bukan kata: tidak disembunyikan dan tidak perlu dibaca. */
+    private boolean mushafIsMark(int si, int ai, int wi) {
+        if (mushafMarksSi != si) {
+            mushafMarks.clear();
+            for (int a = 0; a < SambungAyat.jumlahAyat(si); a++) {
+                String[] w = SambungAyat.ayat(si, a).trim().split("\\s+");
+                for (int k = 0; k < w.length; k++) {
+                    if (normAr(w[k]).trim().isEmpty()) mushafMarks.add(a + ":" + k);
+                }
+            }
+            mushafMarksSi = si;
+        }
+        return mushafMarks.contains(ai + ":" + wi);
+    }
+
     private boolean mushafHidden(int si, int ai, int wi) {
         if (mushafMode == 0 || mushafOpen.contains(ai + ":" + wi)) return false;
+        if (mushafIsMark(si, ai, wi)) return false;
         if (mushafMode == 1 && wi < mushafAwal) return false;
         return true;
     }
@@ -11970,6 +11989,7 @@ public class MainActivity extends Activity {
             return;
         }
         mushafIdle = 0;
+        mushafRetry = 0;
         startMic();
     }
 
@@ -12003,14 +12023,21 @@ public class MainActivity extends Activity {
         }
         handler.postDelayed(() -> {
             if (mushafListening) {
-                startMic();
+                startMic(false);
             }
-        }, 250);
+        }, 300);
     }
 
+    private int mushafRetry = 0;
+
     private void startMic() {
+        startMic(true);
+    }
+
+    /** fresh=true: buat pengenal suara baru; false: pakai ulang yang ada (lebih stabil untuk sambung otomatis). */
+    private void startMic(boolean fresh) {
         stopSurahAudio();
-        if (mushafSr != null) {
+        if (fresh && mushafSr != null) {
             try {
                 mushafSr.cancel();
             } catch (Exception e) {
@@ -12024,10 +12051,11 @@ public class MainActivity extends Activity {
             mushafSr = null;
         }
         try {
+            if (mushafSr == null) {
             mushafSr = android.speech.SpeechRecognizer.createSpeechRecognizer(this);
             mushafSr.setRecognitionListener(new android.speech.RecognitionListener() {
                 @Override public void onReadyForSpeech(Bundle p) { mushafSetStatus("🎙 Silakan baca ayatnya..."); }
-                @Override public void onBeginningOfSpeech() { }
+                @Override public void onBeginningOfSpeech() { mushafRetry = 0; }
                 @Override public void onRmsChanged(float v) { }
                 @Override public void onBufferReceived(byte[] b) { }
                 @Override public void onEndOfSpeech() { mushafSetStatus("Memeriksa bacaan..."); }
@@ -12061,10 +12089,23 @@ public class MainActivity extends Activity {
                         mushafNext(false);
                         return;
                     }
+                    // 5 = klien, 8 = sibuk, 11 = layanan suara terputus: biasanya sementara, sambungkan ulang
+                    boolean soft = e == 5 || e == 8 || e == 11;
+                    if (soft && mushafListening && mushafRetry < 3) {
+                        mushafRetry++;
+                        mushafSetStatus("Menyambungkan ulang suara...");
+                        handler.postDelayed(() -> {
+                            if (mushafListening) {
+                                startMic(true);
+                            }
+                        }, 600);
+                        return;
+                    }
                     handler.post(() -> stopMic());
-                    mushafSetStatus("Pengenalan suara gagal (kode " + e + "). Pastikan layanan suara Google aktif.");
+                    mushafSetStatus("Pengenalan suara gagal (kode " + e + "). Pastikan layanan suara Google aktif lalu tekan 🎙 Baca lagi.");
                 }
             });
+            }
             Intent in = new Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             in.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             in.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ar-SA");
@@ -12077,6 +12118,24 @@ public class MainActivity extends Activity {
             stopMic();
             mushafSetStatus("Mikrofon tidak bisa dipakai di HP ini");
         }
+    }
+
+    /** Berapa kata berurutan dari ucapan (mulai kata ke-t) yang cocok bila kata ke-t dipasang di posisi k. */
+    private int mushafChain(java.util.ArrayList<String> nrm, String[] sp, int t, int k) {
+        int n = nrm.size();
+        int p = k + 1;
+        int cnt = 1;
+        for (int u = t + 1; u < sp.length; u++) {
+            if (sp[u].isEmpty()) continue;
+            for (int q = p; q < Math.min(n, p + 4); q++) {
+                if (sameAr(nrm.get(q), sp[u])) {
+                    cnt++;
+                    p = q + 1;
+                    break;
+                }
+            }
+        }
+        return cnt;
     }
 
     private void mushafCocok(String said, final boolean partial) {
@@ -12093,15 +12152,25 @@ public class MainActivity extends Activity {
         int p = -1;
         int hit = 0;
         int n = nrm.size();
-        for (String w : sp) {
+        // posisi terjauh yang sudah terbuka: kata berulang (mis. "الناس" di An-Nas) dicocokkan ke yang terdekat setelahnya
+        int cursor = 0;
+        for (int k = 0; k < n; k++) {
+            if (mushafOpen.contains(pos.get(k)[0] + ":" + pos.get(k)[1])) cursor = k + 1;
+        }
+        for (int t = 0; t < sp.length; t++) {
+            String w = sp[t];
             if (w.isEmpty()) continue;
             int found = -1;
             if (p < 0) {
-                for (int k = 0; k < n && found < 0; k++) {
-                    if (sameAr(nrm.get(k), w) && mushafHidden(mushafSi, pos.get(k)[0], pos.get(k)[1])) found = k;
-                }
-                for (int k = 0; k < n && found < 0; k++) {
-                    if (sameAr(nrm.get(k), w)) found = k;
+                int bestSc = -1;
+                for (int k = 0; k < n; k++) {
+                    if (!sameAr(nrm.get(k), w)) continue;
+                    boolean hid = mushafHidden(mushafSi, pos.get(k)[0], pos.get(k)[1]);
+                    int sc = mushafChain(nrm, sp, t, k) * 10 + (hid ? 5 : 0) + (k >= cursor ? 3 : 0);
+                    if (sc > bestSc) {
+                        bestSc = sc;
+                        found = k;
+                    }
                 }
             } else {
                 for (int k = p; k < Math.min(n, p + 4); k++) {
@@ -12122,6 +12191,7 @@ public class MainActivity extends Activity {
                 p = found + 1;
             }
         }
+
         if (!partial || hit > 0) {
             mushafRender();
         }
@@ -12297,6 +12367,7 @@ public class MainActivity extends Activity {
         setScreen(8);
         mushafOn = true;
         nameFields = null;
+        mushafMarksSi = -1;
         if (!SambungAyat.load(this)) {
             Toast.makeText(this, "Data ayat tidak bisa dibuka", Toast.LENGTH_LONG).show();
             showMenu();
