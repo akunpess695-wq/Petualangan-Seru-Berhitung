@@ -908,6 +908,9 @@ public class MainActivity extends Activity {
         } else if (screen == 8 && mushafOn) {
             kebunNoGrow = true;
             showSambung();
+        } else if (screen == 2 && sambungOn()) {
+            kebunNoGrow = true;
+            showSambung();
         } else if (screen == 11) {
             showGuru();
         } else {
@@ -1138,11 +1141,15 @@ public class MainActivity extends Activity {
 
     private GradientDrawable optionBg(int color) {
         if (plainUi) {
-            GradientDrawable p = new GradientDrawable();
-            p.setColor(color == GREEN ? Color.parseColor("#E8F5E9") : color == RED ? Color.parseColor("#FFEBEE") : Color.WHITE);
-            p.setCornerRadius(dp(20));
-            p.setStroke(dp(2), color == GREEN ? GREEN : color == RED ? RED : Color.parseColor("#CFD8DC"));
-            return p;
+            boolean okC = color == GREEN;
+            boolean badC = color == RED;
+            GradientDrawable pg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    okC ? new int[]{Color.parseColor("#F1FAF0"), Color.parseColor("#DDF0DA")}
+                    : badC ? new int[]{Color.parseColor("#FFF3F3"), Color.parseColor("#FFE0E0")}
+                    : new int[]{Color.WHITE, Color.parseColor("#FFF7E3")});
+            pg.setCornerRadius(dp(22));
+            pg.setStroke(dp(2), okC ? GREEN : badC ? RED : Color.parseColor("#E8D7A8"));
+            return pg;
         }
         GradientDrawable g = new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
@@ -9097,6 +9104,9 @@ public class MainActivity extends Activity {
                 .setPositiveButton("Keluar", (dl, w) -> {
                     if (advLevel >= 0) {
                         showPeta();
+                    } else if (sambungOn()) {
+                        kebunNoGrow = true;
+                        showSambung();
                     } else {
                         showMenu();
                     }
@@ -9134,7 +9144,17 @@ public class MainActivity extends Activity {
         c.addView(top, lp(WRAP, 0));
         String who = (np > 1) ? av(cur) + " " + names[cur]
                 : (advLevel >= 0 ? av(0) + " Level " + (advLevel + 1) : av(0) + " Petualang");
-        top.addView(pill(who, np > 1 ? PLAYER_COLORS[cur] : ORANGE),
+        if (plainUi) {
+            TextView bk = text("\u2190", 20, Color.parseColor("#285A35"), true);
+            bk.setBackground(rr(Color.parseColor("#FFF8E6"), Color.parseColor("#EADFC0"), 1, 22));
+            bk.setElevation(dp(3));
+            pressable(bk);
+            bk.setOnClickListener(v -> confirmExit());
+            LinearLayout.LayoutParams bkp = new LinearLayout.LayoutParams(dp(44), dp(44));
+            bkp.rightMargin = dp(10);
+            top.addView(bk, bkp);
+        }
+        top.addView(pill(who, np > 1 ? PLAYER_COLORS[cur] : (plainUi ? Color.parseColor("#3E8E41") : ORANGE)),
                 new LinearLayout.LayoutParams(WRAP, WRAP));
         top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
         tvHearts = text("", 18, DARK, false);
@@ -9193,10 +9213,17 @@ public class MainActivity extends Activity {
         cardQ = new LinearLayout(this);
         cardQ.setOrientation(LinearLayout.VERTICAL);
         cardQ.setGravity(Gravity.CENTER);
-        cardQ.setBackground(premiumSurface(28));
+        cardQ.setBackground(plainUi ? sambungCardBg() : premiumSurface(28));
         cardQ.setElevation(dp(8));
-        cardQ.setPadding(dp(18), dp(30), dp(18), dp(30));
-        tvQuestion = text("", 46, ORANGE_DARK, true);
+        cardQ.setPadding(dp(18), dp(plainUi ? 22 : 30), dp(18), dp(30));
+        if (plainUi) {
+            TextView tag = text(urut ? "\u2726  URUTKAN AYAT  \u2726" : "\u2726  SAMBUNG AYAT  \u2726", 11, GOLD_DEEP, true);
+            tag.setLetterSpacing(0.12f);
+            LinearLayout.LayoutParams tagp = new LinearLayout.LayoutParams(WRAP, WRAP);
+            tagp.bottomMargin = dp(14);
+            cardQ.addView(tag, tagp);
+        }
+        tvQuestion = text("", 46, plainUi ? Color.parseColor("#1F5A2E") : ORANGE_DARK, true);
         cardQ.addView(tvQuestion, new LinearLayout.LayoutParams(MATCH, WRAP));
         c.addView(cardQ, lp(WRAP, 18));
 
@@ -9217,7 +9244,7 @@ public class MainActivity extends Activity {
             }
         }
 
-        Button back = button(advLevel >= 0 ? "Kembali ke peta" : "Kembali ke menu", GRAY, 14);
+        Button back = button(advLevel >= 0 ? "Kembali ke peta" : (sambungOn() ? "Kembali ke Kebun" : "Kembali ke menu"), GRAY, 14);
         back.setTextColor(GOLD_DEEP);
         back.setBackground(ghostButtonBg());
         rt.addView(back, lp(dp(46), 22));
@@ -9225,9 +9252,28 @@ public class MainActivity extends Activity {
 
         if (wide) {
             wrapTwo(c, cr);
+        } else if (plainUi) {
+            wrapBg(c, sambungScreenBg());
         } else {
             wrap(c);
         }
+    }
+
+    private GradientDrawable sambungScreenBg() {
+        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.parseColor("#FFFDF7"), Color.parseColor("#F1F7E6"), Color.parseColor("#E4F1D3")});
+    }
+
+    private GradientDrawable sambungCardBg() {
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.WHITE, Color.parseColor("#FFF4D6")});
+        g.setCornerRadius(dp(28));
+        g.setStroke(dp(2), Color.parseColor("#E8C766"));
+        return g;
+    }
+
+    private int sambungOptSize(int len) {
+        return len <= 10 ? 24 : len <= 24 ? 19 : len <= 40 ? 16 : 14;
     }
 
     private void showQuestion() {
@@ -9249,10 +9295,11 @@ public class MainActivity extends Activity {
             final int idx = i;
             String ot = optText(q, i);
             opts[i].setText(ot);
-            opts[i].setTextSize((q.sopts != null ? bankOptionSize(ot.length()) : optionSize(ot.length())) * ui);
+            opts[i].setTextSize((q.sopts != null ? (plainUi ? sambungOptSize(ot.length()) : bankOptionSize(ot.length()))
+                    : optionSize(ot.length())) * ui);
             opts[i].setBackground(optionBg(OPT_COLORS[i]));
             if (plainUi) {
-                opts[i].setTextColor(Color.BLACK);
+                opts[i].setTextColor(Color.parseColor("#1F2A24"));
             }
             opts[i].setAlpha(1f);
             opts[i].setOnClickListener(v -> choose(idx));
@@ -9706,12 +9753,20 @@ public class MainActivity extends Activity {
         c.addView(again, lp(dp(64), mistakes ? 12 : 26));
         again.setOnClickListener(v -> startGame(mode));
 
-        Button menu = button("Menu Utama", ORANGE, 20);
+        final boolean toKebun = sambungOn();
+        Button menu = button(toKebun ? "Kembali ke Kebun" : "Menu Utama", ORANGE, 20);
         menu.setBackground(ghostButtonBg());
         menu.setTextColor(ORANGE_DARK);
         menu.setElevation(dp(2));
         c.addView(menu, lp(dp(60), 12));
-        menu.setOnClickListener(v -> showMenu());
+        menu.setOnClickListener(v -> {
+            if (toKebun) {
+                kebunNoGrow = true;
+                showSambung();
+            } else {
+                showMenu();
+            }
+        });
     }
 
     // =====================================================================
