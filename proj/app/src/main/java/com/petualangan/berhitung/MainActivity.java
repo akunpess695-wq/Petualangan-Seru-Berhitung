@@ -11841,7 +11841,7 @@ public class MainActivity extends Activity {
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < s.length(); i++) {
             char ch = s.charAt(i);
-            if ((ch >= '\u064B' && ch <= '\u065F') || ch == '\u0670' || ch == '\u0640'
+            if ((ch >= '\u064B' && ch <= '\u065F') || ch == '\u0670' || ch == '\u0640' || ch == '\u06D5'
                     || (ch >= '\u06D6' && ch <= '\u06ED')) {
                 continue;
             }
@@ -11876,6 +11876,13 @@ public class MainActivity extends Activity {
         return prev[b.length()] <= 1;
     }
 
+    private static boolean hasLetter(String t) {
+        for (int i = 0; i < t.length(); i++) {
+            if (Character.isLetter(t.charAt(i))) return true;
+        }
+        return false;
+    }
+
     private final java.util.HashSet<String> mushafMarks = new java.util.HashSet<>();
     private int mushafMarksSi = -1;
 
@@ -11886,7 +11893,7 @@ public class MainActivity extends Activity {
             for (int a = 0; a < SambungAyat.jumlahAyat(si); a++) {
                 String[] w = SambungAyat.ayat(si, a).trim().split("\\s+");
                 for (int k = 0; k < w.length; k++) {
-                    if (normAr(w[k]).trim().isEmpty()) mushafMarks.add(a + ":" + k);
+                    if (!hasLetter(normAr(w[k]))) mushafMarks.add(a + ":" + k);
                 }
             }
             mushafMarksSi = si;
