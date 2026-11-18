@@ -11431,30 +11431,30 @@ public class MainActivity extends Activity {
             drawFence(c, w, fenceTop);
 
             // dua papan sejajar, berdiri di tanah di belakang bingkai petak
-            float mg = Math.max(d * 10, w * 0.025f);
-            float bb = fenceTop - d * 10;
-            float bh = Math.max(d * 34, Math.min(d * 56, bb - d * 6));
-            float bt = bb - bh;
-            float pl = mg;
-            float pr = mg + w * 0.40f;
-            float nr = w - mg;
-            float nl = nr - w * 0.30f;
-            signPosts(c, pl, pr, bb, fenceTop);
-            signPosts(c, nl, nr, bb, fenceTop);
-            signBoard(c, pl, bt, pr, bb);
-            signBoard(c, nl, bt, nr, bb);
-            drawProgressSign(c, pl, bt, pr, bb);
-            drawNameSign(c, nl, bt, nr, bb);
+            float sgM = Math.max(d * 10, w * 0.025f);
+            float sgB = fenceTop - d * 10;
+            float sgH = Math.max(d * 34, Math.min(d * 56, sgB - d * 6));
+            float sgT = sgB - sgH;
+            float sgL1 = sgM;
+            float sgR1 = sgM + w * 0.40f;
+            float sgR2 = w - sgM;
+            float sgL2 = sgR2 - w * 0.30f;
+            signPosts(c, sgL1, sgR1, sgB, fenceTop);
+            signPosts(c, sgL2, sgR2, sgB, fenceTop);
+            signBoard(c, sgL1, sgT, sgR1, sgB);
+            signBoard(c, sgL2, sgT, sgR2, sgB);
+            drawProgressSign(c, sgL1, sgT, sgR1, sgB);
+            drawNameSign(c, sgL2, sgT, sgR2, sgB);
             // semak + bunga di dasar tiang supaya papan terlihat tumbuh dari kebun
-            signBase(c, pl, pr, fenceTop);
-            signBase(c, nl, nr, fenceTop);
+            signBase(c, sgL1, sgR1, fenceTop);
+            signBase(c, sgL2, sgR2, fenceTop);
             // hiasan daun dan bunga di sudut papan
-            flower(c, pl + d * 5, bt + d * 4, d * 3.2f);
-            flower(c, nr - d * 5, bt + d * 4, d * 3.2f);
-            leaf(c, pl + d * 8, bt + d * 3, d * 11, -25f, "#4E9A3A");
-            leaf(c, pr - d * 8, bt + d * 3, d * 11, 205f, "#68B84B");
-            leaf(c, nl + d * 8, bt + d * 3, d * 11, -25f, "#68B84B");
-            leaf(c, nr - d * 9, bt + d * 3, d * 11, 205f, "#4E9A3A");
+            flower(c, sgL1 + d * 5, sgT + d * 4, d * 3.2f);
+            flower(c, sgR2 - d * 5, sgT + d * 4, d * 3.2f);
+            leaf(c, sgL1 + d * 8, sgT + d * 3, d * 11, -25f, "#4E9A3A");
+            leaf(c, sgR1 - d * 8, sgT + d * 3, d * 11, 205f, "#68B84B");
+            leaf(c, sgL2 + d * 8, sgT + d * 3, d * 11, -25f, "#68B84B");
+            leaf(c, sgR2 - d * 9, sgT + d * 3, d * 11, 205f, "#4E9A3A");
 
             // tanah: bingkai petak seluruhnya di dalam view (inset 4dp kiri/kanan, 8dp bawah), geometri sudah dihitung di atas
             if (ptB != null) {
@@ -11914,6 +11914,7 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, REQ_MIC);
             return;
         }
+        mushafIdle = 0;
         startMic();
     }
 
@@ -11922,6 +11923,7 @@ public class MainActivity extends Activity {
         super.onRequestPermissionsResult(rc, perms, res);
         if (rc == REQ_MIC) {
             if (res.length > 0 && res[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                mushafIdle = 0;
                 startMic();
             } else {
                 mushafSetStatus("Izin mikrofon ditolak");
@@ -11929,8 +11931,43 @@ public class MainActivity extends Activity {
         }
     }
 
+    private int mushafIdle = 0;
+
+    /** Lanjut mendengarkan otomatis selama masih ada kata tersembunyi; berhenti bila selesai atau lama hening. */
+    private void mushafNext(boolean got) {
+        if (!got) {
+            mushafIdle++;
+        }
+        if (!mushafListening || mushafSisa() == 0 || mushafIdle >= 3) {
+            boolean idle = mushafListening && mushafSisa() > 0 && mushafIdle >= 3;
+            handler.post(() -> stopMic());
+            if (idle) {
+                mushafSetStatus("Suara belum terdengar. Tekan 🎙 Baca untuk lanjut.");
+            }
+            return;
+        }
+        handler.postDelayed(() -> {
+            if (mushafListening) {
+                startMic();
+            }
+        }, 250);
+    }
+
     private void startMic() {
         stopSurahAudio();
+        if (mushafSr != null) {
+            try {
+                mushafSr.cancel();
+            } catch (Exception e) {
+                // abaikan
+            }
+            try {
+                mushafSr.destroy();
+            } catch (Exception e) {
+                // abaikan
+            }
+            mushafSr = null;
+        }
         try {
             mushafSr = android.speech.SpeechRecognizer.createSpeechRecognizer(this);
             mushafSr.setRecognitionListener(new android.speech.RecognitionListener() {
@@ -11939,33 +11976,45 @@ public class MainActivity extends Activity {
                 @Override public void onRmsChanged(float v) { }
                 @Override public void onBufferReceived(byte[] b) { }
                 @Override public void onEndOfSpeech() { mushafSetStatus("Memeriksa bacaan..."); }
-                @Override public void onPartialResults(Bundle p) { }
+                @Override
+                public void onPartialResults(Bundle pb) {
+                    if (!mushafListening) return;
+                    java.util.ArrayList<String> l = pb.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (l != null && !l.isEmpty()) {
+                        mushafCocok(l.get(0), true);
+                    }
+                }
+
                 @Override public void onEvent(int t, Bundle p) { }
 
                 @Override
                 public void onResults(Bundle b) {
                     java.util.ArrayList<String> l = b.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION);
-                    handler.post(() -> stopMic());
-                    if (l != null && !l.isEmpty()) {
-                        mushafCocok(l.get(0));
-                    } else {
-                        mushafSetStatus("Belum terdengar, coba lagi");
+                    boolean got = l != null && !l.isEmpty();
+                    if (got) {
+                        mushafIdle = 0;
+                        mushafCocok(l.get(0), false);
                     }
+                    mushafNext(got);
                 }
 
                 @Override
                 public void onError(int e) {
+                    boolean silent = e == android.speech.SpeechRecognizer.ERROR_NO_MATCH
+                            || e == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT;
+                    if (silent && mushafListening) {
+                        mushafNext(false);
+                        return;
+                    }
                     handler.post(() -> stopMic());
-                    mushafSetStatus(e == android.speech.SpeechRecognizer.ERROR_NO_MATCH
-                            || e == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT
-                            ? "Suara belum terdengar, coba lagi"
-                            : "Pengenalan suara gagal (kode " + e + "). Pastikan layanan suara Google aktif.");
+                    mushafSetStatus("Pengenalan suara gagal (kode " + e + "). Pastikan layanan suara Google aktif.");
                 }
             });
             Intent in = new Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             in.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             in.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ar-SA");
             in.putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+            in.putExtra(android.speech.RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
             mushafSr.startListening(in);
             mushafListening = true;
             if (mushafMicBtn != null) mushafMicBtn.setText("⏹ Berhenti");
@@ -11975,7 +12024,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void mushafCocok(String said) {
+    private void mushafCocok(String said, final boolean partial) {
         java.util.ArrayList<int[]> pos = new java.util.ArrayList<>();
         java.util.ArrayList<String> nrm = new java.util.ArrayList<>();
         for (int ai = 0; ai < SambungAyat.jumlahAyat(mushafSi); ai++) {
@@ -12018,14 +12067,21 @@ public class MainActivity extends Activity {
                 p = found + 1;
             }
         }
-        mushafRender();
+        if (!partial || hit > 0) {
+            mushafRender();
+        }
         if (hit > 0 && mushafSisa() == 0) {
             sfx(SFX_CORRECT);
             mushafSetStatus("🎉 MasyaAllah! Semua kata sudah terbuka.");
+            if (partial) {
+                handler.post(() -> stopMic());
+            }
         } else if (hit > 0) {
-            sfx(SFX_CORRECT);
+            if (!partial) {
+                sfx(SFX_CORRECT);
+            }
             mushafSetStatus("✅ " + hit + " kata benar! Sisa " + mushafSisa() + " kata.");
-        } else {
+        } else if (!partial) {
             mushafSetStatus("Belum cocok, coba baca lebih pelan dan jelas.");
         }
     }
