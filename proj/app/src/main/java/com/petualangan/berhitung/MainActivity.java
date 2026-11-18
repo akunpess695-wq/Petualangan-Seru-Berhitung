@@ -11124,6 +11124,255 @@ public class MainActivity extends Activity {
             c.drawText(s, cx, y, p);
         }
 
+        // ================= LATAR & PAPAN KEBUN (digambar kode) =================
+
+        private void tree(Canvas c, float cx, float baseY, float hgt) {
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(null);
+            p.setColor(Color.parseColor("#9A6A3A"));
+            rf.set(cx - hgt * 0.06f, baseY - hgt * 0.42f, cx + hgt * 0.06f, baseY);
+            c.drawRect(rf, p);
+            float r = hgt * 0.30f;
+            float cy = baseY - hgt * 0.62f;
+            p.setColor(Color.parseColor("#4E9A3A"));
+            c.drawCircle(cx, cy, r, p);
+            c.drawCircle(cx - r * 0.75f, cy + r * 0.35f, r * 0.72f, p);
+            c.drawCircle(cx + r * 0.75f, cy + r * 0.35f, r * 0.72f, p);
+            p.setColor(Color.parseColor("#68B84B"));
+            c.drawCircle(cx - r * 0.2f, cy - r * 0.15f, r * 0.7f, p);
+            c.drawCircle(cx + r * 0.6f, cy + r * 0.2f, r * 0.5f, p);
+            p.setColor(Color.argb(110, 200, 240, 140));
+            c.drawCircle(cx - r * 0.45f, cy - r * 0.45f, r * 0.25f, p);
+        }
+
+        private void leaf(Canvas c, float x, float y, float len, float angle, String color) {
+            c.save();
+            c.rotate(angle, x, y);
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(null);
+            p.setColor(Color.parseColor(color));
+            rf.set(x, y - len * 0.3f, x + len, y + len * 0.3f);
+            c.drawOval(rf, p);
+            c.restore();
+        }
+
+        /** Latar kebun: langit, matahari, awan, bukit, pohon, dan hamparan rumput. */
+        private void drawScene(Canvas c, float w, float h, float fenceTop) {
+            float hor = fenceTop - d * 14;
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new LinearGradient(0, 0, 0, hor + d * 24, Color.parseColor("#7CC8F0"),
+                    Color.parseColor("#E2F5E6"), Shader.TileMode.CLAMP));
+            c.drawRect(0, 0, w, hor + d * 24, p);
+            p.setShader(null);
+            // matahari
+            float sx = w * 0.52f;
+            float sy = Math.max(d * 20, hor * 0.32f);
+            p.setShader(new android.graphics.RadialGradient(sx, sy, d * 44, Color.argb(200, 255, 244, 190),
+                    Color.argb(0, 255, 244, 190), Shader.TileMode.CLAMP));
+            c.drawCircle(sx, sy, d * 44, p);
+            p.setShader(null);
+            p.setColor(Color.parseColor("#FFE79A"));
+            c.drawCircle(sx, sy, d * 11, p);
+            // awan (bergerak pelan)
+            cloud(c, w * 0.30f + (float) Math.sin(tm) * d * 5, hor * 0.42f, d * 11);
+            cloud(c, w * 0.80f + (float) Math.sin(tm + 2f) * d * 5, hor * 0.30f, d * 9);
+            // bukit
+            p.setColor(Color.parseColor("#A7DC7E"));
+            rf.set(-w * 0.25f, hor - d * 34, w * 0.60f, hor + d * 40);
+            c.drawOval(rf, p);
+            p.setColor(Color.parseColor("#93D06C"));
+            rf.set(w * 0.35f, hor - d * 28, w * 1.25f, hor + d * 40);
+            c.drawOval(rf, p);
+            // pohon di kejauhan
+            tree(c, w * 0.07f, hor + d * 4, d * 46);
+            tree(c, w * 0.21f, hor + d * 5, d * 32);
+            tree(c, w * 0.47f, hor + d * 3, d * 24);
+            tree(c, w * 0.60f, hor + d * 4, d * 30);
+            tree(c, w * 0.93f, hor + d * 4, d * 48);
+            // hamparan rumput
+            p.setShader(new LinearGradient(0, hor, 0, h, Color.parseColor("#B3E07D"),
+                    Color.parseColor("#CDEB9A"), Shader.TileMode.CLAMP));
+            c.drawRect(0, hor, w, h, p);
+            p.setShader(null);
+            // semak dan bunga di tepi
+            bush(c, -d * 4, fenceTop + d * 8, d * 24);
+            bush(c, w + d * 4, fenceTop + d * 10, d * 26);
+            flower(c, w * 0.04f, fenceTop + d * 4, d * 3.5f);
+            flower(c, w * 0.97f, fenceTop + d * 6, d * 3.8f);
+            flower(c, w * 0.52f, fenceTop + d * 4, d * 3f);
+        }
+
+        /** Pagar kayu rendah sepanjang bagian atas petak. */
+        private void drawFence(Canvas c, float w, float fenceTop) {
+            float fh = d * 26;
+            float top = fenceTop - fh;
+            float pw = d * 10;
+            float gap = d * 7;
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(null);
+            p.setColor(Color.argb(40, 60, 100, 20));
+            rf.set(0, fenceTop - d * 2, w, fenceTop + d * 8);
+            c.drawRect(rf, p);
+            for (float x = d * 2; x < w; x += pw + gap) {
+                rf.set(x, top, x + pw, fenceTop + d * 6);
+                p.setColor(Color.parseColor("#EBBB76"));
+                c.drawRoundRect(rf, d * 4, d * 4, p);
+                rf.set(x + pw * 0.62f, top + d * 3, x + pw, fenceTop + d * 6);
+                p.setColor(Color.argb(50, 120, 70, 20));
+                c.drawRect(rf, p);
+            }
+            p.setColor(Color.parseColor("#D9A055"));
+            float y1 = top + fh * 0.28f;
+            float y2 = top + fh * 0.68f;
+            rf.set(0, y1, w, y1 + d * 4);
+            c.drawRect(rf, p);
+            rf.set(0, y2, w, y2 + d * 4);
+            c.drawRect(rf, p);
+        }
+
+        private void signPosts(Canvas c, float l, float r, float bb, float fenceTop) {
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(null);
+            float[] px = {l + (r - l) * 0.2f, l + (r - l) * 0.8f};
+            for (float x : px) {
+                rf.set(x - d * 3.5f, bb - d * 4, x + d * 3.5f, fenceTop + d * 14);
+                p.setColor(Color.parseColor("#B9783E"));
+                c.drawRoundRect(rf, d * 2, d * 2, p);
+                rf.set(x + d * 0.5f, bb - d * 4, x + d * 3.5f, fenceTop + d * 14);
+                p.setColor(Color.argb(60, 70, 30, 0));
+                c.drawRect(rf, p);
+            }
+        }
+
+        private void signBase(Canvas c, float l, float r, float fenceTop) {
+            float[] px = {l + (r - l) * 0.2f, l + (r - l) * 0.8f};
+            for (float x : px) {
+                bush(c, x, fenceTop + d * 1, d * 11);
+            }
+            flower(c, l + (r - l) * 0.5f, fenceTop - d * 1, d * 3f);
+        }
+
+        /** Papan kayu: bayangan, gradasi, serat, bingkai, dan paku. */
+        private void signBoard(Canvas c, float l, float t, float r, float b) {
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(null);
+            p.setColor(Color.argb(55, 50, 25, 0));
+            rf.set(l + d * 1.5f, t + d * 3, r + d * 1.5f, b + d * 3);
+            c.drawRoundRect(rf, d * 9, d * 9, p);
+            rf.set(l, t, r, b);
+            p.setShader(new LinearGradient(0, t, 0, b, Color.parseColor("#F6D595"),
+                    Color.parseColor("#E2A95F"), Shader.TileMode.CLAMP));
+            c.drawRoundRect(rf, d * 9, d * 9, p);
+            p.setShader(null);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(d * 1f);
+            p.setColor(Color.argb(35, 120, 70, 20));
+            float my = t + (b - t) * 0.55f;
+            c.drawLine(l + d * 10, my, r - d * 10, my, p);
+            p.setStrokeWidth(d * 2.5f);
+            p.setColor(Color.parseColor("#A5683A"));
+            rf.set(l, t, r, b);
+            c.drawRoundRect(rf, d * 9, d * 9, p);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.parseColor("#8A5428"));
+            c.drawCircle(l + d * 6, b - d * 6, d * 1.6f, p);
+            c.drawCircle(r - d * 6, b - d * 6, d * 1.6f, p);
+        }
+
+        private void signText(Canvas c, String s, float x, float y, float size, float maxW, Paint.Align al) {
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(null);
+            p.setTypeface(ROUND_BOLD);
+            p.setTextAlign(al);
+            p.setColor(Color.parseColor("#5A3416"));
+            p.setTextSize(size);
+            float tw = p.measureText(s);
+            if (tw > maxW && tw > 0f) {
+                p.setTextSize(size * maxW / tw);
+            }
+            c.drawText(s, x, y, p);
+        }
+
+        private void drawProgressSign(Canvas c, float l, float t, float r, float b) {
+            float h = b - t;
+            float pad = d * 9;
+            float frac = tot > 0 ? Math.min(1f, done / (float) tot) : 0f;
+            float y1 = t + h * 0.36f;
+            float icon = Math.min(d * 22, h * 0.4f);
+            float x = l + pad;
+            android.graphics.Bitmap tn = kBmp("ic_tunas");
+            if (tn != null) {
+                float iw = icon * tn.getWidth() / tn.getHeight();
+                kRf.set(x, y1 - icon / 2f, x + iw, y1 + icon / 2f);
+                c.drawBitmap(tn, null, kRf, kPaint);
+                x += iw + d * 5;
+            } else {
+                drawPlant(c, p, x + d * 10, y1 + d * 9, d * 20, 1, 0f, 0f, false);
+                x += d * 24;
+            }
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(null);
+            p.setTypeface(ROUND_BOLD);
+            p.setTextSize(d * 11.5f);
+            float pctW = p.measureText("100%");
+            float barR = r - pad - pctW - d * 5;
+            float barH = d * 9;
+            rf.set(x, y1 - barH / 2f, barR, y1 + barH / 2f);
+            p.setColor(Color.parseColor("#8A5A2B"));
+            c.drawRoundRect(rf, barH / 2f, barH / 2f, p);
+            if (frac > 0f) {
+                float fx0 = x + d * 1.5f;
+                float fx1 = Math.max(fx0 + d * 7, fx0 + (barR - x - d * 3) * frac);
+                rf.set(fx0, y1 - barH / 2f + d * 1.5f, fx1, y1 + barH / 2f - d * 1.5f);
+                p.setColor(Color.parseColor("#7BC95A"));
+                c.drawRoundRect(rf, barH / 2f, barH / 2f, p);
+            }
+            signText(c, pctTxt, r - pad, y1 + d * 4.2f, d * 11.5f, pctW, Paint.Align.RIGHT);
+            // baris kedua: ikon buku + jumlah ayat
+            float y2 = t + h * 0.76f;
+            float px0 = l + pad;
+            android.graphics.Bitmap bk = kBmp("ic_buku");
+            if (bk != null) {
+                float bi = Math.min(d * 16, h * 0.3f);
+                float bw = bi * bk.getWidth() / bk.getHeight();
+                kRf.set(px0, y2 - bi / 2f, px0 + bw, y2 + bi / 2f);
+                c.drawBitmap(bk, null, kRf, kPaint);
+                px0 += bw + d * 4;
+            }
+            float pr0 = r - pad;
+            float pillH = d * 16;
+            rf.set(px0, y2 - pillH / 2f, pr0, y2 + pillH / 2f);
+            p.setColor(Color.argb(165, 255, 246, 222));
+            c.drawRoundRect(rf, pillH / 2f, pillH / 2f, p);
+            signText(c, doneTxt, (px0 + pr0) / 2f, y2 + d * 4f, d * 11f, (pr0 - px0) - d * 8, Paint.Align.CENTER);
+        }
+
+        private void drawNameSign(Canvas c, float l, float t, float r, float b) {
+            float h = b - t;
+            float cy = t + h * 0.5f;
+            float maxW = (r - l) - d * 20;
+            float icon = Math.min(d * 24, h * 0.46f);
+            android.graphics.Bitmap tn = kBmp("ic_tunas");
+            float iw = tn != null ? icon * tn.getWidth() / tn.getHeight() : 0f;
+            float gap = tn != null ? d * 4 : 0f;
+            p.setTypeface(ROUND_BOLD);
+            float size = d * 15;
+            p.setTextSize(size);
+            float tw = p.measureText("Kebunmu");
+            if (tw + iw + gap > maxW) {
+                size = size * maxW / (tw + iw + gap);
+                p.setTextSize(size);
+                tw = p.measureText("Kebunmu");
+            }
+            float x0 = (l + r) / 2f - (iw + gap + tw) / 2f;
+            if (tn != null) {
+                kRf.set(x0, cy - icon / 2f, x0 + iw, cy + icon / 2f);
+                c.drawBitmap(tn, null, kRf, kPaint);
+            }
+            signText(c, "Kebunmu", x0 + iw + gap, cy + size * 0.35f, size, tw + d, Paint.Align.LEFT);
+        }
+
+
         private void board(Canvas c, float l, float t, float r, float b, float rot) {
             c.save();
             c.rotate(rot, (l + r) / 2f, (t + b) / 2f);
@@ -11153,135 +11402,13 @@ public class MainActivity extends Activity {
             p.setStyle(Paint.Style.FILL);
             p.setTypeface(ROUND_BOLD);
 
-            if (!kCover(c, "kebun_latar", w, h, 0.25f)) {
-            // awan
-            cloud(c, w * 0.22f + (float) Math.sin(tm) * d * 5, h * 0.08f, d * 17);
-            cloud(c, w * 0.80f + (float) Math.sin(tm + 2f) * d * 5, h * 0.06f, d * 14);
-            // bukit jauh
-            p.setColor(Color.parseColor("#9ADB74"));
-            c.drawOval(new RectF(-w * 0.2f, h * 0.2f, w * 0.62f, h * 0.5f), p);
-            p.setColor(Color.parseColor("#8CD36A"));
-            c.drawOval(new RectF(w * 0.4f, h * 0.22f, w * 1.2f, h * 0.5f), p);
-            // rumput
-            p.setShader(new LinearGradient(0, h * 0.33f, 0, h, Color.parseColor("#B9E77C"), Color.parseColor("#CFEA9A"), Shader.TileMode.CLAMP));
-            c.drawRect(0, h * 0.33f, w, h, p);
-            p.setShader(null);
-
-            // pagar
-            float fy = h * 0.3f;
-            float rail = d * 8;
-            p.setColor(Color.parseColor("#E7B26A"));
-            c.drawRoundRect(new RectF(0, fy, w, fy + rail), d * 3, d * 3, p);
-            c.drawRoundRect(new RectF(0, fy + rail * 1.9f, w, fy + rail * 2.9f), d * 3, d * 3, p);
-            float[] postX = {0.46f, 0.6f, 0.74f};
-            for (float px : postX) {
-                rf.set(w * px - d * 8, fy - d * 12, w * px + d * 8, fy + rail * 4.2f);
-                p.setColor(Color.parseColor("#E0A45E"));
-                c.drawRoundRect(rf, d * 5, d * 5, p);
-                p.setColor(Color.argb(60, 120, 70, 20));
-                c.drawRect(w * px + d * 2, fy - d * 8, w * px + d * 8, fy + rail * 4f, p);
-            }
-            // semak dan bunga di pinggir
-            bush(c, -d * 4, h * 0.36f, d * 34);
-            bush(c, w + d * 4, h * 0.38f, d * 36);
-            flower(c, w * 0.04f, h * 0.38f, d * 4);
-            flower(c, w * 0.97f, h * 0.45f, d * 4.5f);
-            flower(c, w * 0.52f, h * 0.345f, d * 3.2f);
-            }
-
-            // papan Progress Kebun
-            float bh = Math.max(d * 62, Math.min(d * 84, h * 0.26f));
-            float mg = Math.max(d * 10, w * 0.025f);
-            float bl = mg;
-            float bt = Math.max(d * 8, h * 0.03f);
-            float br = bl + w * 0.36f;
-            android.graphics.Bitmap pbB = kBmp("kebun_papan_progres");
-            if (pbB != null) {
-                float qk = (br - bl) / 760f;
-                kRf.set(bl, bt, br, bt + 521f * qk);
-                c.drawBitmap(pbB, null, kRf, kPaint);
-                float qf = tot > 0 ? Math.min(1f, done / (float) tot) : 0f;
-                p.setShader(null);
-                p.setStyle(Paint.Style.FILL);
-                if (qf > 0f) {
-                    float qx0 = bl + 188 * qk;
-                    float qx1 = bl + (188 + (576 - 188) * qf) * qk;
-                    rf.set(qx0, bt + 156 * qk, Math.max(qx1, qx0 + 40 * qk), bt + 197 * qk);
-                    p.setColor(Color.parseColor("#68B84B"));
-                    c.drawRoundRect(rf, 20 * qk, 20 * qk, p);
-                }
-                fitText(c, pctTxt, bl + 650 * qk, bt + 196 * qk, 52 * qk, 96 * qk);
-                fitText(c, doneTxt, bl + 410 * qk, bt + 306 * qk, 46 * qk, 360 * qk);
-            } else {
-            board(c, bl, bt, br, bt + bh, -3f);
-            c.save();
-            c.rotate(-3f, (bl + br) / 2f, bt + bh / 2f);
-            float tx = bl + d * 10;
-            p.setTextAlign(Paint.Align.LEFT);
-            p.setColor(Color.parseColor("#5A3416"));
-            p.setTextSize(d * 12.5f);
-            c.drawText("Progress Kebun", tx, bt + bh * 0.3f, p);
-            float barL = tx;
-            float barR = br - d * 40;
-            float barY = bt + bh * 0.5f;
-            rf.set(barL, barY - d * 4, barR, barY + d * 4);
-            p.setColor(Color.argb(150, 255, 248, 230));
-            c.drawRoundRect(rf, d * 4, d * 4, p);
-            float frac = tot > 0 ? Math.min(1f, done / (float) tot) : 0f;
-            if (frac > 0f) {
-                rf.set(barL, barY - d * 4, barL + Math.max(d * 8, (barR - barL) * frac), barY + d * 4);
-                p.setColor(Color.parseColor("#68B84B"));
-                c.drawRoundRect(rf, d * 4, d * 4, p);
-            }
-            p.setTextSize(d * 11);
-            p.setColor(Color.parseColor("#5A3416"));
-            c.drawText(Math.round(frac * 100) + "%", barR + d * 6, barY + d * 4, p);
-            drawPlant(c, p, tx + d * 6, bt + bh * 0.9f, d * 20, 1, 0f, 0f, false);
-            p.setTextSize(d * 11.5f);
-            p.setColor(Color.parseColor("#5A3416"));
-            c.drawText(done + " / " + tot + " Ayat", tx + d * 18, bt + bh * 0.86f, p);
-            c.restore();
-            }
-
-            // papan Kebunmu
-            float kw = w * 0.28f;
-            float kl = w - mg - kw;
-            float kt = bt;
-            float kh = Math.max(d * 58, Math.min(d * 74, h * 0.22f));
-            android.graphics.Bitmap knB = kBmp("kebun_papan_nama");
-            if (knB != null) {
-                kRf.set(kl, kt, kl + kw, kt + kw * 472f / 620f);
-                c.drawBitmap(knB, null, kRf, kPaint);
-            } else {
-            p.setColor(Color.parseColor("#B9783E"));
-            c.drawRect(kl + kw / 2f - d * 5, kt + kh - d * 2, kl + kw / 2f + d * 5, h * 0.4f, p);
-            board(c, kl, kt, kl + kw, kt + kh, 2f);
-            p.setColor(Color.parseColor("#C8794A"));
-            path.reset();
-            float pcx = kl + kw / 2f;
-            float pby = kt + kh * 0.62f;
-            path.moveTo(pcx - d * 8, pby - d * 7);
-            path.lineTo(pcx + d * 8, pby - d * 7);
-            path.lineTo(pcx + d * 6, pby + d * 1);
-            path.lineTo(pcx - d * 6, pby + d * 1);
-            path.close();
-            drawPlant(c, p, pcx, pby - d * 6, d * 22, 1, 0f, 0f, false);
-            p.setColor(Color.parseColor("#C8794A"));
-            c.drawPath(path, p);
-            p.setTextAlign(Paint.Align.CENTER);
-            p.setTextSize(d * 12.5f);
-            p.setColor(Color.parseColor("#5A3416"));
-            c.drawText("Kebunmu", pcx, kt + kh * 0.88f, p);
-            }
-
-            // tanah
-            // bingkai petak seluruhnya di dalam view: inset 4dp kiri/kanan, 8dp bawah
+            // geometri petak dihitung lebih dulu agar pagar, papan, dan latar menyatu dengan bingkai tanah
             float fl = d * 4;
             float fr = w - d * 4;
             float fb = h - d * 8;
             android.graphics.Bitmap ptB = kBmp("kebun_petak");
             float qs = (fr - fl) / 900f;
-            float st = h * 0.43f;
+            float st = h * 0.45f;
             float sl;
             float sr;
             float sb;
@@ -11297,6 +11424,39 @@ public class MainActivity extends Activity {
             if (st > sb - d * 70) {
                 st = sb - d * 70;
             }
+            float fenceTop = ptB != null ? st - 100 * qs : st - d * 10;
+
+            // latar bertema kebun (digambar kode): langit, bukit, pohon, rumput, pagar
+            drawScene(c, w, h, fenceTop);
+            drawFence(c, w, fenceTop);
+
+            // dua papan sejajar, berdiri di tanah di belakang bingkai petak
+            float mg = Math.max(d * 10, w * 0.025f);
+            float bb = fenceTop - d * 10;
+            float bh = Math.max(d * 34, Math.min(d * 56, bb - d * 6));
+            float bt = bb - bh;
+            float pl = mg;
+            float pr = mg + w * 0.40f;
+            float nr = w - mg;
+            float nl = nr - w * 0.30f;
+            signPosts(c, pl, pr, bb, fenceTop);
+            signPosts(c, nl, nr, bb, fenceTop);
+            signBoard(c, pl, bt, pr, bb);
+            signBoard(c, nl, bt, nr, bb);
+            drawProgressSign(c, pl, bt, pr, bb);
+            drawNameSign(c, nl, bt, nr, bb);
+            // semak + bunga di dasar tiang supaya papan terlihat tumbuh dari kebun
+            signBase(c, pl, pr, fenceTop);
+            signBase(c, nl, nr, fenceTop);
+            // hiasan daun dan bunga di sudut papan
+            flower(c, pl + d * 5, bt + d * 4, d * 3.2f);
+            flower(c, nr - d * 5, bt + d * 4, d * 3.2f);
+            leaf(c, pl + d * 8, bt + d * 3, d * 11, -25f, "#4E9A3A");
+            leaf(c, pr - d * 8, bt + d * 3, d * 11, 205f, "#68B84B");
+            leaf(c, nl + d * 8, bt + d * 3, d * 11, -25f, "#68B84B");
+            leaf(c, nr - d * 9, bt + d * 3, d * 11, 205f, "#4E9A3A");
+
+            // tanah: bingkai petak seluruhnya di dalam view (inset 4dp kiri/kanan, 8dp bawah), geometri sudah dihitung di atas
             if (ptB != null) {
                 kPiece(c, ptB, 0, 100, fl, st - 100 * qs, fr, st);
                 kPiece(c, ptB, 100, 268, fl, st, fr, sb);
