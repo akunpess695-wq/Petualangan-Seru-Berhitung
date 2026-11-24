@@ -1807,6 +1807,15 @@ public class MainActivity extends Activity {
     // ---------- Menu ----------
 
     private void loadPrefs() {
+        if (!prefs.getBoolean("photoAvDefault_v1", false)) {
+            SharedPreferences.Editor ed = prefs.edit().putBoolean("photoAvDefault_v1", true);
+            for (int i = 0; i < MAX_PLAYERS; i++) {
+                ed.putInt("avatar" + i, NO_HOOD);
+                ed.putBoolean("peciOff" + i, false);
+                ed.putBoolean("tasOff" + i, false);
+            }
+            ed.apply();
+        }
         kelas = Math.max(0, Math.min(5, prefs.getInt("kelas", 0)));
         timed = prefs.getBoolean("timed", false);
         secs = Math.max(SECS_MIN, Math.min(SECS_MAX, prefs.getInt("secs", 10)));
@@ -1815,7 +1824,7 @@ public class MainActivity extends Activity {
         relaxed = prefs.getBoolean("relaxed", false);
         for (int i = 0; i < MAX_PLAYERS; i++) {
             names[i] = prefs.getString("name" + i, "Pemain " + (i + 1));
-            avatar[i] = HOOD_ALIAS[Math.max(0, Math.min(AVATARS.length - 1, prefs.getInt("avatar" + i, i)))];
+            avatar[i] = HOOD_ALIAS[Math.max(0, Math.min(AVATARS.length - 1, prefs.getInt("avatar" + i, NO_HOOD)))];
             genderOf[i] = prefs.getInt("gender" + i, 0) == 1 ? 1 : 0;
         }
     }
@@ -7690,28 +7699,19 @@ public class MainActivity extends Activity {
             side.addView(gt, gl);
         }
         if (USE_PUTRI_GL) {
-            if (genderOf[shopPl] == 0) {
-                final boolean peciLepas = peciOff(shopPl);
-                TextView pc = orb("🧢 Peci", !peciLepas, GREEN);
-                pc.setContentDescription(peciLepas ? "Peci dilepas. Ketuk untuk memakai peci" : "Peci dipakai. Ketuk untuk melepas peci");
-                pc.setOnClickListener(v -> {
-                    prefs.edit().putBoolean("peciOff" + shopPl, !peciLepas).apply();
+            if (isHood(avatar[shopPl])) {
+                TextView hd = orb("🐾 Lepas Tudung", true, ORANGE);
+                hd.setContentDescription("Lepas tudung hewan");
+                hd.setOnClickListener(v -> {
+                    avatar[shopPl] = NO_HOOD;
+                    prefs.edit().putInt("avatar" + shopPl, NO_HOOD).apply();
                     sfx(SFX_OK);
                     showToko();
                 });
-                LinearLayout.LayoutParams pl2 = new LinearLayout.LayoutParams(WRAP, dp(36));
-                pl2.bottomMargin = dp(6);
-                side.addView(pc, pl2);
+                LinearLayout.LayoutParams hdlp = new LinearLayout.LayoutParams(WRAP, dp(36));
+                hdlp.bottomMargin = dp(6);
+                side.addView(hd, hdlp);
             }
-            final boolean tasLepas = tasOff(shopPl);
-            TextView tb = orb("🎒 Tas", !tasLepas, GREEN);
-            tb.setContentDescription(tasLepas ? "Tas dilepas. Ketuk untuk memakai tas" : "Tas dipakai. Ketuk untuk melepas tas");
-            tb.setOnClickListener(v -> {
-                prefs.edit().putBoolean("tasOff" + shopPl, !tasLepas).apply();
-                sfx(SFX_OK);
-                showToko();
-            });
-            side.addView(tb, new LinearLayout.LayoutParams(WRAP, dp(36)));
         }
         FrameLayout.LayoutParams sdl = new FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP | Gravity.START);
         sdl.setMargins(dp(10), dp(10), 0, 0);

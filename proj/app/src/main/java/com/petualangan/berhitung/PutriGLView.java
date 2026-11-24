@@ -391,15 +391,28 @@ final class PutriGLView extends GLSurfaceView {
         /** Susun ulang buffer GPU dari mesh bersama + salinan warna/indeks untuk tampilan ini. Dipanggil di thread GL. */
         void uploadMesh() {
             int g = curGender;
+            boolean hasPhoto = photoAvatar != null && photoAvatar.ready(g);
+            final int hd = hood;
+            if (hasPhoto && hd < 0) {
+                idxCount = 0;
+                return;
+            }
             float[] mpos, mnor, mcol, mgloss = null;
             byte[] parts;
             int[] midx;
             int mvc;
-            if (g == 0) {
+            if (hasPhoto) {
+                parts = null;
+                mpos = new float[0];
+                mnor = new float[0];
+                mcol = new float[0];
+                midx = new int[0];
+                mvc = 0;
+            } else if (g == 0) {
                 if (sMeshPutra == null) sMeshPutra = PutraMesh.build();
                 PutraMesh m = sMeshPutra;
                 parts = m.part;
-                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci, hood >= 0 ? PutraMesh.STYLE_HOOD : hairStyle, (lookPakaian == null || "#FFFFFF,#FFFFFF,#C62828".equalsIgnoreCase(lookPakaian)), showTas); mvc = m.vertCount;
+                mpos = m.pos; mnor = m.nor; midx = m.indexFor(showPeci, hd >= 0 ? PutraMesh.STYLE_HOOD : hairStyle, (lookPakaian == null || "#FFFFFF,#FFFFFF,#C62828".equalsIgnoreCase(lookPakaian)), showTas); mvc = m.vertCount;
                 mcol = m.outfitColors(lookPakaian, lookRambut);
             } else {
                 if (sMesh == null) sMesh = PutriMesh.build();
@@ -410,7 +423,6 @@ final class PutriGLView extends GLSurfaceView {
             }
             // tudung hewan: titik dan indeksnya ditambahkan di belakang mesh badan (indeks tetap di bawah 65.536)
             HoodMesh hm = null;
-            final int hd = hood;
             if (hd >= 0) {
                 if (sHood[g][hd] == null) sHood[g][hd] = HoodMesh.build(hd, g);
                 hm = sHood[g][hd];
@@ -551,16 +563,8 @@ final class PutriGLView extends GLSurfaceView {
                 GLES20.glVertexAttribPointer(aCol, 3, GLES20.GL_FLOAT, false, stride, 24);
                 GLES20.glDrawElements(GLES20.GL_TRIANGLES, podIdxCount, GLES20.GL_UNSIGNED_SHORT, 0);
             }
-            boolean usePhoto = photoAvatar != null && photoAvatar.ready(curGender)
-                    && hood < 0 && showTas
-                    && (curGender == 1 || (showPeci && hairStyle == PutraMesh.STYLE_DEFAULT));
-            if (usePhoto) {
-                GLES20.glDisableVertexAttribArray(aPos);
-                GLES20.glDisableVertexAttribArray(aNor);
-                GLES20.glDisableVertexAttribArray(aCol);
-                GLES20.glDisableVertexAttribArray(aGloss);
-                photoAvatar.draw(curGender, mvp, nm, elapsed, jumpY, lookPakaian, lookRambut);
-            } else {
+            boolean usePhoto = photoAvatar != null && photoAvatar.ready(curGender);
+            if (idxCount > 0) {
                 GLES20.glUniform1f(uT, elapsed);
                 GLES20.glUniform1f(uJump, jumpY);
                 GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo);
@@ -574,10 +578,13 @@ final class PutriGLView extends GLSurfaceView {
                 GLES20.glEnableVertexAttribArray(aCol);
                 GLES20.glVertexAttribPointer(aCol, 3, GLES20.GL_FLOAT, false, stride, 24);
                 GLES20.glDrawElements(GLES20.GL_TRIANGLES, idxCount, GLES20.GL_UNSIGNED_SHORT, 0);
-                GLES20.glDisableVertexAttribArray(aPos);
-                GLES20.glDisableVertexAttribArray(aNor);
-                GLES20.glDisableVertexAttribArray(aCol);
-                GLES20.glDisableVertexAttribArray(aGloss);
+            }
+            GLES20.glDisableVertexAttribArray(aPos);
+            GLES20.glDisableVertexAttribArray(aNor);
+            GLES20.glDisableVertexAttribArray(aCol);
+            GLES20.glDisableVertexAttribArray(aGloss);
+            if (usePhoto) {
+                photoAvatar.draw(curGender, mvp, nm, elapsed, jumpY, lookPakaian, lookRambut);
             }
             if (nagaOn) {
                 if (naga == null) naga = new NagaScene(getContext());
