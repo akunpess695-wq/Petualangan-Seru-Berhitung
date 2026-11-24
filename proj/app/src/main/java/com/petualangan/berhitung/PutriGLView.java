@@ -48,6 +48,7 @@ final class PutriGLView extends GLSurfaceView {
     private GodzillaScene2 goji;
     private volatile String toonPetId = null;  // Pet toon 3D berdiri di samping kiri avatar
     private ToonPetScene toonPet;
+    private PhotoAvatarScene photoAvatar;
 
     private void syncRenderMode() {
         setRenderMode(RENDERMODE_CONTINUOUSLY);
@@ -300,6 +301,7 @@ final class PutriGLView extends GLSurfaceView {
             naga = null;   // konteks GL baru: sumber daya naga dibuat ulang
             goji = null;
             toonPet = null;
+            photoAvatar = new PhotoAvatarScene(getContext());
             GLES20.glClearColor(bgR, bgG, bgB, 1f);
             GLES20.glEnable(GLES20.GL_DEPTH_TEST);
             GLES20.glDisable(GLES20.GL_CULL_FACE); // dua sisi, seperti pratinjau
@@ -549,23 +551,34 @@ final class PutriGLView extends GLSurfaceView {
                 GLES20.glVertexAttribPointer(aCol, 3, GLES20.GL_FLOAT, false, stride, 24);
                 GLES20.glDrawElements(GLES20.GL_TRIANGLES, podIdxCount, GLES20.GL_UNSIGNED_SHORT, 0);
             }
-            GLES20.glUniform1f(uT, elapsed);
-            GLES20.glUniform1f(uJump, jumpY);
-            GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo);
-            GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, ibo);
-            GLES20.glEnableVertexAttribArray(aGloss);
-            GLES20.glVertexAttribPointer(aGloss, 1, GLES20.GL_FLOAT, false, stride, 36);
-            GLES20.glEnableVertexAttribArray(aPos);
-            GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, stride, 0);
-            GLES20.glEnableVertexAttribArray(aNor);
-            GLES20.glVertexAttribPointer(aNor, 3, GLES20.GL_FLOAT, false, stride, 12);
-            GLES20.glEnableVertexAttribArray(aCol);
-            GLES20.glVertexAttribPointer(aCol, 3, GLES20.GL_FLOAT, false, stride, 24);
-            GLES20.glDrawElements(GLES20.GL_TRIANGLES, idxCount, GLES20.GL_UNSIGNED_SHORT, 0);
-            GLES20.glDisableVertexAttribArray(aPos);
-            GLES20.glDisableVertexAttribArray(aNor);
-            GLES20.glDisableVertexAttribArray(aCol);
-            GLES20.glDisableVertexAttribArray(aGloss);
+            boolean usePhoto = photoAvatar != null && photoAvatar.ready(curGender)
+                    && hood < 0 && showTas
+                    && (curGender == 1 || (showPeci && hairStyle == PutraMesh.STYLE_DEFAULT));
+            if (usePhoto) {
+                GLES20.glDisableVertexAttribArray(aPos);
+                GLES20.glDisableVertexAttribArray(aNor);
+                GLES20.glDisableVertexAttribArray(aCol);
+                GLES20.glDisableVertexAttribArray(aGloss);
+                photoAvatar.draw(curGender, mvp, nm, elapsed, jumpY, lookPakaian, lookRambut);
+            } else {
+                GLES20.glUniform1f(uT, elapsed);
+                GLES20.glUniform1f(uJump, jumpY);
+                GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo);
+                GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, ibo);
+                GLES20.glEnableVertexAttribArray(aGloss);
+                GLES20.glVertexAttribPointer(aGloss, 1, GLES20.GL_FLOAT, false, stride, 36);
+                GLES20.glEnableVertexAttribArray(aPos);
+                GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, stride, 0);
+                GLES20.glEnableVertexAttribArray(aNor);
+                GLES20.glVertexAttribPointer(aNor, 3, GLES20.GL_FLOAT, false, stride, 12);
+                GLES20.glEnableVertexAttribArray(aCol);
+                GLES20.glVertexAttribPointer(aCol, 3, GLES20.GL_FLOAT, false, stride, 24);
+                GLES20.glDrawElements(GLES20.GL_TRIANGLES, idxCount, GLES20.GL_UNSIGNED_SHORT, 0);
+                GLES20.glDisableVertexAttribArray(aPos);
+                GLES20.glDisableVertexAttribArray(aNor);
+                GLES20.glDisableVertexAttribArray(aCol);
+                GLES20.glDisableVertexAttribArray(aGloss);
+            }
             if (nagaOn) {
                 if (naga == null) naga = new NagaScene(getContext());
                 naga.draw(sceneView, proj);
