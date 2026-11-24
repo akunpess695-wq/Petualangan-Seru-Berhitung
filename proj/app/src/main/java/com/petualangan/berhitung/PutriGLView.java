@@ -26,12 +26,9 @@ import javax.microedition.khronos.opengles.GL10;
 final class PutriGLView extends GLSurfaceView {
     private static PutriMesh sMesh;     // putri, dibuat sekali, dipakai ulang
     private static PutraMesh sMeshPutra; // putra
-    private static final ExternalCharacterMesh[] sExternal = new ExternalCharacterMesh[2];
-    private static final boolean[] sExternalTried = new boolean[2];
     private static final HoodMesh[][] sHood = new HoodMesh[2][HoodMesh.COUNT]; // tudung per gender dan hewan, dibuat saat dipakai
     private final int gender;            // 0 = putra, 1 = putri
     private volatile int curGender;      // dapat diganti langsung tanpa membuat ulang GLSurfaceView
-    private volatile boolean useExternal = false; // model OBJ baru; mesh prosedural tetap menjadi cadangan
 
     private volatile float yaw = 0f, pitch = 0f; // derajat
     private volatile float bgR = 1f, bgG = 1f, bgB = 1f; // warna latar (default putih = warna kartu)
@@ -53,8 +50,7 @@ final class PutriGLView extends GLSurfaceView {
     private ToonPetScene toonPet;
 
     private void syncRenderMode() {
-        boolean anim = nagaOn || gojiOn || (toonPetId != null && !toonPetId.isEmpty());
-        setRenderMode(anim ? RENDERMODE_CONTINUOUSLY : RENDERMODE_WHEN_DIRTY);
+        setRenderMode(RENDERMODE_CONTINUOUSLY);
         requestRender();
     }
 
@@ -91,7 +87,7 @@ final class PutriGLView extends GLSurfaceView {
         setEGLConfigChooser(8, 8, 8, 0, 16, 0); // RGB + depth 16
         getHolder().setFormat(PixelFormat.OPAQUE); // latar opak (transparan menghasilkan kotak hitam)
         setRenderer(renderer);
-        setRenderMode(RENDERMODE_WHEN_DIRTY);
+        setRenderMode(RENDERMODE_CONTINUOUSLY);
     }
 
     /** Warna latar (0xRRGGBB); harus sama dengan kartu induk karena tampilan ini opak. Panggil sebelum tampil. */
@@ -113,18 +109,6 @@ final class PutriGLView extends GLSurfaceView {
     /** Ganti gender karakter secara langsung tanpa membuat ulang GLSurfaceView. */
     void setGender(int g) {
         curGender = g == 0 ? 0 : 1;
-    }
-
-    /** Mode model OBJ baru. Tudung hewan dan gaya rambut khusus otomatis memakai mesh lama. */
-    void setExternalModel(boolean on) { useExternal = on; }
-
-    private ExternalCharacterMesh externalMesh() {
-        int g = curGender;
-        if (!sExternalTried[g]) {
-            sExternal[g] = ExternalCharacterMesh.tryLoad(getContext(), g);
-            sExternalTried[g] = true;
-        }
-        return sExternal[g];
     }
 
     void setLook(String pakaian, String rambut, String latar, boolean peci, int gayaRambut) {
@@ -225,6 +209,8 @@ final class PutriGLView extends GLSurfaceView {
     private static final String VS =
             "uniform mat4 uMVP;\n" +
             "uniform mat3 uNM;\n" +
+            "uniform float uT;\n" +
+            "uniform float uJump;\n" +
             "attribute vec3 aPos;\n" +
             "attribute vec3 aNor;\n" +
             "attribute vec3 aCol;\n" +
@@ -233,13 +219,26 @@ final class PutriGLView extends GLSurfaceView {
             "varying vec3 vN;\n" +
             "varying vec3 vC;\n" +
             "void main(){\n" +
-            "  gl_Position = uMVP * vec4(aPos, 1.0);\n" +
+            "  vec3 p = aPos;\n" +
+            "  if (uT >= 0.0) {\n" +
+            "    float br = sin(uT * 2.3);\n" +
+            "    float sw = sin(uT * 1.15);\n" +
+            "    float torsoW = smoothstep(22.0, 52.0, p.y) * (1.0 - smoothstep(52.0, 62.0, p.y));\n" +
+            "    p.z += 0.32 * br * torsoW;\n" +
+            "    p.x *= 1.0 + 0.012 * br * torsoW;\n" +
+            "    float upW = smoothstep(26.0, 75.0, p.y);\n" +
+            "    p.x += 0.55 * sw * upW;\n" +
+            "    p.y += 0.35 * br * smoothstep(28.0, 68.0, p.y) + uJump;\n" +
+            "    float headW = smoothstep(55.0, 72.0, p.y);\n" +
+            "    p.z += 0.35 * sin(uT * 1.7 + 0.8) * headW;\n" +
+            "  }\n" +
+            "  gl_Position = uMVP * vec4(p, 1.0);\n" +
             "  vN = uNM * aNor;\n" +
             "  vC = aCol;\n" +
             "  vGloss = aGloss;\n" +
             "}\n";
 
-    // Sama dengan render.py: key (-0.45,0.65,0.62), fill (0.6,0.1,0.5), spekular 0.10^24
+    // Soft Toon + Rim Lighting: warna lebih hidup, bayangan hangat, dan siluet tepi lembut menyatu dengan Pet Toon
     private static final String FS =
             "precision mediump float;\n" +
             "varying vec3 vN;\n" +
@@ -248,15 +247,18 @@ final class PutriGLView extends GLSurfaceView {
             "void main(){\n" +
             "  vec3 n = normalize(vN);\n" +
             "  if (n.z < 0.0) n = -n;\n" +
-            "  vec3 L1 = normalize(vec3(-0.45, 0.65, 0.62));\n" +
-            "  vec3 L2 = normalize(vec3(0.6, 0.1, 0.5));\n" +
+            "  vec3 L1 = normalize(vec3(-0.42, 0.68, 0.60));\n" +
+            "  vec3 L2 = normalize(vec3(0.58, 0.15, 0.52));\n" +
             "  vec3 Hh = normalize(L1 + vec3(0.0, 0.0, 1.0));\n" +
             "  float d1 = max(dot(n, L1), 0.0);\n" +
             "  float d2 = max(dot(n, L2), 0.0);\n" +
+            "  float toon1 = mix(d1, smoothstep(0.18, 0.68, d1), 0.42);\n" +
             "  float hemi = 0.5 + 0.5 * n.y;\n" +
-            "  float sh = 0.48 + 0.16 * hemi + 0.36 * d1 + 0.10 * d2;\n" +
-            "  float spec = vGloss * pow(max(dot(n, Hh), 0.0), 24.0);\n" +
-            "  vec3 c = vC * sh + vec3(spec) + (1.0 - sh) * vec3(-0.01, 0.0, 0.025);\n" +
+            "  float sh = 0.50 + 0.16 * hemi + 0.34 * toon1 + 0.09 * d2;\n" +
+            "  float spec = vGloss * pow(max(dot(n, Hh), 0.0), 22.0);\n" +
+            "  float rim = pow(clamp(1.0 - n.z, 0.0, 1.0), 2.8) * (0.35 + 0.65 * max(n.y, 0.0));\n" +
+            "  vec3 rimCol = mix(vC, vec3(1.0, 0.97, 1.0), 0.55) * (0.14 * rim);\n" +
+            "  vec3 c = vC * sh + vec3(spec) + rimCol + (1.0 - sh) * vec3(0.01, -0.005, 0.03);\n" +
             "  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);\n" +
             "}\n";
 
@@ -288,7 +290,8 @@ final class PutriGLView extends GLSurfaceView {
         private int bgProg, bgP, bgC, bgSeg;
         private FloatBuffer bgQuad;
         volatile boolean ready;
-        private int aPos, aNor, aCol, aGloss, uMVP, uNM;
+        private int aPos, aNor, aCol, aGloss, uMVP, uNM, uT, uJump;
+        private final long t0 = System.nanoTime();
         private final float[] proj = new float[16], model = new float[16], view = new float[16], sceneView = new float[16], stageRot = new float[16];
         private final float[] mv = new float[16], mvp = new float[16], nm = new float[9];
 
@@ -307,6 +310,8 @@ final class PutriGLView extends GLSurfaceView {
             aGloss = GLES20.glGetAttribLocation(prog, "aGloss");
             uMVP = GLES20.glGetUniformLocation(prog, "uMVP");
             uNM = GLES20.glGetUniformLocation(prog, "uNM");
+            uT = GLES20.glGetUniformLocation(prog, "uT");
+            uJump = GLES20.glGetUniformLocation(prog, "uJump");
 
             bgProg = link(compile(GLES20.GL_VERTEX_SHADER, BG_VS), compile(GLES20.GL_FRAGMENT_SHADER, BG_FS));
             bgP = GLES20.glGetAttribLocation(bgProg, "aP");
@@ -388,18 +393,7 @@ final class PutriGLView extends GLSurfaceView {
             byte[] parts;
             int[] midx;
             int mvc;
-            boolean extEligible = useExternal && hood < 0
-                    && (g == 1 || hairStyle == PutraMesh.STYLE_DEFAULT);
-            ExternalCharacterMesh ext = extEligible ? externalMesh() : null;
-            if (ext != null) {
-                parts = null;
-                mpos = ext.pos;
-                mnor = ext.nor;
-                midx = ext.indices;
-                mvc = ext.vertexCount;
-                mcol = ext.outfitColors(lookPakaian, lookRambut);
-                mgloss = ext.gloss;
-            } else if (g == 0) {
+            if (g == 0) {
                 if (sMeshPutra == null) sMeshPutra = PutraMesh.build();
                 PutraMesh m = sMeshPutra;
                 parts = m.part;
@@ -525,11 +519,24 @@ final class PutriGLView extends GLSurfaceView {
             nm[3] = model[4] * invZ; nm[4] = model[5] * invZ; nm[5] = model[6] * invZ;
             nm[6] = model[8] * invZ; nm[7] = model[9] * invZ; nm[8] = model[10] * invZ;
 
+            long nn = System.nanoTime();
+            float elapsed = (nn - t0) / 1e9f;
+            float jumpY = 0f;
+            int rt = NagaScene.rType;
+            if (rt == 1) {
+                float rp = (nn - NagaScene.rT0) / 1e9f / 0.9f;
+                if (rp >= 0f && rp < 1f) {
+                    jumpY = 5.5f * (float) Math.abs(Math.sin(rp * Math.PI * 2f)) * (1f - rp);
+                }
+            }
+
             GLES20.glUseProgram(prog);
             GLES20.glUniformMatrix4fv(uMVP, 1, false, mvp, 0);
             GLES20.glUniformMatrix3fv(uNM, 1, false, nm, 0);
             int stride = 10 * 4;
             if (podVbo != 0) {
+                GLES20.glUniform1f(uT, -1f);
+                GLES20.glUniform1f(uJump, 0f);
                 GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, podVbo);
                 GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, podIbo);
                 GLES20.glEnableVertexAttribArray(aGloss);
@@ -542,6 +549,8 @@ final class PutriGLView extends GLSurfaceView {
                 GLES20.glVertexAttribPointer(aCol, 3, GLES20.GL_FLOAT, false, stride, 24);
                 GLES20.glDrawElements(GLES20.GL_TRIANGLES, podIdxCount, GLES20.GL_UNSIGNED_SHORT, 0);
             }
+            GLES20.glUniform1f(uT, elapsed);
+            GLES20.glUniform1f(uJump, jumpY);
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo);
             GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, ibo);
             GLES20.glEnableVertexAttribArray(aGloss);

@@ -342,7 +342,30 @@ final class PutriMesh {
                     new double[][]{{3.18, 3.18}, {3.15, 3.15}, {2.85, 2.85}}, CUFF, 24);
             M.cur = P_OTHER;
             M.ellipsoid(new double[]{s * 17.85, 29.7, -1.8}, new double[]{0.25, 0.42, 0.42}, BTN, 12, 8);
-            M.ellipsoid(new double[]{s * 15.0, 26.6, -0.4}, new double[]{2.7, 4.0, 2.5}, SKIN, 18, 12);
+            // Telapak tangan 3D + 4 jari meruncing + ibu jari (menggantikan bulatan mitten polos)
+            M.ellipsoid(new double[]{s * 15.0, 27.3, -0.5}, new double[]{2.25, 2.55, 1.85}, SKIN, 18, 12);
+            double[] fxOff = {-1.08, -0.36, 0.36, 1.04};
+            double[] fLen = {2.25, 2.65, 2.50, 2.00};
+            double[] fRad = {0.54, 0.58, 0.56, 0.50};
+            for (int fi = 0; fi < 4; fi++) {
+                double fz = -0.45 + fxOff[fi] * 0.92;
+                double fx0 = s * (15.0 + 0.14 * Math.abs(fxOff[fi]));
+                double[][] fp = {
+                        {fx0, 25.5, fz},
+                        {fx0 - s * 0.24, 25.5 - fLen[fi] * 0.55, fz + 0.20},
+                        {fx0 - s * 0.52, 25.5 - fLen[fi], fz + 0.40}
+                };
+                double r0 = fRad[fi];
+                M.tube(fp, new double[][]{{r0, r0}, {r0 * 0.88, r0 * 0.88}, {r0 * 0.68, r0 * 0.68}}, SKIN, 10);
+                M.ellipsoid(fp[2], new double[]{r0 * 0.68, r0 * 0.68, r0 * 0.68}, SKIN, 10, 6);
+            }
+            double[][] thumb = {
+                    {s * 14.25, 27.7, 0.80},
+                    {s * 13.55, 26.4, 1.55},
+                    {s * 13.25, 25.3, 1.95}
+            };
+            M.tube(thumb, new double[][]{{0.72, 0.72}, {0.64, 0.64}, {0.52, 0.52}}, SKIN, 10);
+            M.ellipsoid(thumb[2], new double[]{0.52, 0.52, 0.52}, SKIN, 10, 6);
         }
         M.cur = P_TAS;
         // tas: badan + saku depan + kancing (di atas jilbab belakang, jadi ujung jilbab tertutup tas)
@@ -392,18 +415,32 @@ final class PutriMesh {
                 lrad[i] = new double[]{r, r};
             }
             M.tube(lash, lrad, LASH, 6); // bulu mata atas tebal + ujung melentik
+            // Kelopak mata bawah lembut
+            double[][] lowLid = new double[6][];
+            for (int i = 0; i < 6; i++) {
+                double u = Math.toRadians(205 + 130.0 * i / 5.0);
+                double lx = ex + s * 2.60 * Math.cos(u), ly = ey - 0.15 + 3.25 * Math.sin(u);
+                lowLid[i] = new double[]{lx, ly, onHead(lx, ly, 0.22)};
+            }
+            M.tube(lowLid, rr(6, 0.16, 0.13), new double[]{0.94, 0.76, 0.66}, 6);
             M.decal(s * 8.2, 61.9, 2.6, 1.6, 0.30, 0.05, PINK, 18, 10); // pipi lembut
+            if (sg == 1) {
+                // Hidung 3D mungil Putri
+                M.ellipsoid(new double[]{0, 63.3, onHead(0, 63.3, 0.42)}, new double[]{0.82, 0.70, 0.78}, SKIN, 14, 10);
+                M.decal(0, 62.95, 0.68, 0.32, 0.16, 0.06, new double[]{0.93, 0.74, 0.62}, 12, 8);
+            }
             double[][] br = new double[4][], brr = new double[4][];
-            double[] bx = {2.4, 4.4, 7.0, 9.8}, by = {72.9, 73.9, 73.6, 72.2}, bw = {0.6, 0.8, 0.75, 0.42};
+            double[] bx = {2.4, 4.4, 7.0, 9.8}, by = {72.9, 73.9, 73.6, 72.2}, bw = {0.55, 0.74, 0.68, 0.38};
             for (int i = 0; i < 4; i++) { br[i] = new double[]{s * bx[i], by[i], onHead(s * bx[i], by[i], 0.3)}; brr[i] = new double[]{bw[i], bw[i]}; }
-            M.tube(br, brr, BROWN, 8); // alis tebal, puncak di sisi dalam
+            M.tube(br, brr, BROWN, 8); // alis rapi melengkung
         }
         double[][] arc = new double[7][];
         for (int i = 0; i < 7; i++) {
-            double x = -2.9 + 5.8 * i / 6, y = 60.4 + 0.1 * x * x;
-            arc[i] = new double[]{x, y, onHead(x, y, 0.3)};
+            double x = -2.9 + 5.8 * i / 6, y = 60.2 + 0.14 * x * x;
+            arc[i] = new double[]{x, y, onHead(x, y, 0.32)};
         }
-        M.tube(arc, rr(7, 0.32, 0.3), LIP, 6); // senyum tipis
+        M.tube(arc, rr(7, 0.34, 0.32), LIP, 6); // senyum manis
+        M.decal(0, 59.3, 1.3, 0.45, 0.18, 0.06, new double[]{0.95, 0.74, 0.66}, 12, 8); // bibir bawah lembut
 
         // dasi marun: menjuntai dari balik ujung V jilbab, melebar lalu meruncing (hanya bagian bawahnya yang terlihat)
         M.cur = P_OTHER;

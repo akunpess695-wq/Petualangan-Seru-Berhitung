@@ -428,7 +428,30 @@ final class PutraMesh {
             M.tube(fore, new double[][]{{3.3, 3.3}, {3.35, 3.35}, {3.25, 3.25}, {2.9, 2.9}}, SKIN, 16);
             M.ellipsoid(new double[]{s * 15.0, 30.0, -2.0}, new double[]{2.9, 1.3, 2.9}, SKIN, 16, 8); // penutup pergelangan
             M.cur = P_OTHER;
-            M.ellipsoid(new double[]{s * 15.0, 26.6, -0.4}, new double[]{2.7, 4.0, 2.5}, SKIN, 18, 12);
+            // Telapak tangan 3D + 4 jari meruncing + ibu jari (menggantikan bulatan mitten polos)
+            M.ellipsoid(new double[]{s * 15.0, 27.3, -0.5}, new double[]{2.35, 2.65, 1.95}, SKIN, 18, 12);
+            double[] fxOff = {-1.15, -0.38, 0.38, 1.10};
+            double[] fLen = {2.35, 2.75, 2.60, 2.10};
+            double[] fRad = {0.58, 0.62, 0.60, 0.54};
+            for (int fi = 0; fi < 4; fi++) {
+                double fz = -0.45 + fxOff[fi] * 0.95;
+                double fx0 = s * (15.0 + 0.15 * Math.abs(fxOff[fi]));
+                double[][] fp = {
+                        {fx0, 25.5, fz},
+                        {fx0 - s * 0.25, 25.5 - fLen[fi] * 0.55, fz + 0.22},
+                        {fx0 - s * 0.55, 25.5 - fLen[fi], fz + 0.42}
+                };
+                double r0 = fRad[fi];
+                M.tube(fp, new double[][]{{r0, r0}, {r0 * 0.88, r0 * 0.88}, {r0 * 0.68, r0 * 0.68}}, SKIN, 10);
+                M.ellipsoid(fp[2], new double[]{r0 * 0.68, r0 * 0.68, r0 * 0.68}, SKIN, 10, 6);
+            }
+            double[][] thumb = {
+                    {s * 14.2, 27.7, 0.85},
+                    {s * 13.5, 26.4, 1.65},
+                    {s * 13.2, 25.3, 2.05}
+            };
+            M.tube(thumb, new double[][]{{0.78, 0.78}, {0.68, 0.68}, {0.55, 0.55}}, SKIN, 10);
+            M.ellipsoid(thumb[2], new double[]{0.55, 0.55, 0.55}, SKIN, 10, 6);
         }
         M.cur = P_BAG;
         // ransel: badan + saku depan + kancing + tali
@@ -464,16 +487,30 @@ final class PutraMesh {
                 lrad[i] = new double[]{r, r};
             }
             M.tube(lash, lrad, LASH, 6); // bulu mata atas tipis
-            M.decal(s * 7.6, 61.8, 1.85, 1.3, 0.22, 0.05, PINK, 18, 10); // pipi (lembut, di bawah sudut luar mata)
+            // Kelopak mata bawah lembut (memberi ekspresi senyum hangat pada mata)
+            double[][] lowLid = new double[6][];
+            for (int i = 0; i < 6; i++) {
+                double u = Math.toRadians(205 + 130.0 * i / 5.0);
+                double lx = ex + s * 2.85 * Math.cos(u), ly = ey - 0.15 + 3.25 * Math.sin(u);
+                lowLid[i] = new double[]{lx, ly, onHead(lx, ly, 0.22)};
+            }
+            M.tube(lowLid, rr(6, 0.18, 0.14), new double[]{0.94, 0.76, 0.66}, 6);
+            M.decal(s * 7.6, 61.8, 2.15, 1.4, 0.24, 0.05, PINK, 18, 10); // rona pipi hangat
             double[][] br = new double[4][], brr = new double[4][];
-            if (sg == 1) M.decal(0, 62.6, 0.6, 0.45, 0.30, 0.05, new double[]{0.96, 0.78, 0.64}, 12, 8); // hidung kecil, sederhana
+            if (sg == 1) {
+                // Hidung 3D mungil bervolume lembut
+                M.ellipsoid(new double[]{0, 62.7, onHead(0, 62.7, 0.45)}, new double[]{0.95, 0.78, 0.85}, SKIN, 14, 10);
+                M.decal(0, 62.35, 0.75, 0.35, 0.18, 0.06, new double[]{0.93, 0.74, 0.62}, 12, 8);
+            }
             double[] bx = {3.5, 5.0, 6.8, 8.4}, by = {70.6, 71.4, 71.3, 70.2}, bw = {0.42, 0.58, 0.55, 0.26};
             for (int i = 0; i < 4; i++) { br[i] = new double[]{s * bx[i], by[i], onHead(s * bx[i], by[i], 0.3)}; brr[i] = new double[]{bw[i], bw[i]}; }
             M.tube(br, brr, HAIR, 8); // alis tipis melengkung
         }
         double[][] arc = new double[7][];
-        for (int i = 0; i < 7; i++) { double x = -2.9 + 5.8 * i / 6, y = 58.6 + 0.30 * x * x; arc[i] = new double[]{x, y, onHead(x, y, 0.3)}; }
+        for (int i = 0; i < 7; i++) { double x = -2.9 + 5.8 * i / 6, y = 58.6 + 0.26 * x * x; arc[i] = new double[]{x, y, onHead(x, y, 0.32)}; }
         M.tube(arc, rr(7, 0.34, 0.34), LIP, 6); // senyum ramah
+        // Lekuk bibir bawah & dagu lembut
+        M.decal(0, 57.6, 1.4, 0.48, 0.20, 0.06, new double[]{0.95, 0.75, 0.65}, 12, 8);
         // rambut: cangkang di atas kepala, bukaan wajah dipotong di depan; bagian bawah berhenti di y=63
         M.cur = P_HAIR;
         M.curShade = SHELL;
