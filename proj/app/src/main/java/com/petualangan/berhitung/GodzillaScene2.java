@@ -18,15 +18,22 @@ import java.nio.ShortBuffer;
 final class GodzillaScene2 {
     private FloatBuffer vb; private ShortBuffer ib;
     private int nIdx, prog, tex;
+    private int uMVP, uM, uId, uFr, uLit, uEd, uFl, uS, aP, aN, aT;
     private final long t0 = System.nanoTime();
     private final float[] model = new float[16], mv = new float[16], mvp = new float[16];
 
+    private static byte[] readAll(InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int r;
+        while ((r = in.read(buf)) > 0) bo.write(buf, 0, r);
+        in.close();
+        return bo.toByteArray();
+    }
+
     GodzillaScene2(Context ctx) {
         try {
-            InputStream in = op(ctx, "godzilla_pet.bin");
-            byte[] b = new byte[in.available()]; int n = 0;
-            while (n < b.length) { int k = in.read(b, n, b.length - n); if (k < 0) break; n += k; }
-            in.close();
+            byte[] b = readAll(op(ctx, "godzilla_pet.bin"));
             ByteBuffer bb = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN);
             bb.position(4);
             int nv = bb.getShort() & 0xFFFF, nt = bb.getInt();
@@ -57,6 +64,17 @@ final class GodzillaScene2 {
             + "float m=uId+lit*1.6+edge*2.2+uFl*3.5;"
             + "gl_FragColor=vec4(c*vL*1.1+vec3(0.,.35,.6)*g*m+vec3(.5,.7,1.)*g*uFl*1.5,1.);}";
         prog = link(vs, fs);
+        uMVP = GLES20.glGetUniformLocation(prog, "uMVP");
+        uM = GLES20.glGetUniformLocation(prog, "uM");
+        uId = GLES20.glGetUniformLocation(prog, "uId");
+        uFr = GLES20.glGetUniformLocation(prog, "uFr");
+        uLit = GLES20.glGetUniformLocation(prog, "uLit");
+        uEd = GLES20.glGetUniformLocation(prog, "uEd");
+        uFl = GLES20.glGetUniformLocation(prog, "uFl");
+        uS = GLES20.glGetUniformLocation(prog, "uS");
+        aP = GLES20.glGetAttribLocation(prog, "aP");
+        aN = GLES20.glGetAttribLocation(prog, "aN");
+        aT = GLES20.glGetAttribLocation(prog, "aT");
     }
 
     private static InputStream op(Context c, String n) throws java.io.IOException {
@@ -105,22 +123,21 @@ final class GodzillaScene2 {
         GLES20.glUseProgram(prog);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(prog, "uMVP"), 1, false, mvp, 0);
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(prog, "uM"), 1, false, model, 0);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uId"), id);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uFr"), fr);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uLit"), lit);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uEd"), ed);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uFl"), fl);
+        GLES20.glUniformMatrix4fv(uMVP, 1, false, mvp, 0);
+        GLES20.glUniformMatrix4fv(uM, 1, false, model, 0);
+        GLES20.glUniform1f(uId, id);
+        GLES20.glUniform1f(uFr, fr);
+        GLES20.glUniform1f(uLit, lit);
+        GLES20.glUniform1f(uEd, ed);
+        GLES20.glUniform1f(uFl, fl);
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex);
-        GLES20.glUniform1i(GLES20.glGetUniformLocation(prog, "uS"), 0);
-        int p = GLES20.glGetAttribLocation(prog, "aP"), n = GLES20.glGetAttribLocation(prog, "aN"), uv = GLES20.glGetAttribLocation(prog, "aT");
-        vb.position(0); GLES20.glVertexAttribPointer(p, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(p);
-        vb.position(3); GLES20.glVertexAttribPointer(n, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(n);
-        vb.position(6); GLES20.glVertexAttribPointer(uv, 2, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(uv);
+        GLES20.glUniform1i(uS, 0);
+        vb.position(0); GLES20.glVertexAttribPointer(aP, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(aP);
+        vb.position(3); GLES20.glVertexAttribPointer(aN, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(aN);
+        vb.position(6); GLES20.glVertexAttribPointer(aT, 2, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(aT);
         ib.position(0);
         GLES20.glDrawElements(GLES20.GL_TRIANGLES, nIdx, GLES20.GL_UNSIGNED_SHORT, ib);
-        GLES20.glDisableVertexAttribArray(p); GLES20.glDisableVertexAttribArray(n); GLES20.glDisableVertexAttribArray(uv);
+        GLES20.glDisableVertexAttribArray(aP); GLES20.glDisableVertexAttribArray(aN); GLES20.glDisableVertexAttribArray(aT);
     }
 }

@@ -82,6 +82,10 @@ public class MainActivity extends Activity {
     // Tahap E: putra dan putri di Toko Avatar memakai 3D sungguhan (PutriGLView). false = kembali ke AvatarView lama.
     private static final boolean USE_PUTRI_GL = true;
     private PutriGLView putriGL;
+    private NagaPetView shopNagaGL;
+    private int shopScrollX = 0, shopScrollY = 0;
+    private HorizontalScrollView shopHScroll;
+    private ScrollView mainScrollView;
     private static final String STATS_KEY = "laporan_v1";
     private static final int STATS_MAX_ITEMS = 500;
     private static final String[] OP_NAME = {"Tambah", "Kurang", "Kali", "Bagi", "Campur"};
@@ -688,6 +692,14 @@ public class MainActivity extends Activity {
     private void setScreen(int s) {
         stopSurahAudio();
         stopMic();
+        if (s != 20 && putriGL != null) {
+            putriGL.onPause();
+            putriGL = null;
+        }
+        if (shopNagaGL != null) {
+            shopNagaGL.onPause();
+            shopNagaGL = null;
+        }
         screen = s;
         if (s == 0) {
             int p = tampilProfile;
@@ -851,6 +863,7 @@ public class MainActivity extends Activity {
         }
         pauseGame();
         if (putriGL != null) putriGL.onPause();
+        if (shopNagaGL != null) shopNagaGL.onPause();
         if (nagaOverlay != null) nagaOverlay.onPause();
         super.onPause();
     }
@@ -859,6 +872,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (putriGL != null) putriGL.onResume();
+        if (shopNagaGL != null) shopNagaGL.onResume();
         if (nagaOverlay != null) nagaOverlay.onResume();
         resumeGame();
     }
@@ -1669,9 +1683,14 @@ public class MainActivity extends Activity {
     }
 
     private void wrapBg(LinearLayout c, Drawable bg) {
+        wrapBg(c, bg, true);
+    }
+
+    private void wrapBg(LinearLayout c, Drawable bg, boolean animateIn) {
         syncNaga(!nagaHide);
         nagaHide = false;
         ScrollView sv = new ScrollView(this);
+        mainScrollView = sv;
         sv.setFillViewport(true);
         sv.setBackground(bg);
         if (getResources().getDisplayMetrics().widthPixels > dp(700)) {
@@ -1683,10 +1702,12 @@ public class MainActivity extends Activity {
             sv.addView(c);
         }
         setContentView(sv);
-        sv.setAlpha(0f);
-        sv.setTranslationY(dp(12));
-        sv.animate().alpha(1f).translationY(0f).setDuration(200)
-                .setInterpolator(new DecelerateInterpolator()).start();
+        if (animateIn) {
+            sv.setAlpha(0f);
+            sv.setTranslationY(dp(12));
+            sv.animate().alpha(1f).translationY(0f).setDuration(200)
+                    .setInterpolator(new DecelerateInterpolator()).start();
+        }
     }
 
     private LinearLayout.LayoutParams lp(int height, int topDp) {
@@ -5017,6 +5038,19 @@ public class MainActivity extends Activity {
             dialogAdmin();
         });
 
+        final boolean extOn = avatarExt();
+        Button extBtn = button(extOn ? "✨ Karakter 3D Baru (OBJ): AKTIF" : "🧊 Karakter 3D Baru (OBJ): NONAKTIF",
+                extOn ? TEAL : GRAY_D, 14);
+        if (!extOn) extBtn.setTextColor(DARK);
+        flat(extBtn);
+        c.addView(extBtn, lp(dp(48), 10));
+        extBtn.setOnClickListener(v -> {
+            prefs.edit().putBoolean("avatarExt", !extOn).apply();
+            Toast.makeText(this, !extOn ? "Karakter 3D baru (eksperimental) diaktifkan."
+                    : "Kembali ke karakter 3D standar.", Toast.LENGTH_SHORT).show();
+            dialogAdmin();
+        });
+
         Button reset = button("\uD83E\uDDF9 Reset koin dan koleksi", RED, 15);
         flat(reset);
         c.addView(reset, lp(dp(48), 10));
@@ -5235,6 +5269,7 @@ public class MainActivity extends Activity {
     /** Pasang pakaian, rambut (putra) / warna jilbab (putri), latar, dan peci milik pemain pl ke tampilan 3D. */
     private void applyLook3D(PutriGLView v, int pl) {
         int ba = eqValid(pl, 5), hr = eqValid(pl, 6), bg = eqValid(pl, 4);
+        v.setGender(genderOf[pl]);
         v.setExternalModel(avatarExt());
         v.setHood(isHood(avatar[pl]) ? avatar[pl] : -1); // tudung hewan 3D (putra dan putri)
         v.setTas(!tasOff(pl));
@@ -7462,39 +7497,34 @@ public class MainActivity extends Activity {
     private View shopCell(final int id) {
         final boolean own = owns(id);
         final boolean on = eq(shopPl, itSlot(id)) == id;
-        // This catalog displays only supported 3D equipment. Legacy 2D items
-        // are kept in ITEMS for compatibility but filtered from the visible shop.
-        final boolean pending3D = false;
         final int rar = itRar(id);
         final int rc = RAR_COLOR[rar];
         LinearLayout cell = new LinearLayout(this);
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER_HORIZONTAL);
-        cell.setPadding(dp(5), dp(6), dp(5), dp(6));
+        cell.setPadding(dp(7), dp(7), dp(7), dp(7));
 
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                on ? new int[]{Color.rgb(229, 250, 238), Color.WHITE}
-                   : new int[]{Color.WHITE, Color.rgb(246, 246, 255)});
+                on ? new int[]{Color.rgb(232, 252, 240), Color.rgb(255, 255, 255)}
+                   : own ? new int[]{Color.rgb(245, 248, 255), Color.rgb(255, 255, 255)}
+                         : new int[]{Color.WHITE, Color.rgb(248, 246, 255)});
         bg.setCornerRadius(dp(20));
-        bg.setStroke(dp(on ? 3 : 1), on ? GREEN : (rar > 0 ? rc : Color.rgb(222, 226, 240)));
+        bg.setStroke(dp(on ? 3 : (rar >= 2 ? 2 : 1)),
+                on ? GREEN : (rar > 0 ? rc : Color.rgb(220, 214, 244)));
         cell.setBackground(bg);
-        cell.setElevation(dp(on ? 4 : 2));
-
-        TextView rarity = text(RAR_NAME[rar].toUpperCase(Locale.ROOT), 9, rc, true);
-        rarity.setGravity(Gravity.CENTER);
-        rarity.setPadding(dp(7), dp(2), dp(7), dp(2));
-        rarity.setBackground(box(Color.rgb(243, 245, 252), 10));
-        // Rarity stays in accessibility description; omit its extra visual row.
+        cell.setElevation(dp(on ? 5 : 2));
 
         FrameLayout display = new FrameLayout(this);
         GradientDrawable stage = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Color.rgb(237, 240, 255), Color.rgb(249, 251, 255)});
-        stage.setCornerRadius(dp(16));
+                on ? new int[]{Color.rgb(212, 245, 225), Color.rgb(238, 253, 244)}
+                   : new int[]{Color.rgb(235, 232, 255), Color.rgb(248, 247, 255)});
+        stage.setCornerRadius(dp(15));
         display.setBackground(stage);
         if (itSlot(id) == 4) {
             View sw = new View(this);
             sw.setBackground(bgDrawable(id, dp(14)));
-            FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(58), dp(58), Gravity.CENTER);
+            FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(MATCH, MATCH, Gravity.CENTER);
+            sp.setMargins(dp(6), dp(6), dp(6), dp(6));
             display.addView(sw, sp);
         } else if (itSlot(id) == 3) {
             TextView emoji = text(itIcon(id), 38, DARK, false);
@@ -7506,31 +7536,33 @@ public class MainActivity extends Activity {
             preview.gender = itGender(id) < 0 ? genderOf[shopPl] : itGender(id);
             display.addView(preview, new FrameLayout.LayoutParams(MATCH, MATCH));
         }
-        cell.addView(display, new LinearLayout.LayoutParams(MATCH, dp(70)));
+        TextView rarity = text(RAR_NAME[rar].toUpperCase(Locale.ROOT), 8, Color.WHITE, true);
+        rarity.setGravity(Gravity.CENTER);
+        rarity.setPadding(dp(6), dp(2), dp(6), dp(2));
+        rarity.setBackground(box(rc, 8));
+        FrameLayout.LayoutParams rlp = new FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP | Gravity.END);
+        rlp.setMargins(dp(4), dp(4), dp(4), dp(4));
+        display.addView(rarity, rlp);
+        cell.addView(display, new LinearLayout.LayoutParams(MATCH, dp(76)));
 
-        TextView itemName = text(itName(id), 12, Color.rgb(48, 42, 72), true);
+        TextView itemName = text(itName(id), 12, Color.rgb(42, 34, 68), true);
         itemName.setGravity(Gravity.CENTER);
-        itemName.setMaxLines(2);
+        itemName.setMaxLines(1);
         itemName.setEllipsize(TextUtils.TruncateAt.END);
-        cell.addView(itemName, lp(dp(30), 3));
+        cell.addView(itemName, lp(dp(22), 4));
 
-        String label = pending3D ? "3D SEGERA" : on ? "✓ DIPAKAI" : own ? "PAKAI" : "🪙 " + itPrice(id);
-        int actionColor = pending3D ? Color.rgb(135, 142, 160) : on ? GREEN : own ? BLUE : coins() >= itPrice(id) ? ORANGE : SILVER;
+        int price = itPrice(id);
+        String label = on ? "✓ DIPAKAI" : own ? "PAKAI" : (price == 0 ? "GRATIS" : "🪙 " + price);
+        int actionColor = on ? GREEN : own ? BLUE : (coins() >= price ? ORANGE : Color.rgb(158, 168, 182));
         TextView action = text(label, 11, Color.WHITE, true);
         action.setGravity(Gravity.CENTER);
-        action.setMinHeight(dp(32));
         action.setBackground(box(actionColor, 12));
-        cell.addView(action, new LinearLayout.LayoutParams(MATCH, dp(30)));
+        cell.addView(action, lp(dp(28), 3));
         cell.setContentDescription(itName(id) + ", " + RAR_NAME[rar] + ", " +
                 (on ? "sedang dipakai" : own ? "sudah dimiliki, ketuk untuk memakai" :
-                        "harga " + itPrice(id) + " koin"));
-        cell.setOnClickListener(v -> {
-            if (pending3D) {
-                Toast.makeText(this, "Model 3D belum tersedia untuk " + itName(id), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            tapItem(id);
-        });
+                        "harga " + price + " koin"));
+        pressable(cell);
+        cell.setOnClickListener(v -> tapItem(id));
         return cell;
     }
 
@@ -7559,28 +7591,53 @@ public class MainActivity extends Activity {
     }
 
     private void showToko() {
+        final boolean alreadyInShop = (screen == 20);
+        if (alreadyInShop) {
+            if (shopHScroll != null) shopScrollX = shopHScroll.getScrollX();
+            if (mainScrollView != null) shopScrollY = mainScrollView.getScrollY();
+        } else {
+            shopScrollX = 0;
+            shopScrollY = 0;
+        }
         handler.removeCallbacksAndMessages(null);
         setScreen(20);
         nameFields = null;
         loadPrefs();
+        if (shopTab == 1) {
+            shopTab = 0;
+        }
         if (shopPl >= np) {
             shopPl = 0;
         }
 
         nagaHide = true;
         LinearLayout c = column();
-        // Spanduk ringkas
+        c.setPadding(dp(14), dp(16), dp(14), dp(18));
+
+        // Spanduk ringkas dengan tombol kembali di kiri
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setPadding(dp(14), dp(7), dp(10), dp(7));
+        head.setPadding(dp(8), dp(7), dp(10), dp(7));
         GradientDrawable headBg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Color.rgb(126, 94, 232), Color.rgb(94, 62, 198)});
+                new int[]{Color.rgb(118, 82, 230), Color.rgb(86, 52, 194)});
         headBg.setCornerRadius(dp(24));
-        headBg.setStroke(dp(2), Color.rgb(196, 176, 255));
+        headBg.setStroke(dp(2), Color.rgb(198, 178, 255));
         head.setBackground(headBg);
-        head.addView(text("🛍️ Toko Avatar 3D", 18, Color.WHITE, true), new LinearLayout.LayoutParams(0, WRAP, 1f));
-        head.addView(pill("💰 " + coins(), ORANGE), new LinearLayout.LayoutParams(WRAP, WRAP));
+        head.setElevation(dp(4));
+
+        TextView topBack = text("←", 18, Color.WHITE, true);
+        topBack.setGravity(Gravity.CENTER);
+        topBack.setBackground(box(Color.argb(55, 255, 255, 255), 18));
+        topBack.setContentDescription("Kembali ke menu");
+        topBack.setOnClickListener(v -> showMenu());
+        pressable(topBack);
+        LinearLayout.LayoutParams tblp = new LinearLayout.LayoutParams(dp(38), dp(38));
+        tblp.rightMargin = dp(8);
+        head.addView(topBack, tblp);
+
+        head.addView(text("🛍️ Toko Avatar 3D", 17, Color.WHITE, true), new LinearLayout.LayoutParams(0, WRAP, 1f));
+        head.addView(pill("🪙 " + coins(), ORANGE), new LinearLayout.LayoutParams(WRAP, WRAP));
         c.addView(head, lp(WRAP, 0));
 
         if (np > 1) {
@@ -7589,23 +7646,23 @@ public class MainActivity extends Activity {
             for (int i = 0; i < np; i++) {
                 final int pl = i;
                 boolean sel = i == shopPl;
-                TextView t = text(av(i) + " " + names[i], 14, sel ? Color.WHITE : DARK, true);
-                t.setBackground(box(sel ? PLAYER_COLORS[i] : GRAY, 16));
+                TextView t = text(av(i) + " " + names[i], 13, sel ? Color.WHITE : DARK, true);
+                t.setBackground(box(sel ? PLAYER_COLORS[i] : Color.argb(230, 255, 255, 255), 16));
                 t.setOnClickListener(v -> {
                     shopPl = pl;
                     showToko();
                 });
                 pr.addView(t, weight(i == 0 ? 0 : 4, 0));
             }
-            c.addView(pr, lp(dp(44), 8));
+            c.addView(pr, lp(dp(42), 8));
         }
 
-        // ---- Avatar besar di tengah; tombol ganti-gender / peci / tas melayang di sisinya ----
+        // ---- Studio Avatar 3D di tengah; kontrol melayang di sisinya ----
         LinearLayout pv = new LinearLayout(this);
         pv.setOrientation(LinearLayout.VERTICAL);
         pv.setGravity(Gravity.CENTER_HORIZONTAL);
         pv.setPadding(0, 0, 0, 0);
-        final float pvRad = dp(24);
+        final float pvRad = dp(26);
         pv.setOutlineProvider(new android.view.ViewOutlineProvider() {
             @Override
             public void getOutline(View v, Outline o) {
@@ -7614,219 +7671,322 @@ public class MainActivity extends Activity {
         });
         pv.setClipToOutline(true);
         GradientDrawable studioBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(237, 233, 255), Color.rgb(251, 243, 255)});
-        studioBg.setCornerRadius(dp(24));
-        studioBg.setStroke(dp(1), Color.rgb(219, 206, 255));
+                new int[]{Color.rgb(234, 228, 255), Color.rgb(250, 244, 255)});
+        studioBg.setCornerRadius(dp(26));
+        studioBg.setStroke(dp(2), Color.rgb(212, 196, 255));
         pv.setBackground(studioBg);
-        int usable = Math.min(getResources().getDisplayMetrics().widthPixels, dp(640)) - dp(44);
-        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.36f);
-        int avSize = Math.max(dp(150), Math.min(usable, maxH));
+        pv.setElevation(dp(5));
+        int usable = Math.min(getResources().getDisplayMetrics().widthPixels, dp(640)) - dp(32);
+        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.38f);
+        int avSize = Math.max(dp(185), Math.min(usable, maxH));
         FrameLayout stage = new FrameLayout(this);
         if (USE_PUTRI_GL) {
-            putriGL = new PutriGLView(this, genderOf[shopPl]);
+            if (putriGL == null) {
+                putriGL = new PutriGLView(this, genderOf[shopPl]);
+            } else if (putriGL.getParent() instanceof ViewGroup) {
+                ((ViewGroup) putriGL.getParent()).removeView(putriGL);
+            }
             applyLook3D(putriGL, shopPl);
             stage.addView(putriGL, new FrameLayout.LayoutParams(MATCH, MATCH));
         } else {
             putriGL = null;
             stage.addView(avatarView(shopPl), new FrameLayout.LayoutParams(MATCH, MATCH));
         }
-        // kolom tombol kiri: Putra, Putri, Peci, Tas
+        // kolom tombol kiri: Putra, Putri, 3D, Peci, Tas
         LinearLayout side = new LinearLayout(this);
         side.setOrientation(LinearLayout.VERTICAL);
         for (int g = 0; g < 2; g++) {
             final int gg = g;
-            TextView gt = orb(g == 0 ? "👦" : "👧", genderOf[shopPl] == g, g == 0 ? BLUE : PINK);
+            TextView gt = orb(g == 0 ? "👦 Putra" : "👧 Putri", genderOf[shopPl] == g, g == 0 ? BLUE : PINK);
             gt.setContentDescription(g == 0 ? "Putra" : "Putri");
             gt.setOnClickListener(v -> {
                 genderOf[shopPl] = gg;
                 prefs.edit().putInt("gender" + shopPl, gg).apply();
                 showToko();
             });
-            LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(dp(44), dp(44));
+            LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(WRAP, dp(36));
             gl.bottomMargin = dp(6);
             side.addView(gt, gl);
         }
         if (USE_PUTRI_GL) {
             final boolean ext = avatarExt();
-            TextView xm = orb("3D", ext, PURPLE);
-            xm.setContentDescription(ext ? "Model 3D baru aktif. Ketuk untuk memakai avatar lama"
-                    : "Avatar lama aktif. Ketuk untuk mencoba model 3D baru");
-            xm.setOnClickListener(v -> {
-                prefs.edit().putBoolean("avatarExt", !ext).apply();
-                sfx(SFX_OK);
-                showToko();
-            });
-            LinearLayout.LayoutParams xml = new LinearLayout.LayoutParams(dp(44), dp(44));
-            xml.bottomMargin = dp(6);
-            side.addView(xm, xml);
             if (!ext && genderOf[shopPl] == 0) {
                 final boolean peciLepas = peciOff(shopPl);
-                TextView pc = orb("🧢", !peciLepas, GREEN);
+                TextView pc = orb("🧢 Peci", !peciLepas, GREEN);
                 pc.setContentDescription(peciLepas ? "Peci dilepas. Ketuk untuk memakai peci" : "Peci dipakai. Ketuk untuk melepas peci");
                 pc.setOnClickListener(v -> {
                     prefs.edit().putBoolean("peciOff" + shopPl, !peciLepas).apply();
                     sfx(SFX_OK);
                     showToko();
                 });
-                LinearLayout.LayoutParams pl2 = new LinearLayout.LayoutParams(dp(44), dp(44));
+                LinearLayout.LayoutParams pl2 = new LinearLayout.LayoutParams(WRAP, dp(36));
                 pl2.bottomMargin = dp(6);
                 side.addView(pc, pl2);
             }
             if (!ext) {
                 final boolean tasLepas = tasOff(shopPl);
-                TextView tb = orb("🎒", !tasLepas, GREEN);
+                TextView tb = orb("🎒 Tas", !tasLepas, GREEN);
                 tb.setContentDescription(tasLepas ? "Tas dilepas. Ketuk untuk memakai tas" : "Tas dipakai. Ketuk untuk melepas tas");
                 tb.setOnClickListener(v -> {
                     prefs.edit().putBoolean("tasOff" + shopPl, !tasLepas).apply();
                     sfx(SFX_OK);
                     showToko();
                 });
-                side.addView(tb, new LinearLayout.LayoutParams(dp(44), dp(44)));
+                side.addView(tb, new LinearLayout.LayoutParams(WRAP, dp(36)));
             }
         }
         FrameLayout.LayoutParams sdl = new FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP | Gravity.START);
-        sdl.setMargins(dp(8), dp(8), 0, 0);
+        sdl.setMargins(dp(10), dp(10), 0, 0);
         stage.addView(side, sdl);
-        // tombol tampak depan (kanan bawah)
+
+        // Petunjuk geser/cubit di bawah tengah panggung 3D
         if (USE_PUTRI_GL) {
-            TextView rs = orb("↺", false, PURPLE);
+            TextView hint = text("↔ Geser putar • Cubit zoom", 10, Color.rgb(92, 74, 152), true);
+            hint.setPadding(dp(10), dp(3), dp(10), dp(3));
+            hint.setBackground(box(Color.argb(185, 255, 255, 255), 12));
+            FrameLayout.LayoutParams hlp = new FrameLayout.LayoutParams(WRAP, WRAP, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+            hlp.setMargins(0, 0, 0, dp(8));
+            stage.addView(hint, hlp);
+
+            TextView rs = orb("↺ Reset", false, PURPLE);
             rs.setContentDescription("Tampak depan");
             rs.setOnClickListener(v -> { if (putriGL != null) putriGL.resetView(); });
-            FrameLayout.LayoutParams rl = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.BOTTOM | Gravity.END);
-            rl.setMargins(0, 0, dp(8), dp(8));
+            FrameLayout.LayoutParams rl = new FrameLayout.LayoutParams(WRAP, dp(36), Gravity.BOTTOM | Gravity.END);
+            rl.setMargins(0, 0, dp(10), dp(8));
             stage.addView(rs, rl);
         }
-        // naga pendamping (kanan atas)
-        if (prefs.getBoolean("nagaPakai", false)) {
-            // naga digambar di dalam adegan 3D avatar (terhalang avatar saat di belakang)
-            if (putriGL != null) putriGL.setNaga(true);
-        }
-        if (putriGL != null && prefs.getBoolean("gojiPakai", false)) putriGL.setGoji(true);
-        String[] sp = {"✦", "✧"};
-        int[] spg = {Gravity.BOTTOM | Gravity.START, Gravity.CENTER_VERTICAL | Gravity.END};
-        for (int q = 0; q < 2; q++) {
-            TextView star = text(sp[q], q == 0 ? 20 : 15, Color.WHITE, true);
-            star.setShadowLayer(dp(3), 0, 0, Color.rgb(255, 235, 150));
-            FrameLayout.LayoutParams sl = new FrameLayout.LayoutParams(WRAP, WRAP, spg[q]);
-            sl.setMargins(dp(12), dp(8), dp(12), dp(12));
-            stage.addView(star, sl);
+        if (putriGL != null) {
+            putriGL.setNaga(prefs.getBoolean("nagaPakai", false));
+            putriGL.setGoji(prefs.getBoolean("gojiPakai", false));
+            putriGL.setToonPet(prefs.getString("toonPetPakai", ""));
         }
         pv.addView(stage, new LinearLayout.LayoutParams(MATCH, avSize));
-        c.addView(pv, new LinearLayout.LayoutParams(MATCH, WRAP));
-        ((LinearLayout.LayoutParams) pv.getLayoutParams()).topMargin = dp(8);
+        c.addView(pv, lp(WRAP, 8));
 
-        // ---- Kategori: grid 2 baris x 3 kolom, tanpa geser ----
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setOrientation(LinearLayout.VERTICAL);
-        for (int r = 0; r < 2; r++) {
-            LinearLayout trow = new LinearLayout(this);
-            trow.setOrientation(LinearLayout.HORIZONTAL);
-            for (int q = 0; q < 3; q++) {
-                final int tbi = r * 3 + q;
-                boolean sel = tbi == shopTab;
-                String nm = (tbi == 4 && genderOf[shopPl] == 1) ? "Jilbab" : SHOP_TAB_NAME[tbi];
-                TextView chip = text(SHOP_TAB_ICON[tbi] + " " + nm, 12, sel ? Color.WHITE : DARK, true);
-                chip.setGravity(Gravity.CENTER);
-                chip.setMaxLines(1);
-                chip.setPadding(dp(2), dp(2), dp(2), dp(2));
-                chip.setBackground(box(sel ? Color.rgb(108, 76, 205) : Color.argb(235, 247, 244, 255), 16));
-                chip.setContentDescription("Kategori " + nm + (sel ? ", dipilih" : ""));
-                chip.setOnClickListener(v -> {
-                    shopTab = tbi;
-                    showToko();
-                });
-                trow.addView(chip, weight(q == 0 ? 0 : 3, q == 2 ? 0 : 3));
-            }
-            tabs.addView(trow, lp(dp(44), r == 0 ? 0 : 6));
+        // ---- Kategori: 5 tab aktif (Tudung, Pakaian, Rambut/Jilbab, Suasana, Teman 3D) ----
+        final int[] tabOrder = {0, 3, 4, 2, 5};
+        final String[] tabIcons = {"🐾", "👕", genderOf[shopPl] == 1 ? "🧕" : "💇", "🌅", "🐉"};
+        final String[] tabLabels = {"Tudung", "Pakaian", genderOf[shopPl] == 1 ? "Jilbab" : "Rambut", "Suasana", "Teman 3D"};
+        HorizontalScrollView tabScroll = new HorizontalScrollView(this);
+        tabScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout trow = new LinearLayout(this);
+        trow.setOrientation(LinearLayout.HORIZONTAL);
+        for (int q = 0; q < tabOrder.length; q++) {
+            final int tbi = tabOrder[q];
+            boolean sel = tbi == shopTab;
+            String nm = tabLabels[q];
+            TextView chip = text(tabIcons[q] + " " + nm, 12, sel ? Color.WHITE : Color.rgb(62, 46, 114), true);
+            chip.setGravity(Gravity.CENTER);
+            chip.setSingleLine(true);
+            chip.setPadding(dp(14), dp(8), dp(14), dp(8));
+            GradientDrawable chipBg = new GradientDrawable();
+            chipBg.setCornerRadius(dp(18));
+            chipBg.setColor(sel ? Color.rgb(104, 68, 214) : Color.argb(235, 248, 245, 255));
+            chipBg.setStroke(dp(1), sel ? Color.rgb(196, 176, 255) : Color.rgb(216, 206, 246));
+            chip.setBackground(chipBg);
+            chip.setElevation(dp(sel ? 3 : 1));
+            chip.setContentDescription("Kategori " + nm + (sel ? ", dipilih" : ""));
+            pressable(chip);
+            chip.setOnClickListener(v -> {
+                shopTab = tbi;
+                shopScrollX = 0;
+                if (shopHScroll != null) shopHScroll.scrollTo(0, 0);
+                showToko();
+            });
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(WRAP, dp(40));
+            if (q > 0) clp.leftMargin = dp(6);
+            trow.addView(chip, clp);
         }
-        c.addView(tabs, lp(WRAP, 10));
+        tabScroll.addView(trow);
+        c.addView(tabScroll, lp(WRAP, 10));
 
         if (shopTab == 5) {
             final boolean nagaOn = prefs.getBoolean("nagaPakai", false);
             LinearLayout nc = new LinearLayout(this);
             nc.setOrientation(LinearLayout.VERTICAL);
-            nc.setPadding(dp(8), dp(8), dp(8), dp(8));
-            nc.setBackground(box(Color.argb(235, 247, 244, 255), 22));
-            nc.addView(new NagaPetView(this, true), new LinearLayout.LayoutParams(MATCH, dp(130)));
+            nc.setPadding(dp(12), dp(10), dp(12), dp(10));
+            GradientDrawable ncBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                    nagaOn ? new int[]{Color.rgb(232, 252, 240), Color.WHITE}
+                           : new int[]{Color.WHITE, Color.rgb(246, 242, 255)});
+            ncBg.setCornerRadius(dp(22));
+            ncBg.setStroke(dp(nagaOn ? 2 : 1), nagaOn ? GREEN : Color.rgb(216, 206, 246));
+            nc.setBackground(ncBg);
+            nc.setElevation(dp(3));
+
+            FrameLayout nagaBox = new FrameLayout(this);
+            nagaBox.setBackground(box(Color.rgb(237, 232, 255), 16));
+            shopNagaGL = new NagaPetView(this, true);
+            nagaBox.addView(shopNagaGL, new FrameLayout.LayoutParams(MATCH, dp(125)));
+            TextView nagaBadge = text("GRATIS • 3D ANIMASI", 9, Color.WHITE, true);
+            nagaBadge.setPadding(dp(8), dp(3), dp(8), dp(3));
+            nagaBadge.setBackground(box(PURPLE, 10));
+            FrameLayout.LayoutParams nblp = new FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP | Gravity.END);
+            nblp.setMargins(dp(8), dp(8), dp(8), dp(8));
+            nagaBox.addView(nagaBadge, nblp);
+            nc.addView(nagaBox, new LinearLayout.LayoutParams(MATCH, dp(125)));
+
             LinearLayout nr = new LinearLayout(this);
             nr.setOrientation(LinearLayout.HORIZONTAL);
             nr.setGravity(Gravity.CENTER_VERTICAL);
-            nr.addView(text("🐉 Naga Merah" + (nagaOn ? " · Dipakai" : ""), 14, DARK, true),
-                    new LinearLayout.LayoutParams(0, WRAP, 1f));
-            Button nb = button(nagaOn ? "Lepas naga" : "Pakai naga", nagaOn ? GRAY : GREEN, 13);
-            if (nagaOn) nb.setTextColor(DARK);
+            LinearLayout nInfo = new LinearLayout(this);
+            nInfo.setOrientation(LinearLayout.VERTICAL);
+            TextView nTitle = text("🐉 Naga Merah Pendamping", 14, DARK, true);
+            nTitle.setGravity(Gravity.START);
+            nInfo.addView(nTitle);
+            TextView nDesc = text("Terbang mengitari avatar & bereaksi saat menjawab soal", 11, Color.rgb(104, 92, 138), false);
+            nDesc.setGravity(Gravity.START);
+            nInfo.addView(nDesc);
+            nr.addView(nInfo, new LinearLayout.LayoutParams(0, WRAP, 1f));
+            Button nb = button(nagaOn ? "✓ Dipakai" : "Pakai", nagaOn ? GREEN : BLUE, 13);
             nb.setOnClickListener(v -> {
                 prefs.edit().putBoolean("nagaPakai", !nagaOn).apply();
                 sfx(SFX_OK);
                 showToko();
             });
-            nr.addView(nb, new LinearLayout.LayoutParams(dp(130), dp(42)));
-            nc.addView(nr, lp(WRAP, 6));
-            TextView cr = text("Red Dragon by GadgetHamster (CC-BY 4.0)", 10, Color.rgb(110, 90, 170), false);
+            nr.addView(nb, new LinearLayout.LayoutParams(dp(118), dp(42)));
+            nc.addView(nr, lp(WRAP, 8));
+            TextView cr = text("Red Dragon by GadgetHamster (CC-BY 4.0)", 10, Color.rgb(125, 110, 175), false);
             cr.setGravity(Gravity.CENTER);
-            nc.addView(cr, lp(WRAP, 4));
+            nc.addView(cr, lp(WRAP, 2));
             c.addView(nc, lp(WRAP, 10));
 
             final boolean gojiOn = prefs.getBoolean("gojiPakai", false);
             LinearLayout gc = new LinearLayout(this);
             gc.setOrientation(LinearLayout.VERTICAL);
-            gc.setPadding(dp(8), dp(8), dp(8), dp(8));
-            gc.setBackground(box(Color.argb(235, 247, 244, 255), 22));
+            gc.setPadding(dp(12), dp(10), dp(12), dp(10));
+            GradientDrawable gcBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                    gojiOn ? new int[]{Color.rgb(232, 252, 240), Color.WHITE}
+                           : new int[]{Color.WHITE, Color.rgb(246, 242, 255)});
+            gcBg.setCornerRadius(dp(22));
+            gcBg.setStroke(dp(gojiOn ? 2 : 1), gojiOn ? GREEN : Color.rgb(216, 206, 246));
+            gc.setBackground(gcBg);
+            gc.setElevation(dp(3));
+
             LinearLayout gr = new LinearLayout(this);
             gr.setOrientation(LinearLayout.HORIZONTAL);
             gr.setGravity(Gravity.CENTER_VERTICAL);
-            gr.addView(text("\uD83E\uDD96 Godzilla Mini" + (gojiOn ? " · Dipakai" : ""), 14, DARK, true),
-                    new LinearLayout.LayoutParams(0, WRAP, 1f));
-            Button gb = button(gojiOn ? "Lepas Godzilla" : "Pakai Godzilla", gojiOn ? GRAY : GREEN, 13);
-            if (gojiOn) gb.setTextColor(DARK);
+            LinearLayout gInfo = new LinearLayout(this);
+            gInfo.setOrientation(LinearLayout.VERTICAL);
+            TextView gTitle = text("🦖 Godzilla Mini Penjaga", 14, DARK, true);
+            gTitle.setGravity(Gravity.START);
+            gInfo.addView(gTitle);
+            TextView gDesc = text("Berdiri di samping avatar dengan sirip biru menyala", 11, Color.rgb(104, 92, 138), false);
+            gDesc.setGravity(Gravity.START);
+            gInfo.addView(gDesc);
+            gr.addView(gInfo, new LinearLayout.LayoutParams(0, WRAP, 1f));
+            Button gb = button(gojiOn ? "✓ Dipakai" : "Pakai", gojiOn ? GREEN : BLUE, 13);
             gb.setOnClickListener(v -> {
                 prefs.edit().putBoolean("gojiPakai", !gojiOn).apply();
                 sfx(SFX_OK);
                 showToko();
             });
-            gr.addView(gb, new LinearLayout.LayoutParams(dp(150), dp(42)));
-            gc.addView(gr, lp(WRAP, 6));
-            TextView gcr = text("Godzilla Minus Zero by Dola (CC-BY 4.0)", 10, Color.rgb(110, 90, 170), false);
+            gr.addView(gb, new LinearLayout.LayoutParams(dp(118), dp(42)));
+            gc.addView(gr, lp(WRAP, 2));
+            TextView gcr = text("Godzilla Minus Zero by Dola (CC-BY 4.0)", 10, Color.rgb(125, 110, 175), false);
             gcr.setGravity(Gravity.CENTER);
             gc.addView(gcr, lp(WRAP, 4));
-            c.addView(gc, lp(WRAP, 10));
+            c.addView(gc, lp(WRAP, 8));
+
+            final String curToon = prefs.getString("toonPetPakai", "");
+            for (int pi = 0; pi < ToonPetScene.IDS.length; pi++) {
+                final String pid = ToonPetScene.IDS[pi];
+                final boolean pOn = pid.equals(curToon);
+                LinearLayout pc = new LinearLayout(this);
+                pc.setOrientation(LinearLayout.VERTICAL);
+                pc.setPadding(dp(12), dp(10), dp(12), dp(10));
+                GradientDrawable pcBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                        pOn ? new int[]{Color.rgb(232, 252, 240), Color.WHITE}
+                            : new int[]{Color.WHITE, Color.rgb(246, 242, 255)});
+                pcBg.setCornerRadius(dp(22));
+                pcBg.setStroke(dp(pOn ? 2 : 1), pOn ? GREEN : Color.rgb(216, 206, 246));
+                pc.setBackground(pcBg);
+                pc.setElevation(dp(3));
+
+                LinearLayout pr2 = new LinearLayout(this);
+                pr2.setOrientation(LinearLayout.HORIZONTAL);
+                pr2.setGravity(Gravity.CENTER_VERTICAL);
+                ImageView pThumb = new ImageView(this);
+                pThumb.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                pThumb.setBackground(box(Color.rgb(237, 232, 255), 14));
+                try (InputStream tin = getAssets().open("characters/" + pid + "_thumb.png")) {
+                    pThumb.setImageBitmap(android.graphics.BitmapFactory.decodeStream(tin));
+                } catch (Exception ignored) {
+                }
+                LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(dp(64), dp(54));
+                tlp.rightMargin = dp(10);
+                pr2.addView(pThumb, tlp);
+
+                LinearLayout pInfo = new LinearLayout(this);
+                pInfo.setOrientation(LinearLayout.VERTICAL);
+                TextView pTitle = text(ToonPetScene.EMOJIS[pi] + " " + ToonPetScene.NAMES[pi] + " · 3D", 14, DARK, true);
+                pTitle.setGravity(Gravity.START);
+                pInfo.addView(pTitle);
+                TextView pDesc = text(ToonPetScene.DESCS[pi], 11, Color.rgb(104, 92, 138), false);
+                pDesc.setGravity(Gravity.START);
+                pInfo.addView(pDesc);
+                pr2.addView(pInfo, new LinearLayout.LayoutParams(0, WRAP, 1f));
+                Button pb = button(pOn ? "✓ Dipakai" : "Pakai", pOn ? GREEN : BLUE, 13);
+                pb.setOnClickListener(v -> {
+                    prefs.edit().putString("toonPetPakai", pOn ? "" : pid).apply();
+                    sfx(SFX_OK);
+                    showToko();
+                });
+                pr2.addView(pb, new LinearLayout.LayoutParams(dp(118), dp(42)));
+                pc.addView(pr2, lp(WRAP, 2));
+                c.addView(pc, lp(WRAP, 8));
+            }
         }
 
-        // ---- Barang: dua baris, digeser ke samping (tanpa gulir ke bawah) ----
+        // ---- Barang: dua baris, digeser ke samping ----
         final ArrayList<View> cells = new ArrayList<>();
         if (shopTab == 0) {
             for (int idx = 0; idx < HOOD_ORDER.length; idx++) {
-                    final int k = HOOD_ORDER[idx];
-                    final boolean on = avatar[shopPl] == k;
-                    LinearLayout tile = new LinearLayout(this);
-                    tile.setOrientation(LinearLayout.VERTICAL);
-                    tile.setGravity(Gravity.CENTER_HORIZONTAL);
-                    tile.setPadding(dp(3), dp(4), dp(3), dp(4));
-                    tile.setBackground(box(on ? Color.rgb(223, 246, 233) : Color.rgb(243, 241, 251), 14));
-                    AvatarView preview = previewView(isHood(k) ? k : -1, -1, -1, 1);
-                    preview.gender = genderOf[shopPl];
-                    tile.addView(preview, new LinearLayout.LayoutParams(MATCH, dp(66)));
-                    TextView label = text(HOOD_NAMES[k], 11, DARK, true);
-                    label.setGravity(Gravity.CENTER);
-                    label.setMaxLines(1);
-                    tile.addView(label, new LinearLayout.LayoutParams(MATCH, WRAP));
-                    if (on) {
-                        TextView status = text("Dipakai", 10, GREEN, true);
-                        status.setGravity(Gravity.CENTER);
-                        tile.addView(status, new LinearLayout.LayoutParams(MATCH, WRAP));
-                    }
-                    tile.setContentDescription("Tudung " + HOOD_NAMES[k] + (on ? ", sedang dipakai" : ", ketuk untuk memakai"));
-                    tile.setOnClickListener(v -> {
-                        for (int j = 0; j < np; j++) {
-                            if (isHood(k) && j != shopPl && avatar[j] == k) {
-                                avatar[j] = avatar[shopPl];
-                                prefs.edit().putInt("avatar" + j, avatar[j]).apply();
-                            }
+                final int k = HOOD_ORDER[idx];
+                final boolean on = avatar[shopPl] == k;
+                LinearLayout tile = new LinearLayout(this);
+                tile.setOrientation(LinearLayout.VERTICAL);
+                tile.setGravity(Gravity.CENTER_HORIZONTAL);
+                tile.setPadding(dp(7), dp(7), dp(7), dp(7));
+                GradientDrawable tbg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                        on ? new int[]{Color.rgb(232, 252, 240), Color.WHITE}
+                           : new int[]{Color.WHITE, Color.rgb(248, 246, 255)});
+                tbg.setCornerRadius(dp(20));
+                tbg.setStroke(dp(on ? 3 : 1), on ? GREEN : Color.rgb(220, 214, 244));
+                tile.setBackground(tbg);
+                tile.setElevation(dp(on ? 5 : 2));
+
+                FrameLayout stageBox = new FrameLayout(this);
+                stageBox.setBackground(box(on ? Color.rgb(218, 247, 230) : Color.rgb(238, 234, 255), 15));
+                AvatarView preview = previewView(isHood(k) ? k : -1, -1, -1, 1);
+                preview.gender = genderOf[shopPl];
+                stageBox.addView(preview, new FrameLayout.LayoutParams(MATCH, MATCH));
+                tile.addView(stageBox, new LinearLayout.LayoutParams(MATCH, dp(76)));
+
+                TextView label = text(HOOD_NAMES[k], 12, Color.rgb(42, 34, 68), true);
+                label.setGravity(Gravity.CENTER);
+                label.setMaxLines(1);
+                label.setEllipsize(TextUtils.TruncateAt.END);
+                tile.addView(label, lp(dp(22), 4));
+
+                TextView status = text(on ? "✓ DIPAKAI" : "PAKAI", 11, Color.WHITE, true);
+                status.setGravity(Gravity.CENTER);
+                status.setBackground(box(on ? GREEN : BLUE, 12));
+                tile.addView(status, lp(dp(28), 3));
+
+                tile.setContentDescription("Tudung " + HOOD_NAMES[k] + (on ? ", sedang dipakai" : ", ketuk untuk memakai"));
+                pressable(tile);
+                tile.setOnClickListener(v -> {
+                    for (int j = 0; j < np; j++) {
+                        if (isHood(k) && j != shopPl && avatar[j] == k) {
+                            avatar[j] = avatar[shopPl];
+                            prefs.edit().putInt("avatar" + j, avatar[j]).apply();
                         }
-                        avatar[shopPl] = k;
-                        prefs.edit().putInt("avatar" + shopPl, k).apply();
-                        showToko();
-                    });
+                    }
+                    avatar[shopPl] = k;
+                    prefs.edit().putInt("avatar" + shopPl, k).apply();
+                    sfx(SFX_OK);
+                    showToko();
+                });
                 cells.add(tile);
             }
         }
@@ -7842,24 +8002,31 @@ public class MainActivity extends Activity {
                 }
             }
         }
+        shopHScroll = null;
         if (!cells.isEmpty()) {
             android.widget.HorizontalScrollView sh = new android.widget.HorizontalScrollView(this);
+            shopHScroll = sh;
             sh.setHorizontalScrollBarEnabled(false);
             LinearLayout strip = new LinearLayout(this);
             strip.setOrientation(LinearLayout.HORIZONTAL);
+            strip.setPadding(dp(2), dp(2), dp(2), dp(4));
             for (int i = 0; i < cells.size(); i += 2) {
                 LinearLayout col = new LinearLayout(this);
                 col.setOrientation(LinearLayout.VERTICAL);
                 for (int q = 0; q < 2 && i + q < cells.size(); q++) {
-                    LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(dp(104), WRAP);
-                    cellLp.bottomMargin = dp(6);
+                    LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(dp(116), WRAP);
+                    cellLp.bottomMargin = dp(8);
                     col.addView(cells.get(i + q), cellLp);
                 }
                 LinearLayout.LayoutParams colLp = new LinearLayout.LayoutParams(WRAP, WRAP);
-                colLp.rightMargin = dp(6);
+                colLp.rightMargin = dp(8);
                 strip.addView(col, colLp);
             }
             sh.addView(strip);
+            final int restoreX = shopScrollX;
+            if (restoreX > 0) {
+                sh.post(() -> sh.scrollTo(restoreX, 0));
+            }
             c.addView(sh, lp(WRAP, 8));
         }
         int have = 0, available = 0;
@@ -7871,21 +8038,33 @@ public class MainActivity extends Activity {
         LinearLayout foot = new LinearLayout(this);
         foot.setOrientation(LinearLayout.HORIZONTAL);
         foot.setGravity(Gravity.CENTER_VERTICAL);
-        foot.addView(text("\uD83D\uDDC2\uFE0F Koleksi 3D: " + have + "/" + available, 13, DARK, true),
+        foot.setPadding(dp(12), dp(8), dp(10), dp(8));
+        foot.setBackground(box(Color.argb(210, 255, 255, 255), 20));
+        foot.addView(text("\uD83D\uDDC2\uFE0F Koleksi 3D: " + have + " / " + available, 13, Color.rgb(58, 42, 108), true),
                 new LinearLayout.LayoutParams(0, WRAP, 1f));
-        Button back = button("Kembali", Color.rgb(108, 76, 205), 14);
+        Button back = button("Selesai", Color.rgb(104, 68, 214), 14);
         back.setOnClickListener(v -> showMenu());
-        foot.addView(back, new LinearLayout.LayoutParams(dp(130), dp(46)));
-        c.addView(foot, lp(WRAP, 4));
+        foot.addView(back, new LinearLayout.LayoutParams(dp(120), dp(42)));
+        c.addView(foot, lp(WRAP, 6));
 
-        wrapBg(c, tokoBg());
+        wrapBg(c, tokoBg(), !alreadyInShop);
+        final int restoreY = shopScrollY;
+        if (alreadyInShop && restoreY > 0 && mainScrollView != null) {
+            mainScrollView.post(() -> mainScrollView.scrollTo(0, restoreY));
+        }
     }
 
     private TextView orb(String label, boolean on, int color) {
-        TextView t = text(label, 18, on ? Color.WHITE : DARK, true);
+        TextView t = text(label, 12, on ? Color.WHITE : Color.rgb(54, 42, 96), true);
         t.setGravity(Gravity.CENTER);
-        t.setBackground(box(on ? color : Color.argb(215, 255, 255, 255), 22));
+        t.setPadding(dp(11), dp(4), dp(11), dp(4));
+        GradientDrawable g = new GradientDrawable();
+        g.setCornerRadius(dp(18));
+        g.setColor(on ? color : Color.argb(230, 255, 255, 255));
+        g.setStroke(dp(1), on ? Color.argb(140, 255, 255, 255) : Color.rgb(212, 198, 248));
+        t.setBackground(g);
         t.setElevation(dp(3));
+        pressable(t);
         return t;
     }
 
@@ -12690,7 +12869,7 @@ public class MainActivity extends Activity {
     private android.media.MediaPlayer surahPlayer;
 
     private int surahNoOf(int si) {
-        return SambungAyat.juz == 30 ? 78 + si : -1;
+        return SambungAyat.nomorSurah(si);
     }
 
     private String surahAudioPath(int si) {

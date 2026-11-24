@@ -1474,6 +1474,7 @@ final class PutraMesh {
             if (p.length > 0) body = hex(p[0]);
             if (p.length > 1) arm = hex(p[1]);
             if (p.length > 2) pants = hex(p[2]);
+            else if (body != null) pants = new double[]{body[0] * 0.42, body[1] * 0.44, body[2] * 0.50};
             if (arm == null) arm = body;
         }
         double[] hair = hex(rambut);

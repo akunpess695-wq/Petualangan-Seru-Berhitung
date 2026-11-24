@@ -20,8 +20,13 @@ final class NagaScene {
     static volatile int rType = 0;
     static volatile long rT0 = 0;
 
+    private static final int NSP = 10;
     private FloatBuffer vb; private ShortBuffer ib;
+    private final FloatBuffer spBuf = ByteBuffer.allocateDirect(NSP * 3 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+    private final float[] spPts = new float[NSP * 3];
     private int nIdx, prog, sprog, tex;
+    private int uMVP, uM, uPh, uAmp, uTP, uTA, uTO, uCx, uHx, uCz, uHz, uS, aP, aN, aT;
+    private int suMVP, suSz, suA, saP;
     private float ccx, ccy, ccz, halfX = 0.5f, halfZ = 0.34f;
     private float phF = 0f, phT = 0f;                              // fase kepak sayap & ayun ekor (diintegralkan agar tidak melompat)
     private final long t0 = System.nanoTime();
@@ -29,12 +34,18 @@ final class NagaScene {
     private float hx = 0f, hz = 1f, pitchS = 0f, rollS = 0f;   // arah hadap (vektor) & sudut yang dihaluskan
     private final float[] model = new float[16], mv = new float[16], mvp = new float[16], vp = new float[16];
 
+    private static byte[] readAll(InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int r;
+        while ((r = in.read(buf)) > 0) bo.write(buf, 0, r);
+        in.close();
+        return bo.toByteArray();
+    }
+
     NagaScene(Context ctx) {
         try {
-            InputStream in = op(ctx, "dragon_pet.bin");
-            byte[] b = new byte[in.available()]; int n = 0;
-            while (n < b.length) { int k = in.read(b, n, b.length - n); if (k < 0) break; n += k; }
-            in.close();
+            byte[] b = readAll(op(ctx, "dragon_pet.bin"));
             ByteBuffer bb = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN);
             bb.position(4);
             int nv = bb.getShort() & 0xFFFF, nt = bb.getInt();
@@ -79,10 +90,29 @@ final class NagaScene {
         String fs = "precision mediump float;uniform sampler2D uS;varying vec2 vT;varying float vL;"
             + "void main(){vec4 c=texture2D(uS,vT);gl_FragColor=vec4(c.rgb*vL*1.15,1.);}";
         prog = link(vs, fs);
+        uMVP = GLES20.glGetUniformLocation(prog, "uMVP");
+        uM = GLES20.glGetUniformLocation(prog, "uM");
+        uPh = GLES20.glGetUniformLocation(prog, "uPh");
+        uAmp = GLES20.glGetUniformLocation(prog, "uAmp");
+        uTP = GLES20.glGetUniformLocation(prog, "uTP");
+        uTA = GLES20.glGetUniformLocation(prog, "uTA");
+        uTO = GLES20.glGetUniformLocation(prog, "uTO");
+        uCx = GLES20.glGetUniformLocation(prog, "uCx");
+        uHx = GLES20.glGetUniformLocation(prog, "uHx");
+        uCz = GLES20.glGetUniformLocation(prog, "uCz");
+        uHz = GLES20.glGetUniformLocation(prog, "uHz");
+        uS = GLES20.glGetUniformLocation(prog, "uS");
+        aP = GLES20.glGetAttribLocation(prog, "aP");
+        aN = GLES20.glGetAttribLocation(prog, "aN");
+        aT = GLES20.glGetAttribLocation(prog, "aT");
         String svs = "uniform mat4 uMVP;uniform float uSz;attribute vec3 aP;void main(){gl_Position=uMVP*vec4(aP,1.);gl_PointSize=uSz;}";
         String sfs = "precision mediump float;uniform float uA;void main(){vec2 d=gl_PointCoord-vec2(.5);float r=length(d)*2.;"
             + "if(r>1.)discard;gl_FragColor=vec4(1.,.92,.45,1.)*(1.-r*.5)*uA;}";
         sprog = link(svs, sfs);
+        suMVP = GLES20.glGetUniformLocation(sprog, "uMVP");
+        suSz = GLES20.glGetUniformLocation(sprog, "uSz");
+        suA = GLES20.glGetUniformLocation(sprog, "uA");
+        saP = GLES20.glGetAttribLocation(sprog, "aP");
     }
 
     private static InputStream op(Context c, String n) throws java.io.IOException {
@@ -221,54 +251,50 @@ final class NagaScene {
         GLES20.glUseProgram(prog);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(prog, "uMVP"), 1, false, mvp, 0);
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(prog, "uM"), 1, false, model, 0);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uPh"), phF);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uAmp"), amp);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uTP"), phT);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uTA"), tAmp);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uTO"), tOff);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uCx"), ccx);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uHx"), halfX);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uCz"), ccz);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(prog, "uHz"), halfZ);
+        GLES20.glUniformMatrix4fv(uMVP, 1, false, mvp, 0);
+        GLES20.glUniformMatrix4fv(uM, 1, false, model, 0);
+        GLES20.glUniform1f(uPh, phF);
+        GLES20.glUniform1f(uAmp, amp);
+        GLES20.glUniform1f(uTP, phT);
+        GLES20.glUniform1f(uTA, tAmp);
+        GLES20.glUniform1f(uTO, tOff);
+        GLES20.glUniform1f(uCx, ccx);
+        GLES20.glUniform1f(uHx, halfX);
+        GLES20.glUniform1f(uCz, ccz);
+        GLES20.glUniform1f(uHz, halfZ);
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex);
-        GLES20.glUniform1i(GLES20.glGetUniformLocation(prog, "uS"), 0);
-        int p = GLES20.glGetAttribLocation(prog, "aP"), n = GLES20.glGetAttribLocation(prog, "aN"), uv = GLES20.glGetAttribLocation(prog, "aT");
-        vb.position(0); GLES20.glVertexAttribPointer(p, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(p);
-        vb.position(3); GLES20.glVertexAttribPointer(n, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(n);
-        vb.position(6); GLES20.glVertexAttribPointer(uv, 2, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(uv);
+        GLES20.glUniform1i(uS, 0);
+        vb.position(0); GLES20.glVertexAttribPointer(aP, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(aP);
+        vb.position(3); GLES20.glVertexAttribPointer(aN, 3, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(aN);
+        vb.position(6); GLES20.glVertexAttribPointer(aT, 2, GLES20.GL_FLOAT, false, 32, vb); GLES20.glEnableVertexAttribArray(aT);
         ib.position(0);
         GLES20.glDrawElements(GLES20.GL_TRIANGLES, nIdx, GLES20.GL_UNSIGNED_SHORT, ib);
-        GLES20.glDisableVertexAttribArray(p); GLES20.glDisableVertexAttribArray(n); GLES20.glDisableVertexAttribArray(uv);
+        GLES20.glDisableVertexAttribArray(aP); GLES20.glDisableVertexAttribArray(aN); GLES20.glDisableVertexAttribArray(aT);
 
         if (rp >= 0f && rt == 1) sparkle(view, proj, p0[0], py, p0[2], rp);
     }
 
     private void sparkle(float[] view, float[] proj, float cx, float cy, float cz, float rp) {
-        final int NSP = 10;
-        float[] pts = new float[NSP * 3];
         for (int i = 0; i < NSP; i++) {
             float a = i * 6.2832f / NSP + 0.6f;
             float rad = 12f + 30f * rp;
-            pts[i * 3] = cx + rad * (float) Math.cos(a);
-            pts[i * 3 + 1] = cy + 10f + 22f * rp + 6f * (float) Math.sin(a * 2f);
-            pts[i * 3 + 2] = cz + 8f * (float) Math.sin(a);
+            spPts[i * 3] = cx + rad * (float) Math.cos(a);
+            spPts[i * 3 + 1] = cy + 10f + 22f * rp + 6f * (float) Math.sin(a * 2f);
+            spPts[i * 3 + 2] = cz + 8f * (float) Math.sin(a);
         }
-        FloatBuffer pb = ByteBuffer.allocateDirect(pts.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
-        pb.put(pts).position(0);
+        spBuf.clear();
+        spBuf.put(spPts).position(0);
         Matrix.multiplyMM(vp, 0, proj, 0, view, 0);
         GLES20.glUseProgram(sprog);
         GLES20.glDisable(GLES20.GL_DEPTH_TEST);
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(sprog, "uMVP"), 1, false, vp, 0);
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(sprog, "uSz"), 18f + 14f * (1f - rp));
-        GLES20.glUniform1f(GLES20.glGetUniformLocation(sprog, "uA"), 1f - rp);
-        int ap = GLES20.glGetAttribLocation(sprog, "aP");
-        GLES20.glVertexAttribPointer(ap, 3, GLES20.GL_FLOAT, false, 12, pb);
-        GLES20.glEnableVertexAttribArray(ap);
+        GLES20.glUniformMatrix4fv(suMVP, 1, false, vp, 0);
+        GLES20.glUniform1f(suSz, 18f + 14f * (1f - rp));
+        GLES20.glUniform1f(suA, 1f - rp);
+        GLES20.glVertexAttribPointer(saP, 3, GLES20.GL_FLOAT, false, 12, spBuf);
+        GLES20.glEnableVertexAttribArray(saP);
         GLES20.glDrawArrays(GLES20.GL_POINTS, 0, NSP);
-        GLES20.glDisableVertexAttribArray(ap);
+        GLES20.glDisableVertexAttribArray(saP);
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
     }
 }

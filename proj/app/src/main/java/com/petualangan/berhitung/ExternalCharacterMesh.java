@@ -116,6 +116,7 @@ final class ExternalCharacterMesh {
             String[] p = pakaian.split(",");
             if (p.length > 0) body = hex(p[0]);
             if (p.length > 2) lower = hex(p[2]);
+            else if (body != null) lower = new double[]{body[0] * 0.42, body[1] * 0.44, body[2] * 0.50};
         }
         double[] hair = hex(rambut);
         for (int i = 0; i < vertexCount; i++) {

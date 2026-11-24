@@ -523,6 +523,7 @@ final class PutriMesh {
             if (p.length > 0) body = hex(p[0]);
             if (p.length > 1) arm = hex(p[1]);
             if (p.length > 2) skirt = hex(p[2]);
+            else if (body != null) skirt = new double[]{body[0] * 0.48, body[1] * 0.48, body[2] * 0.55};
             if (arm == null) arm = body;
         }
         double[] hij = hex(jilbab);
