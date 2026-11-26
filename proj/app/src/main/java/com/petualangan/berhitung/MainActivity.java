@@ -392,7 +392,6 @@ public class MainActivity extends Activity {
         int answer;
         int correctIdx;
         int trap = -1;
-        int frac;
         String key = "";
         final int[] opts = new int[4];
     }
@@ -405,113 +404,10 @@ public class MainActivity extends Activity {
         final String[] opt = new String[4];
         int key;
         String expl = "";
-        // "" = pilihan ganda, "pecahan" = isi pembilang/penyebut persis, "pecahan-setara" = nilai sama juga benar
-        String tipe = "";
     }
 
     private interface Pick {
         void on(int i);
-    }
-
-    // Ekspresi pecahan bersusun: pembilang di atas, garis, penyebut di bawah (contoh "3/3 x 2/6 =")
-    private static class FracExprView extends View {
-        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final float density;
-        private String[] tok = new String[0];
-        private float size;
-
-        FracExprView(Context ctx, int color) {
-            super(ctx);
-            density = ctx.getResources().getDisplayMetrics().density;
-            p.setTextAlign(Paint.Align.CENTER);
-            p.setTypeface(Typeface.DEFAULT_BOLD);
-            p.setColor(color);
-        }
-
-        void setExpr(String e) {
-            tok = e.trim().split("\\s+");
-            requestLayout();
-            invalidate();
-        }
-
-        private boolean isFrac(String t) {
-            return t.matches("\\d+/\\d+");
-        }
-
-        private String shown(String t) {
-            if (t.equals("x") || t.equals("X") || t.equals("*")) {
-                return "\u00D7";
-            }
-            if (t.equals(":")) {
-                return "\u00F7";
-            }
-            if (t.equals("-")) {
-                return "\u2212";
-            }
-            return t;
-        }
-
-        private float fracW(String t, float sz) {
-            int k = t.indexOf('/');
-            return Math.max(p.measureText(t.substring(0, k)), p.measureText(t.substring(k + 1))) + sz * 0.3f;
-        }
-
-        private float widthAt(float sz) {
-            p.setTextSize(sz);
-            float w = 0;
-            for (int i = 0; i < tok.length; i++) {
-                w += isFrac(tok[i]) ? fracW(tok[i], sz) : p.measureText(shown(tok[i]));
-                if (i < tok.length - 1) {
-                    w += sz * 0.5f;
-                }
-            }
-            return w;
-        }
-
-        @Override
-        protected void onMeasure(int wSpec, int hSpec) {
-            int w = MeasureSpec.getSize(wSpec);
-            if (w <= 0) {
-                w = (int) (300 * density);
-            }
-            float sz = 34 * density;
-            while (sz > 14 * density && widthAt(sz) > w - 8 * density) {
-                sz -= density;
-            }
-            size = sz;
-            boolean has = false;
-            for (String t : tok) {
-                if (isFrac(t)) {
-                    has = true;
-                }
-            }
-            setMeasuredDimension(w, (int) (has ? sz * 2.4f : sz * 1.6f));
-        }
-
-        @Override
-        protected void onDraw(Canvas c) {
-            float sz = size;
-            p.setTextSize(sz);
-            float x = (getWidth() - widthAt(sz)) / 2f;
-            float midY = getHeight() / 2f;
-            for (int i = 0; i < tok.length; i++) {
-                String t = tok[i];
-                if (isFrac(t)) {
-                    int k = t.indexOf('/');
-                    float w = fracW(t, sz);
-                    p.setStrokeWidth(Math.max(2f, sz * 0.07f));
-                    c.drawLine(x, midY, x + w, midY, p);
-                    c.drawText(t.substring(0, k), x + w / 2f, midY - sz * 0.2f, p);
-                    c.drawText(t.substring(k + 1), x + w / 2f, midY + sz * 0.92f, p);
-                    x += w;
-                } else {
-                    float w = p.measureText(shown(t));
-                    c.drawText(shown(t), x + w / 2f, midY + sz * 0.36f, p);
-                    x += w;
-                }
-                x += sz * 0.5f;
-            }
-        }
     }
 
     // Hujan confetti di layar hasil
@@ -695,13 +591,6 @@ public class MainActivity extends Activity {
     private final View[] dots = new View[MAX_Q];
     private final Button[] opts = new Button[4];
     private Button correctBtn;
-    private FracExprView exprView;
-    private LinearLayout fracPanel;
-    private TextView fracNumTv;
-    private TextView fracDenTv;
-    private final StringBuilder fracN = new StringBuilder();
-    private final StringBuilder fracD = new StringBuilder();
-    private int fracSel;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -803,7 +692,7 @@ public class MainActivity extends Activity {
     private void setScreen(int s) {
         stopSurahAudio();
         stopMic();
-        if (s != 20 && putriGL != null) {
+        if (putriGL != null) {
             putriGL.onPause();
             putriGL = null;
         }
@@ -3520,7 +3409,6 @@ public class MainActivity extends Activity {
                 }
                 b.key = o.getInt("a");
                 b.expl = o.optString("e", "");
-                b.tipe = o.optString("t", "");
                 bank.add(b);
             }
         } catch (Exception e) {
@@ -3543,7 +3431,6 @@ public class MainActivity extends Activity {
                 o.put("o", op);
                 o.put("a", b.key);
                 o.put("e", b.expl);
-                o.put("t", b.tipe);
                 arr.put(o);
             }
             OutputStream out = openFileOutput(BANK_FILE, MODE_PRIVATE);
@@ -3712,50 +3599,12 @@ public class MainActivity extends Activity {
         return dg.charAt(0) - '0';
     }
 
-    // Kunci pecahan "6/18" (penyebut tidak nol); null kalau bentuknya salah
-    private String fracKeyNorm(String k) {
-        String t = k.replace(" ", "");
-        int sl = t.indexOf('/');
-        if (sl <= 0 || sl >= t.length() - 1 || t.length() > 9) {
-            return null;
-        }
-        try {
-            int n = Integer.parseInt(t.substring(0, sl));
-            int d = Integer.parseInt(t.substring(sl + 1));
-            if (n < 0 || d <= 0) {
-                return null;
-            }
-            return n + "/" + d;
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
     private B toBank(ArrayList<String> row, int[] c) {
         int sj = parseSubject(cell(row, c[0]));
         int kl = parseKelas(cell(row, c[1]));
         String q = cell(row, c[2]);
         if (sj < 0 || kl < 1 || kl > 6 || q.isEmpty()) {
             return null;
-        }
-        String tp = cell(row, c[9]).toLowerCase(Locale.ROOT);
-        if (tp.startsWith("pecahan")) {
-            String fk = fracKeyNorm(cell(row, c[7]));
-            if (fk == null) {
-                return null;
-            }
-            B fb = new B();
-            fb.subj = sj;
-            fb.kelas = kl;
-            fb.text = q;
-            fb.opt[0] = fk;
-            fb.opt[1] = "-";
-            fb.opt[2] = "-";
-            fb.opt[3] = "-";
-            fb.key = 0;
-            fb.tipe = tp.contains("setara") ? "pecahan-setara" : "pecahan";
-            fb.expl = cell(row, c[8]);
-            return fb;
         }
         B b = new B();
         b.subj = sj;
@@ -3818,15 +3667,16 @@ public class MainActivity extends Activity {
             return "Berkas kosong.";
         }
         ArrayList<String> head = rows.get(0);
-        String[] heads = {"mapel", "kelas", "soal", "a", "b", "c", "d", "kunci", "pembahasan", "tipe"};
-        int[] c = new int[10];
-        for (int i = 0; i < 10; i++) {
+        String[] heads = {"mapel", "kelas", "soal", "a", "b", "c", "d", "kunci", "pembahasan"};
+        int[] c = new int[9];
+        for (int i = 0; i < 9; i++) {
             c[i] = col(head, heads[i]);
         }
-        // Kolom a-d dan tipe boleh tidak ada (soal pecahan tidak memakai pilihan)
-        if (c[0] < 0 || c[1] < 0 || c[2] < 0 || c[7] < 0) {
-            return "Judul kolom tidak cocok. Pakai template: mapel, kelas, soal, a, b, c, d, kunci, "
-                    + "pembahasan (kolom tipe untuk soal pecahan). Lalu simpan sebagai CSV.";
+        for (int i = 0; i < 8; i++) {
+            if (c[i] < 0) {
+                return "Judul kolom tidak cocok. Pakai template: mapel, kelas, soal, a, b, c, d, kunci, "
+                        + "pembahasan. Lalu simpan sebagai CSV.";
+            }
         }
 
         int added = 0;
@@ -3917,14 +3767,8 @@ public class MainActivity extends Activity {
             Q q = new Q();
             q.text = b.text;
             q.full = b.text;
-            if (!b.tipe.isEmpty()) {
-                q.frac = b.tipe.equals("pecahan-setara") ? 2 : 1;
-                q.sopts = new String[]{b.opt[0], "-", "-", "-"};
-                q.correctIdx = 0;
-            } else {
-                q.sopts = b.opt;
-                q.correctIdx = b.key;
-            }
+            q.sopts = b.opt;
+            q.correctIdx = b.key;
             q.expl = b.expl;
             qs[i] = q;
         }
@@ -3982,9 +3826,7 @@ public class MainActivity extends Activity {
                 + "4. Kirim file ke HP ini, lalu tekan Impor.\n\n"
                 + "Kolom: mapel, kelas, soal, a, b, c, d, kunci (A/B/C/D), pembahasan (boleh kosong).\n"
                 + "Mapel: Matematika, Bahasa Indonesia, atau Bahasa Inggris. Kelas: 1 sampai 6.\n"
-                + "Pilihan jawaban sebaiknya singkat. Soal yang sama akan diperbarui, bukan dobel.\n\n"
-                + "Soal pecahan: tambah kolom tipe berisi pecahan (jawaban harus persis) atau pecahan-setara "
-                + "(nilai sama juga benar). Tulis soal seperti 3/3 x 2/6 dan kunci 6/18. Kolom a sampai d dikosongkan.",
+                + "Pilihan jawaban sebaiknya singkat. Soal yang sama akan diperbarui, bukan dobel.",
                 13, DARK, false);
         how.setGravity(Gravity.START);
         ch.addView(how, lp(WRAP, 8));
@@ -4640,7 +4482,6 @@ public class MainActivity extends Activity {
             o.put("o", op);
             o.put("a", b.key);
             o.put("e", b.expl);
-                o.put("t", b.tipe);
             arr.put(o);
         }
         return arr;
@@ -4802,7 +4643,6 @@ public class MainActivity extends Activity {
                         }
                         b.key = q.getInt("a");
                         b.expl = q.optString("e", "");
-                        b.tipe = q.optString("t", "");
                         if (b.subj < 0 || b.subj > 2 || b.kelas < 1 || b.kelas > 6
                                 || b.key < 0 || b.key > 3) {
                             continue;
@@ -7831,11 +7671,7 @@ public class MainActivity extends Activity {
         int avSize = Math.max(dp(185), Math.min(usable, maxH));
         FrameLayout stage = new FrameLayout(this);
         if (USE_PUTRI_GL) {
-            if (putriGL == null) {
-                putriGL = new PutriGLView(this, genderOf[shopPl]);
-            } else if (putriGL.getParent() instanceof ViewGroup) {
-                ((ViewGroup) putriGL.getParent()).removeView(putriGL);
-            }
+            putriGL = new PutriGLView(this, genderOf[shopPl]);
             applyLook3D(putriGL, shopPl);
             stage.addView(putriGL, new FrameLayout.LayoutParams(MATCH, MATCH));
         } else {
@@ -8299,7 +8135,7 @@ public class MainActivity extends Activity {
     private ArrayList<String[]> matchPool(int sj) {
         ArrayList<String[]> teacher = new ArrayList<>();
         for (B b : bank) {
-            if (b.subj != sj || b.kelas != kelas + 1 || !b.tipe.isEmpty()) {
+            if (b.subj != sj || b.kelas != kelas + 1) {
                 continue;
             }
             String a = b.opt[b.key];
@@ -9542,9 +9378,6 @@ public class MainActivity extends Activity {
         }
         tvQuestion = text("", 46, plainUi ? Color.parseColor("#1F5A2E") : ORANGE_DARK, true);
         cardQ.addView(tvQuestion, new LinearLayout.LayoutParams(MATCH, WRAP));
-        exprView = new FracExprView(this, plainUi ? Color.parseColor("#1F5A2E") : ORANGE_DARK);
-        exprView.setVisibility(View.GONE);
-        cardQ.addView(exprView, new LinearLayout.LayoutParams(MATCH, WRAP));
         c.addView(cardQ, lp(WRAP, 18));
 
         tvFeedback = text(" ", 18, DARK, true);
@@ -9563,8 +9396,6 @@ public class MainActivity extends Activity {
                 opts[r * 2 + k] = b;
             }
         }
-
-        buildFracPanel(rt);
 
         Button back = button(advLevel >= 0 ? "Kembali ke peta" : (sambungOn() ? "Kembali ke Kebun" : "Kembali ke menu"), GRAY, 14);
         back.setTextColor(GOLD_DEEP);
@@ -9626,7 +9457,6 @@ public class MainActivity extends Activity {
             opts[i].setAlpha(1f);
             opts[i].setOnClickListener(v -> choose(idx));
         }
-        applyFracMode(q);
         correctBtn = opts[q.correctIdx];
         dots[qi - 1].setBackground(box(ORANGE, 5));
 
@@ -9658,196 +9488,6 @@ public class MainActivity extends Activity {
             handler.postDelayed(tick, 1000);
         }
         updateHud();
-    }
-
-    // Soal pecahan: sembunyikan 4 pilihan, tampilkan kotak isian dan tombol angka
-    private void applyFracMode(Q q) {
-        boolean fq = q.frac > 0;
-        for (int i = 0; i < 4; i += 2) {
-            View row = (View) opts[i].getParent();
-            if (row != null) {
-                row.setVisibility(fq ? View.GONE : View.VISIBLE);
-            }
-        }
-        if (fracPanel == null || exprView == null) {
-            return;
-        }
-        fracPanel.setVisibility(fq ? View.VISIBLE : View.GONE);
-        exprView.setVisibility(fq ? View.VISIBLE : View.GONE);
-        if (fq) {
-            tvQuestion.setText("Hitung, lalu tulis jawabannya:");
-            tvQuestion.setTextSize(16 * ui);
-            String e = q.text.trim();
-            exprView.setExpr(e.endsWith("=") ? e : e + " =");
-            fracN.setLength(0);
-            fracD.setLength(0);
-            fracSel = 0;
-            fracRefresh();
-        }
-    }
-
-    private TextView fracBox(final int which) {
-        TextView t = text("?", 26, GRAY_D, true);
-        t.setOnClickListener(v -> {
-            if (!locked) {
-                fracSel = which;
-                fracRefresh();
-            }
-        });
-        return t;
-    }
-
-    private void buildFracPanel(LinearLayout parent) {
-        fracPanel = new LinearLayout(this);
-        fracPanel.setOrientation(LinearLayout.VERTICAL);
-        fracPanel.setGravity(Gravity.CENTER_HORIZONTAL);
-        fracPanel.setVisibility(View.GONE);
-
-        LinearLayout ans = new LinearLayout(this);
-        ans.setOrientation(LinearLayout.VERTICAL);
-        ans.setGravity(Gravity.CENTER_HORIZONTAL);
-        fracNumTv = fracBox(0);
-        fracDenTv = fracBox(1);
-        View line = new View(this);
-        line.setBackgroundColor(DARK);
-        ans.addView(fracNumTv, new LinearLayout.LayoutParams(dp(120), dp(52)));
-        LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(dp(120), dp(3));
-        ll.topMargin = dp(6);
-        ll.bottomMargin = dp(6);
-        ans.addView(line, ll);
-        ans.addView(fracDenTv, new LinearLayout.LayoutParams(dp(120), dp(52)));
-        fracPanel.addView(ans, lpw(0));
-
-        String[][] keys = {{"1", "2", "3"}, {"4", "5", "6"}, {"7", "8", "9"}, {"Hapus", "0", "Pindah"}};
-        for (String[] kr : keys) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            fracPanel.addView(row, lp(dp(54), 6));
-            for (final String k : kr) {
-                Button b = button(k, k.equals("Hapus") ? PINK : k.equals("Pindah") ? PURPLE : BLUE,
-                        k.length() > 2 ? 16 : 22);
-                flat(b);
-                b.setOnClickListener(v -> fracKey(k));
-                row.addView(b, weight(3, 3));
-            }
-        }
-        Button ok = button("Periksa \u2714", GREEN, 20);
-        ok.setOnClickListener(v -> submitFrac());
-        fracPanel.addView(ok, lp(dp(58), 10));
-        parent.addView(fracPanel, lp(WRAP, 8));
-    }
-
-    private void fracRefresh() {
-        TextView[] tv = {fracNumTv, fracDenTv};
-        StringBuilder[] sb = {fracN, fracD};
-        for (int i = 0; i < 2; i++) {
-            if (tv[i] == null) {
-                continue;
-            }
-            boolean sel = fracSel == i;
-            tv[i].setText(sb[i].length() == 0 ? "?" : sb[i].toString());
-            tv[i].setTextColor(sb[i].length() == 0 ? GRAY_D : DARK);
-            tv[i].setBackground(rr(Color.WHITE, sel ? ORANGE : BLUE, sel ? 4 : 2, 14));
-        }
-    }
-
-    private void fracKey(String k) {
-        if (locked) {
-            return;
-        }
-        StringBuilder sb = fracSel == 0 ? fracN : fracD;
-        if (k.equals("Hapus")) {
-            if (sb.length() > 0) {
-                sb.setLength(sb.length() - 1);
-            }
-        } else if (k.equals("Pindah")) {
-            fracSel = 1 - fracSel;
-        } else if (sb.length() < 4) {
-            if (sb.toString().equals("0")) {
-                sb.setLength(0);
-            }
-            sb.append(k);
-        }
-        tvFeedback.setText(" ");
-        fracRefresh();
-    }
-
-    private long[] fracKeyVals(Q q) {
-        String[] k = q.sopts[0].split("/");
-        return new long[]{Long.parseLong(k[0]), Long.parseLong(k[1])};
-    }
-
-    private boolean fracOk(Q q, long an, long ad) {
-        try {
-            long[] k = fracKeyVals(q);
-            if (ad == 0) {
-                return false;
-            }
-            if (q.frac == 2) {
-                return an * k[1] == ad * k[0];
-            }
-            return an == k[0] && ad == k[1];
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private void submitFrac() {
-        if (locked) {
-            return;
-        }
-        if (fracN.length() == 0 || fracD.length() == 0) {
-            tvFeedback.setText("Isi kedua kotak dulu ya.");
-            tvFeedback.setTextColor(RED);
-            return;
-        }
-        locked = true;
-        handler.removeCallbacks(tick);
-        if (timed) {
-            timerFill.animate().cancel();
-        }
-        Q q = qs[qi - 1];
-        long an = Long.parseLong(fracN.toString());
-        long ad = Long.parseLong(fracD.toString());
-        boolean ok = fracOk(q, an, ad);
-        q.sopts[1] = fracN + "/" + fracD;
-        pPick[cur][qi - 1] = ok ? 0 : 1;
-        pRes[cur][qi - 1] = ok ? 1 : 2;
-        recordAnswer(q, ok);
-        if (ok) {
-            score += 10;
-            correct++;
-            dots[qi - 1].setBackground(box(GREEN, 5));
-            tvFeedback.setText("Benar! \uD83C\uDF89");
-            tvFeedback.setTextColor(GREEN);
-            sfx(SFX_CORRECT);
-            NagaPetView.reactAll(true);
-            buzz(25);
-            pop(tvFeedback, 1.25f);
-            pop(tvScore, 1.45f);
-        } else {
-            lives--;
-            dots[qi - 1].setBackground(box(RED, 5));
-            String hint = "";
-            try {
-                long[] k = fracKeyVals(q);
-                if (ad != 0 && an * k[1] == ad * k[0]) {
-                    hint = " Nilainya sama, tetapi tulis persis seperti kunci.";
-                }
-            } catch (Exception e) {
-                hint = "";
-            }
-            tvFeedback.setText("Oops! Jawabannya " + q.sopts[0] + "." + hint);
-            tvFeedback.setTextColor(RED);
-            sfx(SFX_WRONG);
-            NagaPetView.reactAll(false);
-            buzz(120);
-            shake(cardQ);
-            shake(tvHearts);
-        }
-        updateHud();
-        exitCard();
-        handler.postDelayed(this::showQuestion, ok ? 1000 : 1800);
     }
 
     private void showTime() {

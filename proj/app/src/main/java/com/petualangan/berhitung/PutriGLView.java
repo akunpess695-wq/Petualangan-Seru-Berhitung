@@ -210,8 +210,6 @@ final class PutriGLView extends GLSurfaceView {
     private static final String VS =
             "uniform mat4 uMVP;\n" +
             "uniform mat3 uNM;\n" +
-            "uniform float uT;\n" +
-            "uniform float uJump;\n" +
             "attribute vec3 aPos;\n" +
             "attribute vec3 aNor;\n" +
             "attribute vec3 aCol;\n" +
@@ -220,26 +218,13 @@ final class PutriGLView extends GLSurfaceView {
             "varying vec3 vN;\n" +
             "varying vec3 vC;\n" +
             "void main(){\n" +
-            "  vec3 p = aPos;\n" +
-            "  if (uT >= 0.0) {\n" +
-            "    float br = sin(uT * 2.3);\n" +
-            "    float sw = sin(uT * 1.15);\n" +
-            "    float torsoW = smoothstep(22.0, 52.0, p.y) * (1.0 - smoothstep(52.0, 62.0, p.y));\n" +
-            "    p.z += 0.32 * br * torsoW;\n" +
-            "    p.x *= 1.0 + 0.012 * br * torsoW;\n" +
-            "    float upW = smoothstep(26.0, 75.0, p.y);\n" +
-            "    p.x += 0.55 * sw * upW;\n" +
-            "    p.y += 0.35 * br * smoothstep(28.0, 68.0, p.y) + uJump;\n" +
-            "    float headW = smoothstep(55.0, 72.0, p.y);\n" +
-            "    p.z += 0.35 * sin(uT * 1.7 + 0.8) * headW;\n" +
-            "  }\n" +
-            "  gl_Position = uMVP * vec4(p, 1.0);\n" +
+            "  gl_Position = uMVP * vec4(aPos, 1.0);\n" +
             "  vN = uNM * aNor;\n" +
             "  vC = aCol;\n" +
             "  vGloss = aGloss;\n" +
             "}\n";
 
-    // Soft Toon + Rim Lighting: warna lebih hidup, bayangan hangat, dan siluet tepi lembut menyatu dengan Pet Toon
+    // Sama dengan render.py + rim light halus
     private static final String FS =
             "precision mediump float;\n" +
             "varying vec3 vN;\n" +
@@ -248,18 +233,15 @@ final class PutriGLView extends GLSurfaceView {
             "void main(){\n" +
             "  vec3 n = normalize(vN);\n" +
             "  if (n.z < 0.0) n = -n;\n" +
-            "  vec3 L1 = normalize(vec3(-0.42, 0.68, 0.60));\n" +
-            "  vec3 L2 = normalize(vec3(0.58, 0.15, 0.52));\n" +
+            "  vec3 L1 = normalize(vec3(-0.45, 0.65, 0.62));\n" +
+            "  vec3 L2 = normalize(vec3(0.6, 0.1, 0.5));\n" +
             "  vec3 Hh = normalize(L1 + vec3(0.0, 0.0, 1.0));\n" +
             "  float d1 = max(dot(n, L1), 0.0);\n" +
             "  float d2 = max(dot(n, L2), 0.0);\n" +
-            "  float toon1 = mix(d1, smoothstep(0.18, 0.68, d1), 0.42);\n" +
             "  float hemi = 0.5 + 0.5 * n.y;\n" +
-            "  float sh = 0.50 + 0.16 * hemi + 0.34 * toon1 + 0.09 * d2;\n" +
-            "  float spec = vGloss * pow(max(dot(n, Hh), 0.0), 22.0);\n" +
-            "  float rim = pow(clamp(1.0 - n.z, 0.0, 1.0), 2.8) * (0.35 + 0.65 * max(n.y, 0.0));\n" +
-            "  vec3 rimCol = mix(vC, vec3(1.0, 0.97, 1.0), 0.55) * (0.14 * rim);\n" +
-            "  vec3 c = vC * sh + vec3(spec) + rimCol + (1.0 - sh) * vec3(0.01, -0.005, 0.03);\n" +
+            "  float sh = 0.48 + 0.16 * hemi + 0.36 * d1 + 0.10 * d2;\n" +
+            "  float spec = vGloss * pow(max(dot(n, Hh), 0.0), 24.0);\n" +
+            "  vec3 c = vC * sh + vec3(spec) + (1.0 - sh) * vec3(-0.01, 0.0, 0.025);\n" +
             "  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);\n" +
             "}\n";
 
@@ -291,7 +273,7 @@ final class PutriGLView extends GLSurfaceView {
         private int bgProg, bgP, bgC, bgSeg;
         private FloatBuffer bgQuad;
         volatile boolean ready;
-        private int aPos, aNor, aCol, aGloss, uMVP, uNM, uT, uJump;
+        private int aPos, aNor, aCol, aGloss, uMVP, uNM;
         private final long t0 = System.nanoTime();
         private final float[] proj = new float[16], model = new float[16], view = new float[16], sceneView = new float[16], stageRot = new float[16];
         private final float[] mv = new float[16], mvp = new float[16], nm = new float[9];
@@ -312,8 +294,6 @@ final class PutriGLView extends GLSurfaceView {
             aGloss = GLES20.glGetAttribLocation(prog, "aGloss");
             uMVP = GLES20.glGetUniformLocation(prog, "uMVP");
             uNM = GLES20.glGetUniformLocation(prog, "uNM");
-            uT = GLES20.glGetUniformLocation(prog, "uT");
-            uJump = GLES20.glGetUniformLocation(prog, "uJump");
 
             bgProg = link(compile(GLES20.GL_VERTEX_SHADER, BG_VS), compile(GLES20.GL_FRAGMENT_SHADER, BG_FS));
             bgP = GLES20.glGetAttribLocation(bgProg, "aP");
@@ -549,8 +529,6 @@ final class PutriGLView extends GLSurfaceView {
             GLES20.glUniformMatrix3fv(uNM, 1, false, nm, 0);
             int stride = 10 * 4;
             if (podVbo != 0) {
-                GLES20.glUniform1f(uT, -1f);
-                GLES20.glUniform1f(uJump, 0f);
                 GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, podVbo);
                 GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, podIbo);
                 GLES20.glEnableVertexAttribArray(aGloss);
@@ -565,8 +543,6 @@ final class PutriGLView extends GLSurfaceView {
             }
             boolean usePhoto = photoAvatar != null && photoAvatar.ready(curGender);
             if (idxCount > 0) {
-                GLES20.glUniform1f(uT, elapsed);
-                GLES20.glUniform1f(uJump, jumpY);
                 GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo);
                 GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, ibo);
                 GLES20.glEnableVertexAttribArray(aGloss);
@@ -584,7 +560,7 @@ final class PutriGLView extends GLSurfaceView {
             GLES20.glDisableVertexAttribArray(aCol);
             GLES20.glDisableVertexAttribArray(aGloss);
             if (usePhoto) {
-                photoAvatar.draw(curGender, mvp, nm, elapsed, jumpY, lookPakaian, lookRambut);
+                photoAvatar.draw(curGender, model, view, proj, elapsed, jumpY);
             }
             if (nagaOn) {
                 if (naga == null) naga = new NagaScene(getContext());
