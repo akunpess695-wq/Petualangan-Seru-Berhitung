@@ -473,12 +473,12 @@ final class PutriGLView extends GLSurfaceView {
         public void onSurfaceChanged(GL10 gl, int w, int h) {
             GLES20.glViewport(0, 0, w, h);
             float aspect = (float) w / Math.max(1, h);
-            // tinggi pandang 118 satuan di jarak 330 (cukup untuk tudung tinggi, naga di atas kepala, dan pet di kiri/kanan)
-            float halfH = aspect < 1.05f ? (59f / Math.max(0.78f, aspect)) : 59f;
-            float fovy = (float) Math.toDegrees(2 * Math.atan(halfH / 330.0));
+            // tinggi pandang 124 satuan di jarak 340 (podium & kaki utuh di atas label bawah, kepala/naga lega di atas)
+            float halfH = aspect < 1.05f ? (62f / Math.max(0.78f, aspect)) : 62f;
+            float fovy = (float) Math.toDegrees(2 * Math.atan(halfH / 340.0));
             Matrix.perspectiveM(proj, 0, fovy, aspect, 80f, 750f);
             Matrix.setIdentityM(view, 0);
-            Matrix.translateM(view, 0, 0f, 0f, -330f);
+            Matrix.translateM(view, 0, 0f, 0f, -340f);
         }
 
         @Override
@@ -505,7 +505,7 @@ final class PutriGLView extends GLSurfaceView {
             Matrix.multiplyMM(sceneView, 0, view, 0, stageRot, 0);
 
             System.arraycopy(stageRot, 0, model, 0, 16);
-            Matrix.translateM(model, 0, 0f, -47f, 0f);
+            Matrix.translateM(model, 0, 0f, -41f, 0f);
             Matrix.multiplyMM(mv, 0, view, 0, model, 0);
             Matrix.multiplyMM(mvp, 0, proj, 0, mv, 0);
             float invZ = 1f / Math.max(0.01f, zoom);
@@ -543,6 +543,15 @@ final class PutriGLView extends GLSurfaceView {
             }
             boolean usePhoto = photoAvatar != null && photoAvatar.ready(curGender);
             if (idxCount > 0) {
+                if (jumpY > 0.001f) {
+                    System.arraycopy(stageRot, 0, model, 0, 16);
+                    Matrix.translateM(model, 0, 0f, -41f + jumpY, 0f);
+                    Matrix.multiplyMM(mv, 0, view, 0, model, 0);
+                    Matrix.multiplyMM(mvp, 0, proj, 0, mv, 0);
+                    GLES20.glUniformMatrix4fv(uMVP, 1, false, mvp, 0);
+                    System.arraycopy(stageRot, 0, model, 0, 16);
+                    Matrix.translateM(model, 0, 0f, -41f, 0f);
+                }
                 GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo);
                 GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, ibo);
                 GLES20.glEnableVertexAttribArray(aGloss);
@@ -560,7 +569,7 @@ final class PutriGLView extends GLSurfaceView {
             GLES20.glDisableVertexAttribArray(aCol);
             GLES20.glDisableVertexAttribArray(aGloss);
             if (usePhoto) {
-                photoAvatar.draw(curGender, model, view, proj, elapsed, jumpY);
+                photoAvatar.draw(curGender, model, view, proj, elapsed, jumpY, lookPakaian, lookRambut, hood >= 0);
             }
             if (nagaOn) {
                 if (naga == null) naga = new NagaScene(getContext());

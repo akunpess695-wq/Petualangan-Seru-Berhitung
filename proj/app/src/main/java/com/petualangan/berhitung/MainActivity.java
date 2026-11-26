@@ -7602,7 +7602,7 @@ public class MainActivity extends Activity {
 
         nagaHide = true;
         LinearLayout c = column();
-        c.setPadding(dp(14), dp(16), dp(14), dp(18));
+        c.setPadding(dp(14), dp(14), dp(14), dp(48));
 
         // Spanduk ringkas dengan tombol kembali di kiri
         LinearLayout head = new LinearLayout(this);
@@ -7739,7 +7739,7 @@ public class MainActivity extends Activity {
 
         // ---- Kategori: 5 tab aktif (Tudung, Pakaian, Rambut/Jilbab, Suasana, Teman 3D) ----
         final int[] tabOrder = {0, 3, 4, 2, 5};
-        final String[] tabIcons = {"🐾", "👕", genderOf[shopPl] == 1 ? "🧕" : "💇", "🌅", "🐉"};
+        final String[] tabIcons = {"🦁", "👕", genderOf[shopPl] == 1 ? "🧕" : "💇", "🌅", "🐉"};
         final String[] tabLabels = {"Tudung", "Pakaian", genderOf[shopPl] == 1 ? "Jilbab" : "Rambut", "Suasana", "Teman 3D"};
         HorizontalScrollView tabScroll = new HorizontalScrollView(this);
         tabScroll.setHorizontalScrollBarEnabled(false);

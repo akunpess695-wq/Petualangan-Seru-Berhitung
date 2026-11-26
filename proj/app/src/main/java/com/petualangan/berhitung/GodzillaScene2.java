@@ -111,7 +111,7 @@ final class GodzillaScene2 {
         float id = 0.9f + 0.25f * (float) Math.sin(t * 1.3f) + 0.35f * lit * (float) Math.sin(t * 5f) * (c < 12f ? 1f : 0f);
         float sc = 36f * (0.3f + 0.7f * ap);
         Matrix.setIdentityM(model, 0);
-        Matrix.translateM(model, 0, 34f + 0.4f * (float) Math.sin(t * 0.7f), -47f + 0.25f * (float) Math.sin(t * 1.2f), 8f);   // napas & bergeser pelan
+        Matrix.translateM(model, 0, 34f + 0.4f * (float) Math.sin(t * 0.7f), -41f + 0.25f * (float) Math.sin(t * 1.2f), 8f);   // napas & bergeser pelan
         Matrix.rotateM(model, 0, -14f + 3f * (float) Math.sin(t * 0.4f), 0f, 1f, 0f);      // menghadap kamera, agak ke avatar
         Matrix.rotateM(model, 0, 1.4f * (float) Math.sin(t * 0.7f), 0f, 0f, 1f);           // menumpu kiri-kanan bergantian
         Matrix.rotateM(model, 0, lean, 1f, 0f, 0f);

@@ -171,8 +171,8 @@ final class ToonPetScene {
         float sc = baseScale * (0.3f + 0.7f * ap);
 
         Matrix.setIdentityM(model, 0);
-        // Berdiri di sisi kiri avatar (-33), lantai y=-47, sedikit di depan (z=10)
-        Matrix.translateM(model, 0, -33f + swayX, -47f + jumpY + 3.2f * hop, 10f);
+        // Berdiri di sisi kiri avatar (-33), lantai y=-41, sedikit di depan (z=10)
+        Matrix.translateM(model, 0, -33f + swayX, -41f + jumpY + 3.2f * hop, 10f);
         Matrix.rotateM(model, 0, yaw, 0f, 1f, 0f);
         Matrix.rotateM(model, 0, pitch, 1f, 0f, 0f);
         Matrix.rotateM(model, 0, roll, 0f, 0f, 1f);
