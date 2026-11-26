@@ -28,7 +28,7 @@ final class PhotoAvatarScene {
     private final int[] tex = new int[2];
     private int prog;
     private boolean shaderOk = false;
-    private int uMVP, uM, uS, uHasShirt, uShirtCol, uLowerCol, uHasHair, uHairCol, uGender, uHasHood;
+    private int uMVP, uM, uHoodMode, uS, uHasShirt, uShirtCol, uLowerCol, uHasHair, uHairCol, uFsGender;
     private int aP, aN, aT;
     private final float[] animModel = new float[16], mv = new float[16], mvp = new float[16];
 
@@ -45,76 +45,102 @@ final class PhotoAvatarScene {
         loadGender(ctx, 0, "putra_photo");
         loadGender(ctx, 1, "putri_photo");
 
-        String vs = "uniform mat4 uMVP,uM;"
-                + "uniform float uHasHood,uGender;"
-                + "attribute vec3 aP,aN;"
-                + "attribute vec2 aT;"
-                + "varying vec2 vT;"
-                + "varying float vL;"
-                + "varying vec3 vP;"
-                + "void main(){"
-                + "vP=aP;"
-                + "vec3 p=aP;"
-                + "if(uHasHood>0.5&&p.y>58.0&&!(uGender>0.5&&p.x<-11.2&&p.y<68.0)){"
-                + "if(uGender<0.5){"
-                + "if(p.y>70.5||p.z<4.0||abs(p.x)>9.2){"
-                + "p.y=63.5+(p.y-63.5)*0.46;"
-                + "p.x*=0.76;"
-                + "p.z=0.5+(p.z-0.5)*0.76;"
-                + "}"
-                + "}else{"
-                + "if(p.y>74.5||p.z<3.2||abs(p.x)>8.8){"
-                + "p.y=69.0+(p.y-69.0)*0.76;"
-                + "p.x*=0.76;"
-                + "p.z=-3.5+(p.z+3.5)*0.74;"
-                + "}"
-                + "}"
-                + "}"
-                + "gl_Position=uMVP*vec4(p,1.);"
-                + "vT=aT;"
-                + "vec3 n=normalize(mat3(uM)*aN);"
-                + "if(n.z<0.)n=-n;"
-                + "vL=.78+.26*max(dot(n,normalize(vec3(-.3,.7,.65))),0.);"
-                + "}";
+        // Catatan penting GLSL ES 2.0: Jangan pernah mendeklarasikan nama uniform yang sama di VS (default highp)
+        // dan FS (precision mediump), karena perbedaan presisi menyebabkan glLinkProgram gagal di GPU Android!
+        String vs =
+                "uniform mat4 uMVP;\n" +
+                "uniform mat4 uM;\n" +
+                "uniform float uHoodMode;\n" +
+                "attribute vec3 aP;\n" +
+                "attribute vec3 aN;\n" +
+                "attribute vec2 aT;\n" +
+                "varying vec2 vT;\n" +
+                "varying float vL;\n" +
+                "varying vec3 vP;\n" +
+                "void main(){\n" +
+                "  vP = aP;\n" +
+                "  vec3 p = aP;\n" +
+                "  if (uHoodMode > 0.5 && p.y > 58.0) {\n" +
+                "    if (uHoodMode < 1.5) {\n" +
+                "      if (p.y > 70.5 || p.z < 4.0 || abs(p.x) > 9.2) {\n" +
+                "        p.y = 63.5 + (p.y - 63.5) * 0.46;\n" +
+                "        p.x = p.x * 0.76;\n" +
+                "        p.z = 0.5 + (p.z - 0.5) * 0.76;\n" +
+                "      }\n" +
+                "    } else {\n" +
+                "      if (p.x < -11.2 && p.y < 68.0) {\n" +
+                "        p = aP;\n" +
+                "      } else if (p.y > 74.5 || p.z < 3.2 || abs(p.x) > 8.8) {\n" +
+                "        p.y = 69.0 + (p.y - 69.0) * 0.76;\n" +
+                "        p.x = p.x * 0.76;\n" +
+                "        p.z = -3.5 + (p.z + 3.5) * 0.74;\n" +
+                "      }\n" +
+                "    }\n" +
+                "  }\n" +
+                "  gl_Position = uMVP * vec4(p, 1.0);\n" +
+                "  vT = aT;\n" +
+                "  vec3 n = normalize(mat3(uM) * aN);\n" +
+                "  if (n.z < 0.0) n = -n;\n" +
+                "  vec3 L = normalize(vec3(-0.30, 0.70, 0.65));\n" +
+                "  vL = 0.78 + 0.26 * max(dot(n, L), 0.0);\n" +
+                "}\n";
 
-        String fs = "precision mediump float;"
-                + "uniform sampler2D uS;"
-                + "uniform float uHasShirt,uHasHair,uGender;"
-                + "uniform vec3 uShirtCol,uLowerCol,uHairCol;"
-                + "varying vec2 vT;"
-                + "varying float vL;"
-                + "varying vec3 vP;"
-                + "void main(){"
-                + "vec3 c=texture2D(uS,vT).rgb;"
-                + "float mx=max(c.r,max(c.g,c.b));"
-                + "float mn=min(c.r,min(c.g,c.b));"
-                + "float sat=mx-mn;"
-                + "if(uHasShirt>0.5){"
-                + "if(vP.y>34.0&&vP.y<55.5&&sat<0.15&&mx>0.62){c=c*uShirtCol*1.05;}"
-                + "if(vP.y>7.0&&vP.y<38.0&&(c.r-c.g)>0.22&&(c.r-c.b)>0.18){float lm=(c.r*0.4+c.g*0.4+c.b*0.2)*1.6;c=clamp(uLowerCol*lm,0.,1.);}"
-                + "}"
-                + "if(uHasHair>0.5){"
-                + "if(uGender>0.5){"
-                + "if(vP.y>53.5&&sat<0.15&&mx>0.60&&!(vP.z>4.5&&abs(vP.x)<9.5&&vP.y<74.5)){c=c*uHairCol*1.04;}"
-                + "}else{"
-                + "if(vP.y>61.0&&vP.y<78.0&&mx<0.36&&!(vP.z>5.5&&abs(vP.x)<8.8&&vP.y<70.5)){c=clamp(uHairCol*(0.55+mx*1.8),0.,1.);}"
-                + "}"
-                + "}"
-                + "gl_FragColor=vec4(clamp(c*vL,0.,1.),1.);"
-                + "}";
+        String fs =
+                "precision mediump float;\n" +
+                "uniform sampler2D uS;\n" +
+                "uniform float uHasShirt;\n" +
+                "uniform float uHasHair;\n" +
+                "uniform float uFsGender;\n" +
+                "uniform vec3 uShirtCol;\n" +
+                "uniform vec3 uLowerCol;\n" +
+                "uniform vec3 uHairCol;\n" +
+                "varying vec2 vT;\n" +
+                "varying float vL;\n" +
+                "varying vec3 vP;\n" +
+                "void main(){\n" +
+                "  vec3 c = texture2D(uS, vT).rgb;\n" +
+                "  float mx = max(c.r, max(c.g, c.b));\n" +
+                "  float mn = min(c.r, min(c.g, c.b));\n" +
+                "  float sat = mx - mn;\n" +
+                "  if (uHasShirt > 0.5) {\n" +
+                "    if (vP.y > 34.0 && vP.y < 55.5 && sat < 0.15 && mx > 0.62) {\n" +
+                "      c = c * uShirtCol * 1.05;\n" +
+                "    }\n" +
+                "    if (vP.y > 7.0 && vP.y < 38.0 && (c.r - c.g) > 0.22 && (c.r - c.b) > 0.18) {\n" +
+                "      float lm = (c.r * 0.4 + c.g * 0.4 + c.b * 0.2) * 1.6;\n" +
+                "      c = clamp(uLowerCol * lm, 0.0, 1.0);\n" +
+                "    }\n" +
+                "  }\n" +
+                "  if (uHasHair > 0.5) {\n" +
+                "    if (uFsGender > 0.5) {\n" +
+                "      if (vP.z > 4.5 && abs(vP.x) < 9.5 && vP.y < 74.5) {\n" +
+                "        c = c;\n" +
+                "      } else if (vP.y > 53.5 && sat < 0.15 && mx > 0.60) {\n" +
+                "        c = c * uHairCol * 1.04;\n" +
+                "      }\n" +
+                "    } else {\n" +
+                "      if (vP.z > 5.5 && abs(vP.x) < 8.8 && vP.y < 70.5) {\n" +
+                "        c = c;\n" +
+                "      } else if (vP.y > 61.0 && vP.y < 78.0 && mx < 0.36) {\n" +
+                "        c = clamp(uHairCol * (0.55 + mx * 1.8), 0.0, 1.0);\n" +
+                "      }\n" +
+                "    }\n" +
+                "  }\n" +
+                "  gl_FragColor = vec4(clamp(c * vL, 0.0, 1.0), 1.0);\n" +
+                "}\n";
 
         prog = link(vs, fs);
         if (shaderOk) {
             uMVP = GLES20.glGetUniformLocation(prog, "uMVP");
             uM = GLES20.glGetUniformLocation(prog, "uM");
+            uHoodMode = GLES20.glGetUniformLocation(prog, "uHoodMode");
             uS = GLES20.glGetUniformLocation(prog, "uS");
             uHasShirt = GLES20.glGetUniformLocation(prog, "uHasShirt");
             uShirtCol = GLES20.glGetUniformLocation(prog, "uShirtCol");
             uLowerCol = GLES20.glGetUniformLocation(prog, "uLowerCol");
             uHasHair = GLES20.glGetUniformLocation(prog, "uHasHair");
             uHairCol = GLES20.glGetUniformLocation(prog, "uHairCol");
-            uGender = GLES20.glGetUniformLocation(prog, "uGender");
-            uHasHood = GLES20.glGetUniformLocation(prog, "uHasHood");
+            uFsGender = GLES20.glGetUniformLocation(prog, "uFsGender");
             aP = GLES20.glGetAttribLocation(prog, "aP");
             aN = GLES20.glGetAttribLocation(prog, "aN");
             aT = GLES20.glGetAttribLocation(prog, "aT");
@@ -193,7 +219,6 @@ final class PhotoAvatarScene {
 
         System.arraycopy(baseModel, 0, animModel, 0, 16);
         if (hasHood) {
-            // Saat memakai tudung hewan, jaga kepala selaras presisi dengan cangkang HoodMesh
             Matrix.translateM(animModel, 0, 0f, jumpY, 0f);
         } else {
             float breath = (float) Math.sin(elapsed * 2.3f);
@@ -211,8 +236,8 @@ final class PhotoAvatarScene {
         GLES20.glUseProgram(prog);
         GLES20.glUniformMatrix4fv(uMVP, 1, false, mvp, 0);
         GLES20.glUniformMatrix4fv(uM, 1, false, animModel, 0);
-        GLES20.glUniform1f(uGender, (float) g);
-        GLES20.glUniform1f(uHasHood, hasHood ? 1f : 0f);
+        GLES20.glUniform1f(uHoodMode, hasHood ? (g == 0 ? 1f : 2f) : 0f);
+        GLES20.glUniform1f(uFsGender, (float) g);
         if (shirt != null && lower != null) {
             GLES20.glUniform1f(uHasShirt, 1f);
             GLES20.glUniform3f(uShirtCol, shirt[0], shirt[1], shirt[2]);

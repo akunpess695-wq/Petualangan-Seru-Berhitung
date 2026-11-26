@@ -7667,7 +7667,7 @@ public class MainActivity extends Activity {
         pv.setBackground(studioBg);
         pv.setElevation(dp(5));
         int usable = Math.min(getResources().getDisplayMetrics().widthPixels, dp(640)) - dp(32);
-        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.38f);
+        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.355f);
         int avSize = Math.max(dp(185), Math.min(usable, maxH));
         FrameLayout stage = new FrameLayout(this);
         if (USE_PUTRI_GL) {
